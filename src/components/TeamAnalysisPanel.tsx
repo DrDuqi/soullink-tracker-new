@@ -81,7 +81,9 @@ export default function TeamAnalysisPanel({
       .filter((e): e is Encounter => !!e)
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const myTeamEncs = useMemo(() => teamEncsFor(myPlayerId), [teamSlots, encounters, myPlayerId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const partnerTeamEncs = useMemo(() => teamEncsFor(partnerId), [teamSlots, encounters, partnerId])
   const combinedEncs = useMemo(() => [...myTeamEncs, ...partnerTeamEncs], [myTeamEncs, partnerTeamEncs])
 
