@@ -1,0 +1,300 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pk-red: #CC0000;
+  --color-pk-red-dark: #990000;
+  --color-pk-red-light: #FF2222;
+  --color-pk-yellow: #FFCB05;
+  --color-pk-yellow-dark: #D4A800;
+  --color-pk-dark: #111116;
+  --color-pk-card: #1c1c26;
+  --color-pk-border: #2e2e42;
+  --color-pk-white: #F8F8FF;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #111116;
+  color: #e2e8f0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root { min-height: 100vh; }
+
+/* ── Pokéball background tile ──────────────────────── */
+.pokeball-bg {
+  background-color: #111116;
+  background-image:
+    radial-gradient(circle at 50% 50%, transparent 28px, #CC000008 28px, #CC000008 30px, transparent 30px),
+    radial-gradient(circle at 50% 50%, transparent 18px, #ffffff04 18px, #ffffff04 20px, transparent 20px);
+  background-size: 80px 80px;
+}
+
+/* ── Pokéball SVG element ──────────────────────────── */
+.pokeball-deco {
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  border: 6px solid #222;
+  background: linear-gradient(180deg, #CC0000 50%, #f8f8f8 50%);
+  position: relative;
+  box-shadow: 0 0 60px rgba(204,0,0,0.2);
+}
+.pokeball-deco::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: transparent;
+  border: 6px solid #222;
+}
+.pokeball-deco::after {
+  content: '';
+  position: absolute;
+  top: calc(50% - 3px);
+  left: 0; right: 0;
+  height: 6px;
+  background: #222;
+}
+
+/* ── Animations ────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.85); }
+  70%  { transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes deathShake {
+  0%,100% { transform: translateX(0) scale(1); }
+  20%      { transform: translateX(-6px) scale(0.98); }
+  40%      { transform: translateX(6px) scale(0.98); }
+  60%      { transform: translateX(-4px); }
+  80%      { transform: translateX(4px); }
+}
+@keyframes successPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+  70%  { box-shadow: 0 0 0 14px rgba(34,197,94,0); }
+  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+@keyframes linkGlow {
+  0%,100% { box-shadow: 0 0 0 0 rgba(204,0,0,0.35); }
+  50%     { box-shadow: 0 0 0 10px rgba(204,0,0,0); }
+}
+@keyframes toastSlide {
+  from { opacity: 0; transform: translateX(120%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes pkFloat1 {
+  0%, 100% { transform: translateY(0px) rotate(-1deg); }
+  50%       { transform: translateY(-26px) rotate(2deg); }
+}
+@keyframes pkFloat2 {
+  0%, 100% { transform: translateY(0px) rotate(2deg); }
+  40%       { transform: translateY(-22px) rotate(-1.5deg); }
+  75%       { transform: translateY(-8px)  rotate(3deg); }
+}
+@keyframes pkFloat3 {
+  0%, 100% { transform: translateY(0px)   scale(1)    rotate(0deg); }
+  30%       { transform: translateY(-32px) scale(1.01) rotate(-2deg); }
+  70%       { transform: translateY(-12px) scale(0.99) rotate(1.5deg); }
+}
+
+/* ── Utility animation classes ─────────────────────── */
+.anim-fade-up   { animation: fadeInUp 0.45s cubic-bezier(.16,1,.3,1) both; }
+.anim-fade      { animation: fadeIn 0.3s ease both; }
+.anim-slide-r   { animation: slideInRight 0.4s cubic-bezier(.16,1,.3,1) both; }
+.anim-slide-d   { animation: slideInDown 0.35s cubic-bezier(.16,1,.3,1) both; }
+.anim-pop       { animation: popIn 0.4s cubic-bezier(.34,1.56,.64,1) both; }
+.anim-death     { animation: deathShake 0.5s ease; }
+.anim-success   { animation: successPulse 0.6s ease; }
+.anim-link-glow { animation: linkGlow 1.5s ease infinite; }
+.anim-toast     { animation: toastSlide 0.4s cubic-bezier(.16,1,.3,1) both; }
+
+/* ── Stagger delays ────────────────────────────────── */
+.delay-1 { animation-delay: 0.05s; }
+.delay-2 { animation-delay: 0.10s; }
+.delay-3 { animation-delay: 0.15s; }
+.delay-4 { animation-delay: 0.20s; }
+.delay-5 { animation-delay: 0.25s; }
+
+/* ── Card base ─────────────────────────────────────── */
+.pk-card {
+  background: #1c1c26;
+  border: 1px solid #2e2e42;
+  border-radius: 20px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.pk-card:hover {
+  box-shadow: 0 10px 40px rgba(0,0,0,0.55);
+}
+.pk-card-dead {
+  background: #1a1016;
+  border-color: #4a1a1a;
+  filter: saturate(0.3);
+  opacity: 0.7;
+}
+
+/* ── Button base ───────────────────────────────────── */
+.btn-primary {
+  background: #CC0000;
+  color: white;
+  font-weight: 700;
+  border-radius: 14px;
+  padding: 14px 28px;
+  font-size: 16px;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+}
+.btn-primary:hover {
+  background: #AA0000;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(204,0,0,0.4);
+}
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.btn-yellow {
+  background: #FFCB05;
+  color: #111116;
+  font-weight: 700;
+  border-radius: 14px;
+  padding: 14px 28px;
+  font-size: 16px;
+  transition: background 0.15s, transform 0.1s;
+  border: none;
+  cursor: pointer;
+}
+.btn-yellow:hover { background: #E6B800; transform: translateY(-1px); }
+
+.btn-ghost {
+  background: transparent;
+  color: #94a3b8;
+  font-weight: 600;
+  border-radius: 14px;
+  padding: 14px 28px;
+  font-size: 16px;
+  border: 1.5px solid #2e2e42;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-ghost:hover { background: #2e2e42; color: #e2e8f0; }
+
+/* ── Input base ────────────────────────────────────── */
+.pk-input {
+  background: #16161f;
+  border: 1.5px solid #2e2e42;
+  border-radius: 12px;
+  color: #f1f5f9;
+  padding: 14px 18px;
+  font-size: 15px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.pk-input:focus {
+  border-color: #CC0000;
+  box-shadow: 0 0 0 3px rgba(204,0,0,0.15);
+}
+.pk-input::placeholder { color: #4a5568; }
+
+/* ── Badge ─────────────────────────────────────────── */
+.pk-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: capitalize;
+  letter-spacing: 0.5px;
+}
+
+/* ── Scrollbar ─────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #111116; }
+::-webkit-scrollbar-thumb { background: #2e2e42; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #CC0000; }
+
+/* ── Type badge gradient ───────────────────────────── */
+.type-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  letter-spacing: 0.5px;
+  text-transform: capitalize;
+}
+
+/* ── Pokémon atmosphere background (Phase D) ───────── */
+@keyframes pkArtFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-30px) rotate(2deg); }
+}
+@keyframes pkArtFloatAlt {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-22px) rotate(-2.5deg); }
+}
+@keyframes pkArtPulse {
+  0%, 100% { opacity: var(--pk-op, 0.09); }
+  50%      { opacity: calc(var(--pk-op, 0.09) * 1.75); }
+}
+@keyframes pkGlowPulse {
+  0%, 100% { opacity: 0.4;  transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(1.18); }
+}
+@keyframes pkParticle {
+  0%   { transform: translateY(40px) rotate(0deg); opacity: 0; }
+  12%  { opacity: var(--pk-pop, 0.45); }
+  88%  { opacity: var(--pk-pop, 0.45); }
+  100% { transform: translateY(-140px) rotate(240deg); opacity: 0; }
+}
+@keyframes pkFog {
+  0%   { transform: translateX(-6%) translateY(0); }
+  50%  { transform: translateX(6%) translateY(-2%); }
+  100% { transform: translateX(-6%) translateY(0); }
+}
+@keyframes routeFlash {
+  0%   { box-shadow: 0 0 0 0 rgba(255,203,5,0); }
+  15%  { box-shadow: 0 0 0 4px rgba(255,203,5,0.65), 0 0 24px rgba(255,203,5,0.45); }
+  100% { box-shadow: 0 0 0 0 rgba(255,203,5,0); }
+}
+.route-flash { animation: routeFlash 1.8s ease-out; border-radius: 22px; }
+
+/* ── Glassmorphism + partner frame ─────────────────── */
+.glass {
+  background: rgba(28,28,38,0.66);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.partner-frame {
+  border: 1.5px solid rgba(255,203,5,0.38);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255,203,5,0.055), rgba(255,203,5,0.012));
+  box-shadow: 0 0 44px rgba(255,203,5,0.07), inset 0 0 0 1px rgba(255,203,5,0.08);
+}
