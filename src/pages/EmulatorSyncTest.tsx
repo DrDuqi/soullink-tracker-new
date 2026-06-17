@@ -5,51 +5,74 @@ import { getSpriteUrl } from '../lib/pokemon-api'
 import { SYNC_ENDPOINT, STATUS_LABEL_DE } from '../lib/emulatorSync'
 import type { EmulatorPayload, SyncEnvelope } from '../lib/emulatorSync'
 
-type State = 'waiting' | 'connected' | 'error'
+type Status = 'init' | 'connected' | 'waiting' | 'error'
 
-const FRESH_MS = 6000   // payload counts as "live" if received within this window
-const POLL_MS = 1500
+const FRESH_MS = 6000   // payload counts as "live" if its file timestamp is this recent
+const POLL_MS = 1200    // background poll interval
+const FAIL_LIMIT = 3    // consecutive failures before showing the error state (debounce)
 
 export default function EmulatorSyncTest() {
-  const [state, setState] = useState<State>('waiting')
+  // 'init' is shown ONLY before the first response; afterwards the UI stays mounted/stable.
+  const [status, setStatus] = useState<Status>('init')
   const [payload, setPayload] = useState<EmulatorPayload | null>(null)
-  const [receivedAt, setReceivedAt] = useState<number | null>(null)
-  const [, force] = useState(0)
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Mutable refs avoid re-renders: we only setState when something actually changes.
+  const lastDataText = useRef<string | null>(null)
+  const failCount = useRef(0)
 
   useEffect(() => {
     let cancelled = false
+
     async function poll() {
       try {
         const res = await fetch(SYNC_ENDPOINT, { cache: 'no-store' })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const env = (await res.json()) as SyncEnvelope
         if (cancelled) return
-        if (env.last) {
-          setPayload(env.last.data)
-          setReceivedAt(env.last.at)
-          setState(Date.now() - env.last.at < FRESH_MS ? 'connected' : 'waiting')
+        failCount.current = 0
+
+        if (env.last && env.last.data) {
+          const fresh = Date.now() - env.last.at < FRESH_MS
+          // setState with the same primitive value is a no-op (React bails out) → no re-render.
+          setStatus(fresh ? 'connected' : 'waiting')
+          // Only replace the team when the JSON content truly changed → no flicker between updates.
+          const text = JSON.stringify(env.last.data)
+          if (text !== lastDataText.current) {
+            lastDataText.current = text
+            setPayload(env.last.data)
+          }
         } else {
-          setState('waiting')
+          setStatus('waiting')
         }
       } catch {
-        if (!cancelled) setState('error')
+        if (cancelled) return
+        failCount.current += 1
+        if (failCount.current >= FAIL_LIMIT) setStatus('error') // ignore single hiccups
       }
     }
+
     poll()
-    timer.current = setInterval(poll, POLL_MS)
-    const ticker = setInterval(() => force((n) => n + 1), 1000) // refresh "x s ago"
-    return () => { cancelled = true; if (timer.current) clearInterval(timer.current); clearInterval(ticker) }
+    const id = setInterval(poll, POLL_MS)
+    return () => { cancelled = true; clearInterval(id) }
   }, [])
 
-  const team = payload?.team ?? []
-  const ageS = receivedAt ? Math.max(0, Math.round((Date.now() - receivedAt) / 1000)) : null
+  // Initial first-load only — never shown again once a response arrived.
+  if (status === 'init') {
+    return (
+      <div className="min-h-screen pokeball-bg flex items-center justify-center">
+        <div className="text-slate-400 text-lg flex items-center gap-2">
+          <Loader2 className="w-5 h-5 animate-spin" /> Verbinde mit Emulator…
+        </div>
+      </div>
+    )
+  }
 
+  const team = payload?.team ?? []
   const banner = {
     connected: { icon: <Wifi className="w-5 h-5" />, text: 'Live Sync verbunden', color: '#4ade80', bg: 'rgba(74,222,128,0.1)', bd: 'rgba(74,222,128,0.3)' },
     waiting:   { icon: <Loader2 className="w-5 h-5 animate-spin" />, text: 'Wartet auf Emulator…', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)', bd: 'rgba(251,191,36,0.3)' },
     error:     { icon: <WifiOff className="w-5 h-5" />, text: 'Fehler beim Sync (Endpoint nicht erreichbar)', color: '#f87171', bg: 'rgba(248,113,113,0.1)', bd: 'rgba(248,113,113,0.3)' },
-  }[state]
+  }[status]
 
   return (
     <div className="min-h-screen pokeball-bg">
@@ -69,15 +92,15 @@ export default function EmulatorSyncTest() {
           {banner.icon}
           <div className="flex-1">
             <div className="font-black text-sm">{banner.text}</div>
-            {state !== 'error' && (
+            {status !== 'error' && (
               <div className="text-xs opacity-70">
-                {payload ? <>Spiel: {payload.game} · Trainer: {payload.trainer} · zuletzt empfangen {ageS}s her</> : 'Noch keine Daten empfangen.'}
+                {payload ? <>Spiel: {payload.game} · Trainer: {payload.trainer} · {team.length} Pokémon</> : 'Noch keine Daten empfangen.'}
               </div>
             )}
           </div>
         </div>
 
-        {state === 'error' && (
+        {status === 'error' && (
           <div className="rounded-2xl border border-[#2e2e42] bg-[#1c1c26] p-4 text-sm text-slate-400 flex gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
             <div>
@@ -93,7 +116,7 @@ export default function EmulatorSyncTest() {
           <div className="text-slate-300 text-xs font-black uppercase tracking-widest mb-3">Zuletzt empfangenes Team</div>
           {team.length === 0 ? (
             <div className="text-center py-12 rounded-2xl border border-dashed border-[#2e2e42] text-slate-600 text-sm">
-              Noch keine Teamdaten. Lade <code className="font-mono">soullink_sync.lua</code> in BizHawk und stelle den Output-Modus auf „http".
+              Noch keine Teamdaten. Lade <code className="font-mono">soullink_sync.lua</code> in BizHawk (Output „file").
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 gap-3">

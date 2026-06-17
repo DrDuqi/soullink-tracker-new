@@ -78,6 +78,19 @@ function emulatorSyncPlugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), emulatorSyncPlugin()],
+  server: {
+    watch: {
+      // The BizHawk Lua script rewrites these runtime files ~2x/second. Without
+      // ignoring them, Vite's file watcher would trigger a full-page reload on
+      // every write → constant flickering. They are not source files.
+      ignored: [
+        '**/emulator/bizhawk/soullink_team.json',
+        '**/emulator/bizhawk/soullink_party_addr.txt',
+        '**/soullink_team.json',
+        '**/soullink_party_addr.txt',
+      ],
+    },
+  },
   build: {
     chunkSizeWarningLimit: 900,
     rollupOptions: {
