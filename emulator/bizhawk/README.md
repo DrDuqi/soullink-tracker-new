@@ -71,6 +71,23 @@ automatisch neu** — kein manueller Eingriff nötig.
 Falls `comm.httpPost` in deiner BizHawk-Version fehlt, meldet das Script dies
 einmalig; die Daten liegen dann weiterhin in `soullink_team.json`.
 
+## Route-/Fangort-Erkennung (optional, für Auto-Vorauswahl der Route)
+Beim „Als Encounter übernehmen" füllt die App die Route automatisch vor, **sobald
+ein Ortsname vorliegt** und zur Encounter-Checkliste passt (tolerantes Matching,
+keine Fehl-Matches). Quelle ist – falls vorhanden – der Fangort des Pokémon, sonst
+der aktuelle Ort.
+
+Aktueller Ort: setze `CONFIG.location_addr` auf den **Main-RAM-Offset** der
+Location-ID (per RAM-Search finden: 2-Byte-Wert, der sich beim Kartenwechsel
+ändert). Trage anschließend die verifizierten IDs in die `LOCATIONS`-Tabelle im
+Script ein (`[id] = "Route 205"`). Ohne diese beiden Schritte bleibt
+`currentLocationName` `null` (es wird höchstens die ID angezeigt) und die Route
+wird **manuell** gewählt — alles andere funktioniert unverändert.
+
+Der per-Pokémon-Fangort (`metLocation`/`metLevel`) liegt im verschlüsselten
+Block D; die genauen Offsets sind je Edition noch nicht verifiziert → aktuell
+`null` (Roadmap). Falsche Werte werden bewusst vermieden.
+
 ## Weitere Spiele
 `PROFILES` in `soullink_sync.lua` ist auf Platinum/HeartGold (Gen 4)
 vorbereitet. Andere Editionen folgen nach Abschluss von Platinum.

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Skull, Heart, Box, HelpCircle, Trash2, ChevronDown, Link2, Eye, Star, Plus, Lock } from 'lucide-react'
 import { getSpriteUrl, getTypeColor } from '../lib/pokemon-api'
 import { useUpdateEncounterStatus, useDeleteEncounter } from '../hooks/useEncounters'
+import ConfirmDialog from './ConfirmDialog'
 import type { Encounter, PokemonStatus } from '../types/database'
 
 const STATUS_CFG: Record<PokemonStatus, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
@@ -38,6 +39,7 @@ export default function EncounterCard({
   onAddToTeam, onDeathRequest, onReviveRequest, onNavigateToPairs,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const updateStatus = useUpdateEncounterStatus()
   const deleteEncounter = useDeleteEncounter()
   const cfg = STATUS_CFG[encounter.status]
@@ -58,9 +60,9 @@ export default function EncounterCard({
     await updateStatus.mutateAsync({ id: encounter.id, status: s, runId: encounter.run_id })
   }
 
-  async function handleDelete() {
-    if (!confirm(`${encounter.nickname ?? encounter.pokemon_name} aus dem Run entfernen?`)) return
+  async function doDelete() {
     await deleteEncounter.mutateAsync({ id: encounter.id, runId: encounter.run_id })
+    setConfirmDelete(false)
   }
 
   const showAddToTeam = isMyEncounter && !isInTeam && !isDead && !!onAddToTeam
@@ -182,7 +184,7 @@ export default function EncounterCard({
                 )}
               </div>
               {isMyEncounter && (
-                <button onClick={handleDelete} className="text-slate-600 hover:text-red-400 transition-colors p-1 hover:bg-red-400/10 rounded-lg shrink-0">
+                <button onClick={() => setConfirmDelete(true)} className="text-slate-600 hover:text-red-400 transition-colors p-1 hover:bg-red-400/10 rounded-lg shrink-0">
                   <Trash2 className="w-4 h-4" />
                 </button>
               )}
@@ -280,6 +282,19 @@ export default function EncounterCard({
           )}
         </div>
       </div>
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Pokémon entfernen?"
+          message={<>Möchtest du <span className="text-white font-bold capitalize">{encounter.nickname ?? encounter.pokemon_name}</span> wirklich aus deinem Run entfernen?</>}
+          note={'Das Pokémon wird aus „Meine Pokémon“ entfernt. Falls es mit einem Partner-Pokémon verlinkt ist, wird die Verlinkung ebenfalls entfernt.'}
+          confirmLabel="Entfernen"
+          danger
+          busy={deleteEncounter.isPending}
+          onConfirm={doDelete}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   )
 }

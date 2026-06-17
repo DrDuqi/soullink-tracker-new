@@ -4,6 +4,7 @@ import { getSpriteUrl, getTypeColor, fetchPokemon, fetchMoveById, fetchItemName,
 import { STATUS_LABEL_DE, natureName } from '../lib/emulatorSync'
 import type { EmulatorMon } from '../lib/emulatorSync'
 import type { EncounterPrefill } from './AddEncounterModal'
+import { matchRoute } from '../lib/routes'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
 
 const ENABLED_KEY = 'soullink-emusync-enabled'
@@ -12,7 +13,13 @@ const GAME_LABEL: Record<string, string> = { platinum: 'Platinum', heartgold: 'H
 // Resolves ability / item / move names (by id, cached) for one Pokémon and
 // renders the enriched detail. Keyed on the ids so the 1s status ticker doesn't
 // cause refetches; cache makes repeats free.
-function MonRich({ mon, imported, onImport }: { mon: EmulatorMon; imported: boolean; onImport?: (p: EncounterPrefill) => void }) {
+function MonRich({ mon, imported, game, currentLocationName, onImport }: {
+  mon: EmulatorMon
+  imported: boolean
+  game?: string
+  currentLocationName?: string | null
+  onImport?: (p: EncounterPrefill, suggestedRoute?: string) => void
+}) {
   const [moves, setMoves] = useState<({ name: string; type: string } | null)[]>([])
   const [ability, setAbility] = useState<string | null>(null)
   const [item, setItem] = useState<string | null>(null)
@@ -39,13 +46,15 @@ function MonRich({ mon, imported, onImport }: { mon: EmulatorMon; imported: bool
       if (!poke) return
       const ids = (mon.moveIds ?? []).filter((x) => x > 0)
       const mv = await Promise.all(ids.map((id) => fetchMoveById(id)))
+      // Prefer the per-mon catch location, fall back to the current map; match to a checklist route.
+      const route = matchRoute(mon.metLocationName ?? currentLocationName ?? null, game ?? '') ?? undefined
       onImport({
         pokemon: poke,
         nickname: mon.nickname ?? null,
         status: mon.fainted ? 'dead' : 'alive',
         moves: mv.map((m) => m?.name ?? null),
         note: `Aus Emulator · Lv ${mon.level}`,
-      })
+      }, route)
     } finally {
       setImporting(false)
     }
@@ -86,6 +95,7 @@ function MonRich({ mon, imported, onImport }: { mon: EmulatorMon; imported: bool
           <span>Wesen: <span className="text-slate-200">{nature ?? '—'}</span></span>
           <span>Fähigkeit: <span className="text-slate-200">{ability ?? (mon.abilityId ? '…' : '—')}</span></span>
           <span>Item: <span className="text-slate-200">{item ?? (mon.heldItemId ? '…' : '—')}</span></span>
+          {mon.metLocationName && <span>Fangort: <span className="text-slate-200">{mon.metLocationName}</span></span>}
         </div>
         <div className="flex flex-wrap gap-1 pt-0.5">
           {(mon.moveIds ?? []).filter((x) => x > 0).length === 0 ? (
@@ -131,13 +141,14 @@ export default function EmulatorLivePanel({
   game, onImport, importedSpeciesIds,
 }: {
   game?: string
-  onImport?: (p: EncounterPrefill) => void
+  onImport?: (p: EncounterPrefill, suggestedRoute?: string) => void
   importedSpeciesIds?: Set<number>
 }) {
   const [enabled, setEnabled] = useState(() => {
     try { return localStorage.getItem(ENABLED_KEY) !== '0' } catch { return true }
   })
-  const { phase, team, game: liveGame, ageSec } = useEmulatorSync(enabled)
+  const { phase, team, game: liveGame, currentLocationName, currentLocationId, ageSec } = useEmulatorSync(enabled)
+  const locLabel = currentLocationName ?? (currentLocationId != null ? `#${currentLocationId}` : null)
 
   function toggle() {
     const v = !enabled
@@ -166,7 +177,9 @@ export default function EmulatorLivePanel({
         <div className="flex-1 min-w-0">
           <div className="text-slate-200 text-xs font-black uppercase tracking-widest">Emulator Live-Team</div>
           <div className="text-[11px] font-bold" style={{ color }}>
-            {title}{showAge && <span className="text-slate-500 font-medium"> · letztes Update vor {ageSec}s</span>}
+            {title}
+            {phase === 'connected' && locLabel && <span className="text-slate-500 font-medium"> · Ort: {locLabel}</span>}
+            {showAge && <span className="text-slate-500 font-medium"> · vor {ageSec}s</span>}
           </div>
         </div>
         <button
@@ -187,6 +200,8 @@ export default function EmulatorLivePanel({
               key={m.slot}
               mon={m}
               imported={!!importedSpeciesIds?.has(m.speciesId)}
+              game={game}
+              currentLocationName={currentLocationName}
               onImport={onImport}
             />
           ))}

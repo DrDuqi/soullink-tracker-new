@@ -20,14 +20,17 @@ export interface EmulatorMon {
   abilityId?: number | null     // ability id (resolve name via PokéAPI)
   heldItemId?: number | null    // item id, 0 = none (resolve name via PokéAPI)
   moveIds?: number[]            // up to 4 move ids, 0 = empty slot
-  metLocationId?: number | null // not yet mapped (Roadmap) → usually null
-  metLevel?: number | null      // not yet reliably read (Roadmap) → usually null
+  metLocationId?: number | null   // best-effort id (Roadmap) → usually null
+  metLocationName?: string | null // resolved name when known, else null
+  metLevel?: number | null        // not yet reliably read (Roadmap) → usually null
 }
 
 export interface EmulatorPayload {
   game: string          // 'platinum' | 'firered' | 'emerald' | 'heartgold' | 'black'
   trainer: string
   capturedAt: number    // epoch ms on the emulator side (may be 0 if unknown)
+  currentLocationId?: number | null    // current map/location id (optional)
+  currentLocationName?: string | null  // resolved name when known, else null
   team: EmulatorMon[]
 }
 

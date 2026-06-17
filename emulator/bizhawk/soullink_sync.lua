@@ -22,6 +22,10 @@ local CONFIG = {
   interval_frames = 30,            -- ~2x pro Sekunde
   trainer_name    = "Trainer",
   scan_chunk      = 0x20000,       -- Bytes pro Frame beim Auto-Scan
+  -- Aktuelle Map-/Location-ID: Main-RAM-Offset (u16). Standard nil → currentLocation
+  -- bleibt null. Finden via RAM-Search (2-Byte): Wert beobachten, der sich beim
+  -- Wechsel zwischen Karten ändert. Danach die IDs unten in LOCATIONS eintragen.
+  location_addr   = nil,
 }
 
 -- Gen-4 Block-Reihenfolge (Permutation per ((PID>>13)&0x1F)%24)
@@ -105,6 +109,26 @@ local function safeU32(addr)
   local v
   pcall(function() v = memory.read_u32_le(addr) end)
   return v
+end
+
+local function safeU16(addr)
+  local v
+  pcall(function() v = memory.read_u16_le(addr) end)
+  return v
+end
+
+-- Location-ID → lesbarer Name (pro Edition). NOCH NICHT VERVOLLSTÄNDIGT:
+-- verifizierte Platinum-Location-IDs hier eintragen (per RAM-Search ermittelt).
+-- Solange leer, wird im JSON nur die ID geliefert (currentLocationName = null) —
+-- das Frontend füllt dann keine Route automatisch vor (kein Fehl-Match).
+local LOCATIONS = {
+  platinum = {
+    -- [<id>] = "Route 205",   -- Beispiel — echte IDs hier ergänzen
+  },
+}
+local function locationName(game, id)
+  local t = LOCATIONS[game]
+  return (t and id ~= nil and t[id]) or nil
 end
 
 -- ── Auto-Detect: Speicher in Frame-Chunks scannen ───────────────────────────
@@ -267,7 +291,7 @@ local function readMonRich(a, s, maxSpecies)
     natureId   = pid % 25,                        -- Gen 4: Wesen aus PID
     nickname   = decodeNick(w, pC),
     move1 = w[pB + 0], move2 = w[pB + 1], move3 = w[pB + 2], move4 = w[pB + 3],
-    metLocationId = nil, metLevel = nil,          -- Roadmap (Block D)
+    metLocationId = nil, metLocationName = nil, metLevel = nil,   -- Roadmap (Block D: Offsets je Edition noch unverifiziert)
   }
 end
 
@@ -293,15 +317,18 @@ local function buildJson(profile)
       parts[#parts + 1] = string.format(
         '{"slot":%d,"speciesId":%d,"level":%d,"hp":%d,"maxHp":%d,"status":"%s","fainted":%s,'
         .. '"nickname":%s,"natureId":%s,"abilityId":%s,"heldItemId":%s,'
-        .. '"moveIds":[%d,%d,%d,%d],"metLocationId":%s,"metLevel":%s}',
+        .. '"moveIds":[%d,%d,%d,%d],"metLocationId":%s,"metLocationName":%s,"metLevel":%s}',
         slot + 1, m.speciesId, m.level, m.hp, m.maxHp, m.status, tostring(m.fainted),
         jstr(m.nickname), jnum(m.natureId), jnum(m.abilityId), jnum(m.heldItemId),
-        m.move1, m.move2, m.move3, m.move4, jnum(m.metLocationId), jnum(m.metLevel))
+        m.move1, m.move2, m.move3, m.move4, jnum(m.metLocationId), jstr(m.metLocationName), jnum(m.metLevel))
     end
   end
+  -- Aktueller Ort (optional, via CONFIG.location_addr; sonst null)
+  local locId = CONFIG.location_addr and safeU16(CONFIG.location_addr) or nil
+  local locName = locationName(CONFIG.game, locId)
   return string.format(
-    '{"game":"%s","trainer":"%s","capturedAt":%d,"team":[%s]}',
-    CONFIG.game, CONFIG.trainer_name, os.time() * 1000, table.concat(parts, ","))
+    '{"game":"%s","trainer":"%s","capturedAt":%d,"currentLocationId":%s,"currentLocationName":%s,"team":[%s]}',
+    CONFIG.game, CONFIG.trainer_name, os.time() * 1000, jnum(locId), jstr(locName), table.concat(parts, ","))
 end
 
 -- Zielpfad bestimmen: explizit gesetzt > automatisch neben dem Script > relativ.

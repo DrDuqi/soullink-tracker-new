@@ -3,6 +3,7 @@ import { Skull, Heart, Box, HelpCircle, Unlink, Clock, AlertTriangle, Link2, Sta
 import { getSpriteUrl, getTypeColor } from '../lib/pokemon-api'
 import { useDeleteSoulLink } from '../hooks/useSoulLinks'
 import { useCreateRequest } from '../hooks/useRequests'
+import ConfirmDialog from './ConfirmDialog'
 import type { SoulLinkPair, PokemonStatus, Player, RouteMatchType, Encounter } from '../types/database'
 
 const STATUS_ICONS: Record<PokemonStatus, { icon: React.ReactNode; color: string }> = {
@@ -32,6 +33,7 @@ export default function SoulLinkPairCard({ pair, myPlayerId, players, hasPending
   const createRequest = useCreateRequest()
   const [deathSent, setDeathSent] = useState(false)
   const [unlinking, setUnlinking] = useState(false)
+  const [confirmUnlink, setConfirmUnlink] = useState(false)
   const { encounter1: e1, encounter2: e2 } = pair
   const bothDead = e1.status === 'dead' && e2.status === 'dead'
 
@@ -58,7 +60,6 @@ export default function SoulLinkPairCard({ pair, myPlayerId, players, hasPending
   }
 
   async function handleUnlink() {
-    if (!confirm('Diesen Soul Link entfernen?')) return
     setUnlinking(true)
     await deleteLink.mutateAsync({
       id: pair.id,
@@ -66,6 +67,7 @@ export default function SoulLinkPairCard({ pair, myPlayerId, players, hasPending
       enc1Name: e1.nickname ?? e1.pokemon_name,
       enc2Name: e2.nickname ?? e2.pokemon_name,
     })
+    setConfirmUnlink(false)
   }
 
   const showDeathBtn     = !bothDead && !hasPendingDeathRequest && !deathSent && myEncounter
@@ -103,7 +105,7 @@ export default function SoulLinkPairCard({ pair, myPlayerId, players, hasPending
           )}
           {!bothDead && (
             <button
-              onClick={handleUnlink}
+              onClick={() => setConfirmUnlink(true)}
               disabled={unlinking}
               title="Link aufheben"
               className="text-slate-600 hover:text-slate-300 transition-colors p-1.5 hover:bg-white/5 rounded-lg"
@@ -192,6 +194,19 @@ export default function SoulLinkPairCard({ pair, myPlayerId, players, hasPending
           )
         })}
       </div>
+
+      {confirmUnlink && (
+        <ConfirmDialog
+          title="Soul Link entfernen?"
+          message={<>Verlinkung zwischen <span className="text-white font-bold capitalize">{e1.nickname ?? e1.pokemon_name}</span> und <span className="text-white font-bold capitalize">{e2.nickname ?? e2.pokemon_name}</span> wirklich aufheben?</>}
+          note="Die beiden Pokémon bleiben im Run, sind danach aber nicht mehr verlinkt."
+          confirmLabel="Entfernen"
+          danger
+          busy={unlinking}
+          onConfirm={handleUnlink}
+          onCancel={() => setConfirmUnlink(false)}
+        />
+      )}
     </div>
   )
 }

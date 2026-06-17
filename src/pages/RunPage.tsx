@@ -735,7 +735,7 @@ export default function RunPage() {
                 <EmulatorLivePanel
                   game={currentRun.game}
                   importedSpeciesIds={myEncounterSpeciesIds}
-                  onImport={(p) => { setEmuPrefill(p); setAddEncounterRoute(undefined); setShowAddEncounter(true) }}
+                  onImport={(p, route) => { setEmuPrefill(p); setAddEncounterRoute(route); setShowAddEncounter(true) }}
                 />
               )}
 

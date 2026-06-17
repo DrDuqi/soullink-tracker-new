@@ -113,3 +113,21 @@ export function getRoutesForGame(game: string): string[] {
   const routes = ROUTE_MAP[game] ?? KANTO_ROUTES
   return [...new Set(routes), 'Eigene Route...']
 }
+
+// Normalize a location label for tolerant comparison (case/spaces/diacritics/punct).
+function normalizeLoc(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')
+}
+
+/** Match a (possibly differently-spelled) location name to a route of the game's
+ *  checklist. Exact normalized match only — never forces a wrong match. */
+export function matchRoute(input: string | null | undefined, game: string): string | null {
+  if (!input) return null
+  const target = normalizeLoc(input)
+  if (!target) return null
+  for (const r of getRoutesForGame(game)) {
+    if (r === 'Eigene Route...') continue
+    if (normalizeLoc(r) === target) return r
+  }
+  return null
+}

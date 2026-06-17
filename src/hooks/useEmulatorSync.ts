@@ -15,6 +15,8 @@ export interface EmulatorSyncState {
   team: EmulatorMon[]
   game: string | null
   trainer: string | null
+  currentLocationName: string | null
+  currentLocationId: number | null
   ageSec: number | null   // seconds since the file was last written (null if unknown)
 }
 
@@ -29,6 +31,8 @@ export function useEmulatorSync(enabled = true): EmulatorSyncState {
   const [team, setTeam] = useState<EmulatorMon[]>([])
   const [game, setGame] = useState<string | null>(null)
   const [trainer, setTrainer] = useState<string | null>(null)
+  const [curLocName, setCurLocName] = useState<string | null>(null)
+  const [curLocId, setCurLocId] = useState<number | null>(null)
   const [, tick] = useState(0)
 
   const lastAt = useRef<number | null>(null)
@@ -52,6 +56,8 @@ export function useEmulatorSync(enabled = true): EmulatorSyncState {
         lastAt.current = env.last.at
         setGame(data.game ?? null)           // primitive → React bails if unchanged
         setTrainer(data.trainer ?? null)
+        setCurLocName(data.currentLocationName ?? null)
+        setCurLocId(data.currentLocationId ?? null)
 
         const text = JSON.stringify(data.team ?? [])
         if (text !== lastTeamText.current) { lastTeamText.current = text; setTeam(data.team ?? []) }
@@ -73,5 +79,5 @@ export function useEmulatorSync(enabled = true): EmulatorSyncState {
   }, [enabled])
 
   const ageSec = lastAt.current != null ? Math.max(0, Math.floor((Date.now() - lastAt.current) / 1000)) : null
-  return { phase, team, game, trainer, ageSec }
+  return { phase, team, game, trainer, currentLocationName: curLocName, currentLocationId: curLocId, ageSec }
 }
