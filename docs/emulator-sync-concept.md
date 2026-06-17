@@ -98,7 +98,11 @@ bestehende `pokemon-api`).
 - **`party_addr`**: jetzt **automatisch** (Prüfsummen-Scan) — kein manueller Schritt mehr.
 - **Spielername**: separater RAM-Bereich + Gen-spezifische Zeichentabelle →
   aktuell `CONFIG.trainer_name` manuell; RAM-Auslesen als TODO markiert.
-- **`comm.httpPost`** Verfügbarkeit je BizHawk-Build → sonst `output="file"`.
+- **Transport:** datei-basiert ist **Standard** (`output="file"`) — funktioniert mit
+  BizHawk 2.11.x ohne Startparameter. Das Script schreibt `soullink_team.json`
+  neben sich, der Dev-Server liest sie auf `GET /api/emulator-sync` (neuere von
+  Datei vs. optionalem HTTP-POST). `comm.httpPost` ist optional und verlangt auf
+  2.11.x `--url_post` beim Start → daher nicht der Standard.
 - **Gen 5 (Black)** `mon_size`/Charmap final prüfen, sobald aktiv getestet.
 - Spezies-IDs aus **randomized** ROMs sind weiterhin gültige Dex-IDs (Randomizer
   verschiebt die Party-RAM-Struktur nicht).

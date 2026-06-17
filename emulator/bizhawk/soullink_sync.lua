@@ -13,9 +13,12 @@
 
 local CONFIG = {
   game            = "platinum",
-  output          = "http",        -- "http" (Website) | "file" | "console"
+  -- "file" (Standard, funktioniert ohne BizHawk-Startparameter) | "http" | "console"
+  output          = "file",
   http_url        = "http://localhost:5173/api/emulator-sync",
-  file_path       = "soullink_team.json",
+  -- Leer = automatisch NEBEN diesem Script schreiben (emulator/bizhawk/soullink_team.json),
+  -- sodass der Dev-Server die Datei ohne weitere Einrichtung findet.
+  file_path       = "",
   interval_frames = 30,            -- ~2x pro Sekunde
   trainer_name    = "Trainer",
   scan_chunk      = 0x20000,       -- Bytes pro Frame beim Auto-Scan
@@ -186,9 +189,24 @@ local function buildJson(profile)
     CONFIG.game, CONFIG.trainer_name, os.time() * 1000, table.concat(parts, ","))
 end
 
+-- Zielpfad bestimmen: explizit gesetzt > automatisch neben dem Script > relativ.
+local function resolveOutFile()
+  if CONFIG.file_path ~= nil and CONFIG.file_path ~= "" then return CONFIG.file_path end
+  local dir
+  pcall(function()
+    local src = debug.getinfo(1, "S").source         -- "@C:\...\soullink_sync.lua"
+    local p = src and src:match("^@(.*)$")
+    if p then dir = p:match("^(.*[/\\])") end
+  end)
+  if dir then return dir .. "soullink_team.json" end
+  return "soullink_team.json"                          -- Fallback: BizHawk-Arbeitsverzeichnis
+end
+local OUT_FILE = resolveOutFile()
+console.log("[sync] Schreibe Team nach: " .. OUT_FILE)
+
 local httpWarned = false
 local function emit(json)
-  local f = io.open(CONFIG.file_path, "w"); if f then f:write(json); f:close() end   -- Backup
+  local f = io.open(OUT_FILE, "w"); if f then f:write(json); f:close() end   -- primäre Datei (Live-Sync)
   if CONFIG.output == "console" then console.log(json); return end
   if CONFIG.output ~= "http" then return end
   local ok = pcall(function()

@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Emulator live-sync runtime artifacts (written by the BizHawk Lua script)
+emulator/bizhawk/soullink_team.json
+emulator/bizhawk/soullink_party_addr.txt
+soullink_team.json
+soullink_party_addr.txt
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
