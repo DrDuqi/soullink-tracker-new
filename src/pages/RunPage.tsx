@@ -27,6 +27,7 @@ import PokemonDetailModal from '../components/PokemonDetailModal'
 import SlotPickerModal from '../components/SlotPickerModal'
 import UserMenu from '../components/UserMenu'
 import EmulatorLivePanel from '../components/EmulatorLivePanel'
+import EmulatorReconciler from '../components/EmulatorReconciler'
 import { useAuth } from '../contexts/AuthContext'
 import type { Encounter, Run, Player, SoulLinkPair, LinkRequest, ActivityLogEntry } from '../types/database'
 
@@ -233,6 +234,10 @@ export default function RunPage() {
   // Species already tracked by me → used to mark emulator mons as "already imported".
   const myEncounterSpeciesIds = new Set(
     myEncounters.map((e) => e.pokemon_id).filter((x): x is number => x != null)
+  )
+  // Stable PIDs already tracked → PID-based dedup that survives evolution.
+  const myEncounterPids = new Set(
+    myEncounters.map((e) => e.emu_pid).filter((x): x is string => !!x)
   )
   const partnerEncounters = encounters.filter((e) => e.player_id !== myPlayerId) as Encounter[]
   const focusedEncounters = isMyFocus ? myEncounters : partnerEncounters
@@ -735,6 +740,7 @@ export default function RunPage() {
                 <EmulatorLivePanel
                   game={currentRun.game}
                   importedSpeciesIds={myEncounterSpeciesIds}
+                  importedPids={myEncounterPids}
                   onImport={(p, route) => { setEmuPrefill(p); setAddEncounterRoute(route); setShowAddEncounter(true) }}
                 />
               )}
@@ -930,6 +936,11 @@ export default function RunPage() {
           </div>
         </div>
       </div>
+
+      {/* Invisible: keeps emulator-imported encounters in sync by stable PID (evolution etc.) */}
+      {import.meta.env.DEV && myPlayerId && (
+        <EmulatorReconciler encounters={myEncounters} runId={currentRun.id} />
+      )}
 
       {/* ══ Modals ════════════════════════════════════════════════════════ */}
       {showAddEncounter && myPlayer && (

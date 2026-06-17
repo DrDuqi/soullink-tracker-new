@@ -15,6 +15,7 @@ export interface EncounterPrefill {
   status?: PokemonStatus
   moves?: (string | null)[]   // up to 4 move names → move_1..4
   note?: string               // seeded into the notes field (e.g. level, since encounters have no level column)
+  emuPid?: string | null      // stable emulator identity → stored on the encounter (evolution-proof)
 }
 
 interface Props {
@@ -64,6 +65,7 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
         move_2: prefill?.moves?.[1] ?? null,
         move_3: prefill?.moves?.[2] ?? null,
         move_4: prefill?.moves?.[3] ?? null,
+        emu_pid: prefill?.emuPid ?? null,
       })
       onClose()
     } catch (err: unknown) {

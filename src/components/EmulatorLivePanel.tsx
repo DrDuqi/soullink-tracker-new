@@ -54,6 +54,7 @@ function MonRich({ mon, imported, game, currentLocationName, onImport }: {
         status: mon.fainted ? 'dead' : 'alive',
         moves: mv.map((m) => m?.name ?? null),
         note: `Aus Emulator · Lv ${mon.level}`,
+        emuPid: mon.pid != null ? String(mon.pid) : null,
       }, route)
     } finally {
       setImporting(false)
@@ -138,11 +139,12 @@ function MonRich({ mon, imported, game, currentLocationName, onImport }: {
 /** Live in-game party from the local emulator sync. Additive & non-destructive:
  *  it does NOT touch tracked encounters / soul links / the team system. */
 export default function EmulatorLivePanel({
-  game, onImport, importedSpeciesIds,
+  game, onImport, importedSpeciesIds, importedPids,
 }: {
   game?: string
   onImport?: (p: EncounterPrefill, suggestedRoute?: string) => void
   importedSpeciesIds?: Set<number>
+  importedPids?: Set<string>
 }) {
   const [enabled, setEnabled] = useState(() => {
     try { return localStorage.getItem(ENABLED_KEY) !== '0' } catch { return true }
@@ -199,7 +201,7 @@ export default function EmulatorLivePanel({
             <MonRich
               key={m.slot}
               mon={m}
-              imported={!!importedSpeciesIds?.has(m.speciesId)}
+              imported={(m.pid != null && !!importedPids?.has(String(m.pid))) || !!importedSpeciesIds?.has(m.speciesId)}
               game={game}
               currentLocationName={currentLocationName}
               onImport={onImport}

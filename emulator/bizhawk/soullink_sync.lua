@@ -286,6 +286,7 @@ local function readMonRich(a, s, maxSpecies)
   return {
     speciesId = species, level = level, hp = curHp, maxHp = maxHp,
     status = statusToStr(pd[0]), fainted = (curHp == 0),
+    pid = pid,                                    -- stabile Identität (überlebt Entwicklung)
     heldItemId = w[pA + 1],
     abilityId  = (w[pA + 6] >> 8) & 0xFF,        -- 0x0D
     natureId   = pid % 25,                        -- Gen 4: Wesen aus PID
@@ -315,10 +316,10 @@ local function buildJson(profile)
     local m = readMonRichAt(profile, slot)
     if m then
       parts[#parts + 1] = string.format(
-        '{"slot":%d,"speciesId":%d,"level":%d,"hp":%d,"maxHp":%d,"status":"%s","fainted":%s,'
+        '{"slot":%d,"speciesId":%d,"pid":%s,"level":%d,"hp":%d,"maxHp":%d,"status":"%s","fainted":%s,'
         .. '"nickname":%s,"natureId":%s,"abilityId":%s,"heldItemId":%s,'
         .. '"moveIds":[%d,%d,%d,%d],"metLocationId":%s,"metLocationName":%s,"metLevel":%s}',
-        slot + 1, m.speciesId, m.level, m.hp, m.maxHp, m.status, tostring(m.fainted),
+        slot + 1, m.speciesId, jnum(m.pid), m.level, m.hp, m.maxHp, m.status, tostring(m.fainted),
         jstr(m.nickname), jnum(m.natureId), jnum(m.abilityId), jnum(m.heldItemId),
         m.move1, m.move2, m.move3, m.move4, jnum(m.metLocationId), jstr(m.metLocationName), jnum(m.metLevel))
     end

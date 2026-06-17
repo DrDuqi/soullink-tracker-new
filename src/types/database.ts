@@ -46,6 +46,7 @@ export interface Encounter {
   move_2: string | null
   move_3: string | null
   move_4: string | null
+  emu_pid?: string | null   // stable emulator identity (PID), survives evolution; null for manual encounters
   created_at: string
 }
 

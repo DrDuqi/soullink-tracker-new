@@ -81,7 +81,7 @@ export function useUpdateEncounter() {
     }: {
       id: string
       runId: string
-      updates: Partial<Pick<Encounter, 'pokemon_id' | 'pokemon_name' | 'types' | 'nickname' | 'notes' | 'status'>>
+      updates: Partial<Pick<Encounter, 'pokemon_id' | 'pokemon_name' | 'types' | 'nickname' | 'notes' | 'status' | 'emu_pid'>>
       prevPokemonName?: string
     }) => {
       const { data, error } = await supabase.from('encounters').update(updates).eq('id', id).select().single()

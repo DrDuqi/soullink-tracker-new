@@ -13,6 +13,7 @@ export interface EmulatorMon {
   maxHp: number
   status: MonStatus
   fainted: boolean      // hp === 0
+  pid?: number | null   // stable identity (Personality Value) — unchanged by evolution
   // ── Enriched fields (optional; older payloads omit them) ──────────────
   // RAM gives IDs; names are resolved client-side via PokéAPI. null = unknown.
   nickname?: string | null      // best-effort (Gen-4 Western charset), else null
