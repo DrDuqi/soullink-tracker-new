@@ -70,10 +70,12 @@ Die Party liegt als Array von `mon_size`-Byte-Blöcken im RAM.
 Die LCG-Entschlüsselung (`seed = seed*0x41C64E6D + 0x6073; key = seed>>16`) ist in
 `soullink_sync.lua` für Gen 3/4(/5) implementiert.
 
-> **Party-Adresse (`party_addr`)**: bewusst `nil`. Sie ist **ROM-/regions-spezifisch**
-> und muss einmalig verifiziert werden (RAM-Search über die KP, siehe
-> `emulator/bizhawk/README.md`). Bewusst kein hartkodierter „Rate-Wert", der
-> stillschweigend Müll liefern würde.
+> **Party-Adresse (`party_addr`)**: wird **automatisch erkannt** — kein manuelles
+> RAM-Suchen. Das Script scannt `Main RAM` in Frame-Häppchen und akzeptiert einen
+> Kandidaten nur, wenn die **Pokémon-Prüfsumme** stimmt (starker Filter) plus
+> Spezies/Level/KP plausibel sind; die Party ist der längste zusammenhängende
+> 236-Byte-Lauf gültiger Mons. Bei DPPt-Save-Block-Wechsel wird automatisch neu
+> gescannt. Details siehe `emulator/bizhawk/README.md`.
 
 ## 5. Mehrere Spiele unterstützen
 
@@ -93,7 +95,7 @@ bestehende `pokemon-api`).
 - Entschlüsselung & Blockreihenfolge sind deterministisch/standardisiert.
 
 **Noch zu verifizieren / spielabhängig:**
-- **`party_addr`** je ROM/Region (einmaliger RAM-Search-Schritt).
+- **`party_addr`**: jetzt **automatisch** (Prüfsummen-Scan) — kein manueller Schritt mehr.
 - **Spielername**: separater RAM-Bereich + Gen-spezifische Zeichentabelle →
   aktuell `CONFIG.trainer_name` manuell; RAM-Auslesen als TODO markiert.
 - **`comm.httpPost`** Verfügbarkeit je BizHawk-Build → sonst `output="file"`.

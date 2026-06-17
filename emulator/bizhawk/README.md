@@ -1,52 +1,54 @@
-# BizHawk Live-Sync (Prototyp)
+# BizHawk Live-Sync — Pokémon Platinum (vollautomatisch)
 
-Liest das Party-Team aus dem laufenden Spiel und gibt es als Konsole / JSON-Datei
-/ HTTP-POST aus. **Keine** Supabase-Schreibzugriffe, **keine** ROM-/Save-Dateien.
+Liest das Party-Team aus dem laufenden Spiel und sendet es live an die Website.
+**Keine** manuelle RAM-Suche, **keine** Eingaben. **Keine** ROM-/Save-Dateien.
 
 ## Voraussetzungen
-- **BizHawk 2.8+** (Lua 5.4 / NLua — wegen nativer Bit-Operatoren & 64-bit Integer)
-- Geladenes Spiel (zuerst: **Pokémon Platinum**, NDS-Core melonDS oder DeSmuME)
+- **BizHawk 2.8+** (Lua 5.4 / NLua — native Bit-Operatoren)
+- **Pokémon Platinum** geladen (NDS-Core melonDS oder DeSmuME)
 
-## Laden
-1. BizHawk → **Tools → Lua Console**.
-2. `Script → Open` → `emulator/bizhawk/soullink_sync.lua`.
-3. Ausgabe erscheint je nach `CONFIG.output` in der Lua-Konsole, in
-   `soullink_team.json` (neben der BizHawk-EXE) oder per HTTP.
+## Ablauf (ohne manuelle Schritte)
+1. Website-Dev-Server starten: `npm run dev` (Endpoint `http://localhost:5173/api/emulator-sync`).
+2. Browser: `http://localhost:5173/emulator-sync` öffnen.
+3. BizHawk → Platinum laden → **Tools → Lua Console** → `Script → Open` →
+   `emulator/bizhawk/soullink_sync.lua`.
+4. Das Script meldet:
+   ```
+   SoulLink Sync gestartet · Spiel=platinum · Output=http
+   [scan] Suche Party automatisch … (4096 KB)
+   [scan] ✓ Party gefunden @ 0x???? · N Pokémon
+   ```
+   Danach erscheint das Team automatisch auf der Website („Live Sync verbunden").
 
-## Einmaliger Setup: Party-Adresse finden  ⚠️ erforderlich
-Die Party-Adresse ist **ROM-/Versions-spezifisch** und steht im Script bewusst
-auf `nil`, damit keine falschen Werte vorgegaukelt werden. So findest du sie:
+> Damit der Scan etwas findet, muss **mindestens ein Pokémon im Team** sein
+> (am Spielanfang nach Erhalt des Starters). Ist das Team noch leer, scannt das
+> Script alle 2 Sekunden erneut.
 
-**Methode A — RAM Search über die KP (empfohlen, zuverlässig)**
-1. Notiere die **aktuelle KP** deines ersten Team-Pokémon (z. B. 24).
-2. BizHawk → **Tools → RAM Search**, Domain auf **Main RAM** (NDS) bzw.
-   **System Bus** (GBA), Datentyp **2 Byte**.
-3. Suche nach dem KP-Wert; ändere die KP im Spiel (Kampf/Heilung) und suche
-   erneut (`Search`), bis nur noch wenige Adressen übrig sind. Das ist die
-   Adresse der **aktuellen KP** von Slot 1 (`curHp`).
-4. Party-Adresse berechnen:
-   - **Gen 4 (Platinum/HGSS):** `party_addr = curHp_addr − 0x8E`
-   - **Gen 3 (FireRed/Emerald):** `party_addr = curHp_addr − 0x56`
-   - **Gen 5 (Black):** `party_addr = curHp_addr − 0x8E`
-5. Trage den Wert als **Offset innerhalb der gewählten Domain** ins jeweilige
-   Profil in `soullink_sync.lua` (`PROFILES.<spiel>.party_addr`) ein.
+## Wie die automatische Erkennung funktioniert
+Gen-4-Party-Daten sind im RAM verschlüsselt, aber jedes Pokémon trägt eine
+**Prüfsumme**. Das Script scannt die Domain `Main RAM` in Frame-Häppchen,
+entschlüsselt jeden Kandidaten und akzeptiert ihn nur, wenn
 
-**Methode B — Verifikations-Dump**
-- Setze `CONFIG.dump_test_addr` auf einen Kandidaten und lade das Script: es
-  druckt die ersten 6 Slots (Spezies/Level/KP/Status). Sind die Werte plausibel
-  → Adresse ins Profil übernehmen, `dump_test_addr = nil` setzen.
+- die **Prüfsumme** stimmt (starker Filter → praktisch keine Fehltreffer),
+- **Spezies** 1–493, **Level** 1–100, **0 < max. KP ≤ 1000**, aktuelle KP ≤ max. KP.
 
-> Tipp: AR-/Cheat-Datenbanken listen die Party-Adresse je Region. NDS-Werte sind
-> oft als Absolutadresse `0x02xxxxxx` angegeben → **Domain-Offset = Adresse − 0x02000000**.
+Aus allen Treffern wird der längste **zusammenhängende** Lauf (Abstand =
+236 Byte) als Party gewählt und die Adresse gesetzt — und in
+`soullink_party_addr.txt` notiert (nur zur Info).
+
+DPPt wechselt beim Speichern den aktiven Save-Block, wodurch die Adresse
+wandern kann. Das Script erkennt das (Validierung schlägt fehl) und **scannt
+automatisch neu** — kein manueller Eingriff nötig.
 
 ## Output-Modi (`CONFIG.output`)
-- `"console"` — nur Lua-Konsole (Phase 1, schnellster Test).
-- `"file"` — schreibt `soullink_team.json` (Phase 1).
-- `"http"` — POST an `CONFIG.http_url` (Phase 2). Benötigt eine BizHawk-Version
-  mit `comm.httpPost`. Falls nicht verfügbar: `"file"` nutzen und die Datei vom
-  Dev-Server lesen lassen, oder BizHawk-HTTP in den Einstellungen aktivieren.
+- `"http"` *(Standard)* — sendet an `CONFIG.http_url` (Website). Schreibt
+  zusätzlich `soullink_team.json` als Backup.
+- `"file"` — nur `soullink_team.json`.
+- `"console"` — nur Lua-Konsole.
 
-## Domains
-- **NDS (Platinum/HGSS/Black):** `Main RAM`
-- **GBA (FireRed/Emerald):** `System Bus`
-- Verfügbare Domains listet das Script beim Start, falls die gewählte fehlt.
+Falls `comm.httpPost` in deiner BizHawk-Version fehlt, meldet das Script dies
+einmalig; die Daten liegen dann weiterhin in `soullink_team.json`.
+
+## Weitere Spiele
+`PROFILES` in `soullink_sync.lua` ist auf Platinum/HeartGold (Gen 4)
+vorbereitet. Andere Editionen folgen nach Abschluss von Platinum.
