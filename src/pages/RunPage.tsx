@@ -13,7 +13,7 @@ import { useRealtime } from '../hooks/useRealtime'
 import { usePendingRequests, useRequests, useCreateRequest } from '../hooks/useRequests'
 import { useToastStore } from '../store/toastStore'
 import { supabase } from '../lib/supabase'
-import AddEncounterModal from '../components/AddEncounterModal'
+import AddEncounterModal, { type EncounterPrefill } from '../components/AddEncounterModal'
 import SoulLinkModal from '../components/SoulLinkModal'
 import EncounterCard from '../components/EncounterCard'
 import SoulLinkPairCard from '../components/SoulLinkPairCard'
@@ -173,6 +173,7 @@ export default function RunPage() {
 
   const [showAddEncounter, setShowAddEncounter] = useState(false)
   const [addEncounterRoute, setAddEncounterRoute] = useState<string | undefined>(undefined)
+  const [emuPrefill, setEmuPrefill] = useState<EncounterPrefill | undefined>(undefined)
   const [showSoulLink, setShowSoulLink] = useState(false)
   const [copied, setCopied] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -229,6 +230,10 @@ export default function RunPage() {
   const focusedPlayer = isMyFocus ? myPlayer : partnerPlayer
 
   const myEncounters = encounters.filter((e) => e.player_id === myPlayerId) as Encounter[]
+  // Species already tracked by me → used to mark emulator mons as "already imported".
+  const myEncounterSpeciesIds = new Set(
+    myEncounters.map((e) => e.pokemon_id).filter((x): x is number => x != null)
+  )
   const partnerEncounters = encounters.filter((e) => e.player_id !== myPlayerId) as Encounter[]
   const focusedEncounters = isMyFocus ? myEncounters : partnerEncounters
 
@@ -726,7 +731,13 @@ export default function RunPage() {
               )}
 
               {/* Emulator live-team (local dev sync; additive, never overwrites tracked data) */}
-              {isMyFocus && import.meta.env.DEV && <EmulatorLivePanel game={currentRun.game} />}
+              {isMyFocus && import.meta.env.DEV && (
+                <EmulatorLivePanel
+                  game={currentRun.game}
+                  importedSpeciesIds={myEncounterSpeciesIds}
+                  onImport={(p) => { setEmuPrefill(p); setAddEncounterRoute(undefined); setShowAddEncounter(true) }}
+                />
+              )}
 
               {/* Focus-dependent block (framed yellow when viewing partner) */}
               <div className={`space-y-5 ${!isMyFocus ? 'partner-frame p-4 lg:p-5' : ''}`}>
@@ -925,7 +936,8 @@ export default function RunPage() {
         <AddEncounterModal
           runId={currentRun.id} player={myPlayer} game={currentRun.game}
           defaultRoute={addEncounterRoute}
-          onClose={() => { setShowAddEncounter(false); setAddEncounterRoute(undefined) }}
+          prefill={emuPrefill}
+          onClose={() => { setShowAddEncounter(false); setAddEncounterRoute(undefined); setEmuPrefill(undefined) }}
         />
       )}
       {showSoulLink && myPlayerId && (

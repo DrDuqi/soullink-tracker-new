@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Wifi, WifiOff, Loader2, Gamepad2, Heart, Skull, Play, Pause } from 'lucide-react'
-import { getSpriteUrl, getTypeColor, fetchMoveById, fetchItemName, fetchAbilityName } from '../lib/pokemon-api'
+import { Wifi, WifiOff, Loader2, Gamepad2, Heart, Skull, Play, Pause, Plus, Check } from 'lucide-react'
+import { getSpriteUrl, getTypeColor, fetchPokemon, fetchMoveById, fetchItemName, fetchAbilityName } from '../lib/pokemon-api'
 import { STATUS_LABEL_DE, natureName } from '../lib/emulatorSync'
 import type { EmulatorMon } from '../lib/emulatorSync'
+import type { EncounterPrefill } from './AddEncounterModal'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
 
 const ENABLED_KEY = 'soullink-emusync-enabled'
@@ -11,10 +12,11 @@ const GAME_LABEL: Record<string, string> = { platinum: 'Platinum', heartgold: 'H
 // Resolves ability / item / move names (by id, cached) for one Pokémon and
 // renders the enriched detail. Keyed on the ids so the 1s status ticker doesn't
 // cause refetches; cache makes repeats free.
-function MonRich({ mon }: { mon: EmulatorMon }) {
+function MonRich({ mon, imported, onImport }: { mon: EmulatorMon; imported: boolean; onImport?: (p: EncounterPrefill) => void }) {
   const [moves, setMoves] = useState<({ name: string; type: string } | null)[]>([])
   const [ability, setAbility] = useState<string | null>(null)
   const [item, setItem] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
   const moveKey = (mon.moveIds ?? []).join(',')
 
   useEffect(() => {
@@ -26,6 +28,28 @@ function MonRich({ mon }: { mon: EmulatorMon }) {
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moveKey, mon.abilityId, mon.heldItemId])
+
+  // Build a prefill from data the emulator reliably provides, then hand it to the
+  // EXISTING encounter modal/save-flow (no new system). The user still picks the route.
+  async function doImport() {
+    if (!onImport) return
+    setImporting(true)
+    try {
+      const poke = await fetchPokemon(mon.speciesId)
+      if (!poke) return
+      const ids = (mon.moveIds ?? []).filter((x) => x > 0)
+      const mv = await Promise.all(ids.map((id) => fetchMoveById(id)))
+      onImport({
+        pokemon: poke,
+        nickname: mon.nickname ?? null,
+        status: mon.fainted ? 'dead' : 'alive',
+        moves: mv.map((m) => m?.name ?? null),
+        note: `Aus Emulator · Lv ${mon.level}`,
+      })
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const hpPct = mon.maxHp > 0 ? Math.round((mon.hp / mon.maxHp) * 100) : 0
   const hpColor = hpPct > 50 ? '#4ade80' : hpPct > 20 ? '#fbbf24' : '#f87171'
@@ -78,13 +102,38 @@ function MonRich({ mon }: { mon: EmulatorMon }) {
           )}
         </div>
       </div>
+
+      {onImport && (
+        <div className="mt-2">
+          {imported ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-400">
+              <Check className="w-3 h-3" /> Bereits übernommen
+            </span>
+          ) : (
+            <button
+              onClick={doImport}
+              disabled={importing}
+              className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              style={{ color: '#CC0000', background: 'rgba(204,0,0,0.12)', border: '1px solid rgba(204,0,0,0.3)' }}
+            >
+              <Plus className="w-3 h-3" /> {importing ? 'Übernehme…' : 'Als Encounter übernehmen'}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
 /** Live in-game party from the local emulator sync. Additive & non-destructive:
  *  it does NOT touch tracked encounters / soul links / the team system. */
-export default function EmulatorLivePanel({ game }: { game?: string }) {
+export default function EmulatorLivePanel({
+  game, onImport, importedSpeciesIds,
+}: {
+  game?: string
+  onImport?: (p: EncounterPrefill) => void
+  importedSpeciesIds?: Set<number>
+}) {
   const [enabled, setEnabled] = useState(() => {
     try { return localStorage.getItem(ENABLED_KEY) !== '0' } catch { return true }
   })
@@ -133,7 +182,14 @@ export default function EmulatorLivePanel({ game }: { game?: string }) {
 
       {enabled && team.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3" style={{ background: '#161620' }}>
-          {team.map((m) => <MonRich key={m.slot} mon={m} />)}
+          {team.map((m) => (
+            <MonRich
+              key={m.slot}
+              mon={m}
+              imported={!!importedSpeciesIds?.has(m.speciesId)}
+              onImport={onImport}
+            />
+          ))}
         </div>
       )}
 

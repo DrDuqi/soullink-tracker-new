@@ -4,8 +4,18 @@ import PokemonSearch from './PokemonSearch'
 import { useAddEncounter } from '../hooks/useEncounters'
 import { getRoutesForGame } from '../lib/routes'
 import { getTypeColor } from '../lib/pokemon-api'
-import type { Player } from '../types/database'
+import type { Player, PokemonStatus } from '../types/database'
 import type { PokemonBasic } from '../lib/pokemon-api'
+
+/** Optional pre-fill (e.g. when importing from the emulator live-team).
+ *  Only what the encounter model can store is used — the user still picks the route. */
+export interface EncounterPrefill {
+  pokemon?: PokemonBasic
+  nickname?: string | null
+  status?: PokemonStatus
+  moves?: (string | null)[]   // up to 4 move names → move_1..4
+  note?: string               // seeded into the notes field (e.g. level, since encounters have no level column)
+}
 
 interface Props {
   runId: string
@@ -14,20 +24,22 @@ interface Props {
   onClose: () => void
   /** Pre-selected route (e.g. from the encounter checklist). */
   defaultRoute?: string
+  prefill?: EncounterPrefill
 }
 
-export default function AddEncounterModal({ runId, player, game, onClose, defaultRoute }: Props) {
+export default function AddEncounterModal({ runId, player, game, onClose, defaultRoute, prefill }: Props) {
   const addEncounter = useAddEncounter()
   const routes = getRoutesForGame(game)
   const routeInList = !!defaultRoute && routes.includes(defaultRoute)
+  const isImport = !!prefill?.pokemon
 
-  const [selectedPokemon, setSelectedPokemon] = useState<PokemonBasic | null>(null)
-  const [nickname, setNickname] = useState('')
+  const [selectedPokemon, setSelectedPokemon] = useState<PokemonBasic | null>(prefill?.pokemon ?? null)
+  const [nickname, setNickname] = useState(prefill?.nickname ?? '')
   const [location, setLocation] = useState(
     routeInList ? defaultRoute! : defaultRoute ? 'Eigene Route...' : ''
   )
   const [customLocation, setCustomLocation] = useState(routeInList ? '' : defaultRoute ?? '')
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(prefill?.note ?? '')
   const [error, setError] = useState('')
 
   const isCustom = location === 'Eigene Route...'
@@ -45,13 +57,13 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
         pokemon_name: selectedPokemon.name,
         pokemon_id: selectedPokemon.id,
         nickname: nickname.trim() || null,
-        status: 'alive',
+        status: prefill?.status ?? 'alive',
         notes: notes.trim() || null,
         types: selectedPokemon.types,
-        move_1: null,
-        move_2: null,
-        move_3: null,
-        move_4: null,
+        move_1: prefill?.moves?.[0] ?? null,
+        move_2: prefill?.moves?.[1] ?? null,
+        move_3: prefill?.moves?.[2] ?? null,
+        move_4: prefill?.moves?.[3] ?? null,
       })
       onClose()
     } catch (err: unknown) {
@@ -65,8 +77,10 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
         {/* Header */}
         <div className="flex items-center justify-between px-7 py-5 border-b border-[#2e2e42]">
           <div>
-            <h2 className="text-white font-black text-xl">Encounter hinzufügen</h2>
-            <p className="text-slate-400 text-sm mt-0.5">{player.name} · {game}</p>
+            <h2 className="text-white font-black text-xl">{isImport ? 'Als Encounter übernehmen' : 'Encounter hinzufügen'}</h2>
+            <p className="text-slate-400 text-sm mt-0.5">
+              {player.name} · {game}{isImport ? ' · aus Emulator' : ''}
+            </p>
           </div>
           <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-xl">
             <X className="w-5 h-5" />
