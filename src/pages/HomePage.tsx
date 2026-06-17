@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Swords, Users, Zap, Shuffle, LogIn, UserPlus, ArrowRight, Link2, Clock } from 'lucide-react'
+import {
+  Swords, Users, Zap, Shuffle, LogIn, UserPlus, ArrowRight, Link2, Clock,
+  Eye, EyeOff, MoreVertical, Crown, Trash2, LogOut, X,
+} from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useRunStore } from '../store/runStore'
+import { useToastStore } from '../store/toastStore'
 import { GAME_LIST } from '../lib/routes'
 import UserMenu from '../components/UserMenu'
 import type { Run, Player } from '../types/database'
@@ -43,7 +47,8 @@ function Shell({ children, showMenu }: { children: React.ReactNode; showMenu?: b
       <div className="absolute top-[-80px] right-[-80px] w-[320px] h-[320px] rounded-full border-[40px] border-pk-red/8 pointer-events-none hidden lg:block" />
       <div className="absolute bottom-[-60px] left-[-60px] w-[280px] h-[280px] rounded-full border-[35px] border-pk-red/6 pointer-events-none hidden lg:block" />
 
-      <header className="relative z-10 border-b border-white/5 bg-pk-red/5 backdrop-blur-sm">
+      {/* z-50 so the user-menu dropdown always sits above the page content below */}
+      <header className="relative z-50 border-b border-white/5 bg-pk-red/5 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <PokeBall className="w-8 h-8 text-pk-red" />
@@ -65,6 +70,42 @@ function Shell({ children, showMenu }: { children: React.ReactNode; showMenu?: b
   )
 }
 
+// ─── Password field with show/hide toggle ─────────────────────────────────────
+function PasswordField({
+  value, onChange, placeholder, autoComplete, minLength,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  autoComplete?: string
+  minLength?: number
+}) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="relative">
+      <input
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="pk-input pr-11"
+        required
+        minLength={minLength}
+        autoComplete={autoComplete}
+      />
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={() => setShow((s) => !s)}
+        aria-label={show ? 'Passwort verbergen' : 'Passwort anzeigen'}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+      >
+        {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+  )
+}
+
 // ─── Logged-out: Login / Register ─────────────────────────────────────────────
 function AuthView() {
   const { signIn, signUp, signInWithGoogle } = useAuth()
@@ -76,22 +117,15 @@ function AuthView() {
   const [error, setError] = useState('')
 
   async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true); setError('')
+    e.preventDefault(); setLoading(true); setError('')
     const { error } = await signIn(email, password)
-    setLoading(false)
-    if (error) setError(error)
-    // success → AuthProvider updates session → dashboard renders automatically
+    setLoading(false); if (error) setError(error)
   }
-
   async function handleRegister(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true); setError('')
+    e.preventDefault(); setLoading(true); setError('')
     const { error } = await signUp(email, password, username)
-    setLoading(false)
-    if (error) setError(error)
+    setLoading(false); if (error) setError(error)
   }
-
   async function handleGoogle() {
     setError('')
     const { error } = await signInWithGoogle()
@@ -103,9 +137,7 @@ function AuthView() {
       <div className="text-center mb-10 anim-fade-up">
         <div className="flex items-center justify-center gap-3 mb-5">
           <PokeBall className="w-12 h-12 text-pk-red" />
-          <h1 className="text-5xl md:text-6xl font-black text-white tracking-tight leading-none">
-            Soul<span className="text-pk-red">Link</span>
-          </h1>
+          <h1 className="text-5xl md:text-6xl font-black text-white tracking-tight leading-none">Soul<span className="text-pk-red">Link</span></h1>
           <PokeBall className="w-12 h-12 text-pk-red" />
         </div>
         <p className="text-slate-400 text-xl font-medium">Gemeinsam überleben. Gemeinsam sterben.</p>
@@ -136,7 +168,7 @@ function AuthView() {
             </div>
             <div>
               <label className="text-slate-300 text-sm font-bold mb-2 block">Passwort</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="pk-input" required autoComplete="current-password" />
+              <PasswordField value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" />
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full text-base py-4">{loading ? 'Anmelden…' : '⚡ Anmelden'}</button>
             <GoogleButton onClick={handleGoogle} />
@@ -154,7 +186,7 @@ function AuthView() {
             </div>
             <div>
               <label className="text-slate-300 text-sm font-bold mb-2 block">Passwort</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mind. 6 Zeichen" className="pk-input" required minLength={6} autoComplete="new-password" />
+              <PasswordField value={password} onChange={setPassword} placeholder="Mind. 6 Zeichen" autoComplete="new-password" minLength={6} />
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full text-base py-4">{loading ? 'Konto wird erstellt…' : '🔥 Konto erstellen'}</button>
             <GoogleButton onClick={handleGoogle} />
@@ -176,7 +208,7 @@ function GoogleButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-// ─── Logged-in: Dashboard ─────────────────────────────────────────────────────
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 interface RunVM { run: Run; players: Player[]; partnerName: string; lastActivity: string }
 
 function timeAgo(dateStr: string): string {
@@ -192,11 +224,16 @@ function Dashboard() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const { setCurrentRun } = useRunStore()
+  const toast = useToastStore()
   const [game, setGame] = useState(GAME_LIST[0])
   const [customCode, setCustomCode] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [deleteFor, setDeleteFor] = useState<RunVM | null>(null)
+  const [transferFor, setTransferFor] = useState<RunVM | null>(null)
+  const [actionBusy, setActionBusy] = useState(false)
 
   const { data: myRuns = [], isLoading, refetch } = useQuery<RunVM[]>({
     queryKey: ['my-runs', user?.id],
@@ -215,11 +252,17 @@ function Dashboard() {
       for (const a of (acts as { run_id: string; created_at: string }[]) ?? []) if (!lastByRun.has(a.run_id)) lastByRun.set(a.run_id, a.created_at)
       return ((runs as Run[]) ?? []).map((run) => {
         const ps = allP.filter((p) => p.run_id === run.id)
-        const partner = ps.find((p) => p.auth_user_id !== user!.id)
+        const partner = ps.find((p) => p.auth_user_id && p.auth_user_id !== user!.id)
         return { run, players: ps, partnerName: partner?.name ?? '—', lastActivity: lastByRun.get(run.id) ?? run.created_at }
       }).sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
     },
   })
+
+  function openRun(vm: RunVM) {
+    const mine = vm.players.find((p) => p.auth_user_id === user?.id)
+    setCurrentRun(vm.run, vm.players, mine?.id ?? vm.players[0]?.id ?? '')
+    navigate(`/run/${vm.run.id}`)
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -243,28 +286,55 @@ function Dashboard() {
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault()
-    if (!user || !profile || !joinCode.trim()) return
+    if (!user || !joinCode.trim()) return
     setBusy(true); setError('')
     try {
-      const { data: run, error: runErr } = await supabase.from('runs').select('*').eq('share_code', joinCode.trim().toLowerCase()).single()
-      if (runErr || !run) throw new Error('Run nicht gefunden. Code überprüfen.')
-      const { data: existing } = await supabase.from('players').select('*').eq('run_id', run.id)
-      const players = (existing as Player[]) ?? []
-
-      const mine = players.find((p) => p.auth_user_id === user.id)
-      if (mine) { setCurrentRun(run as Run, players, mine.id); navigate(`/run/${run.id}`); return }
-      if (players.length >= 2) throw new Error('Dieser Run hat bereits zwei Spieler.')
-
-      const nextNum = players.length === 0 ? 1 : 2
-      const { data: newPlayer, error: pErr } = await supabase.from('players')
-        .insert({ run_id: run.id, name: profile.username, player_number: nextNum, auth_user_id: user.id })
-        .select().single()
-      if (pErr) throw pErr
-      setCurrentRun(run as Run, [...players, newPlayer as Player], (newPlayer as Player).id)
-      navigate(`/run/${run.id}`)
+      // Secure server-side join: claims a freed slot (rejoin keeps data) or inserts.
+      const { data: runId, error: rpcErr } = await supabase.rpc('join_run', { p_share_code: joinCode.trim() })
+      if (rpcErr) throw new Error(rpcErr.message)
+      const [{ data: run }, { data: players }] = await Promise.all([
+        supabase.from('runs').select('*').eq('id', runId).single(),
+        supabase.from('players').select('*').eq('run_id', runId),
+      ])
+      const ps = (players as Player[]) ?? []
+      const mine = ps.find((p) => p.auth_user_id === user.id)
+      setCurrentRun(run as Run, ps, mine?.id ?? ps[0]?.id ?? '')
+      navigate(`/run/${runId}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Fehler beim Beitreten')
     } finally { setBusy(false) }
+  }
+
+  async function doLeave(vm: RunVM) {
+    setActionBusy(true)
+    const { error } = await supabase.rpc('leave_run', { p_run_id: vm.run.id })
+    setActionBusy(false)
+    if (error) { toast.show(error.message, 'error'); return }
+    toast.show('Run verlassen', 'success'); refetch()
+  }
+  async function doDelete(vm: RunVM) {
+    setActionBusy(true)
+    const { error } = await supabase.rpc('delete_run', { p_run_id: vm.run.id })
+    setActionBusy(false)
+    if (error) { toast.show(error.message, 'error'); return }
+    setDeleteFor(null); toast.show('Run dauerhaft gelöscht', 'success'); refetch()
+  }
+  async function doTransferAndLeave(vm: RunVM, newOwnerId: string) {
+    setActionBusy(true)
+    const { error: tErr } = await supabase.rpc('transfer_run_owner', { p_run_id: vm.run.id, p_new_owner: newOwnerId })
+    if (tErr) { setActionBusy(false); toast.show(tErr.message, 'error'); return }
+    const { error: lErr } = await supabase.rpc('leave_run', { p_run_id: vm.run.id })
+    setActionBusy(false)
+    if (lErr) { toast.show(lErr.message, 'error'); return }
+    setTransferFor(null); toast.show('Besitz übertragen & Run verlassen', 'success'); refetch()
+  }
+
+  function onLeaveClick(vm: RunVM) {
+    setMenuFor(null)
+    const amOwner = vm.run.owner_user_id === user?.id
+    const others = vm.players.filter((p) => p.auth_user_id && p.auth_user_id !== user?.id)
+    if (amOwner && others.length > 0) { setTransferFor(vm); return }
+    doLeave(vm)
   }
 
   return (
@@ -277,29 +347,23 @@ function Dashboard() {
       {error && <div className="bg-red-950/60 border border-red-800 text-red-400 rounded-xl p-4 mb-6 text-sm font-medium">{error}</div>}
 
       <div className="grid md:grid-cols-2 gap-5 mb-10">
-        {/* Create */}
         <form onSubmit={handleCreate} className="pk-card p-6 space-y-4">
           <div className="flex items-center gap-2 text-white font-black"><Swords className="w-5 h-5 text-pk-red" /> Neuer Run</div>
           <div>
             <label className="text-slate-300 text-sm font-bold mb-2 block">Spiel</label>
-            <select value={game} onChange={(e) => setGame(e.target.value)} className="pk-input">
-              {GAME_LIST.map((g) => <option key={g}>{g}</option>)}
-            </select>
+            <select value={game} onChange={(e) => setGame(e.target.value)} className="pk-input">{GAME_LIST.map((g) => <option key={g}>{g}</option>)}</select>
           </div>
           <div>
             <label className="text-slate-300 text-sm font-bold mb-2 block">Run-Code <span className="text-slate-600 font-normal">(optional)</span></label>
             <div className="flex gap-2">
               <input value={customCode} onChange={(e) => setCustomCode(e.target.value)} placeholder="Automatisch generieren" className="pk-input font-mono" maxLength={12} />
-              <button type="button" onClick={() => setCustomCode('')} title="Zufällig" className="shrink-0 w-12 flex items-center justify-center rounded-xl border border-[#2e2e42] text-slate-400 hover:text-white hover:border-slate-500 transition-colors" style={{ background: '#16161f' }}>
-                <Shuffle className="w-4 h-4" />
-              </button>
+              <button type="button" onClick={() => setCustomCode('')} title="Zufällig" className="shrink-0 w-12 flex items-center justify-center rounded-xl border border-[#2e2e42] text-slate-400 hover:text-white hover:border-slate-500 transition-colors" style={{ background: '#16161f' }}><Shuffle className="w-4 h-4" /></button>
             </div>
           </div>
           <p className="text-slate-600 text-xs">Spielername: <span className="text-slate-400 font-bold">{profile?.username}</span> (aus deinem Account)</p>
           <button type="submit" disabled={busy} className="btn-primary w-full py-3.5">{busy ? 'Wird erstellt…' : '⚡ Run starten'}</button>
         </form>
 
-        {/* Join */}
         <form onSubmit={handleJoin} className="pk-card p-6 space-y-4">
           <div className="flex items-center gap-2 text-white font-black"><Users className="w-5 h-5 text-pk-red" /> Run beitreten</div>
           <div>
@@ -307,11 +371,10 @@ function Dashboard() {
             <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="z. B. abc12345" className="pk-input font-mono tracking-widest" required />
           </div>
           <p className="text-slate-600 text-xs">Du trittst als <span className="text-slate-400 font-bold">{profile?.username}</span> bei.</p>
-          <button type="submit" disabled={busy} className="btn-ghost w-full py-3.5 flex items-center justify-center gap-2">{busy ? 'Beitreten…' : <>🔗 Beitreten</>}</button>
+          <button type="submit" disabled={busy} className="btn-ghost w-full py-3.5">{busy ? 'Beitreten…' : '🔗 Beitreten'}</button>
         </form>
       </div>
 
-      {/* My runs */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-white font-black text-lg">Meine Runs</h2>
@@ -327,25 +390,122 @@ function Dashboard() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 gap-3">
-            {myRuns.map(({ run, partnerName, lastActivity, players }) => (
-              <button key={run.id} onClick={() => { setCurrentRun(run, players, players.find((p) => p.auth_user_id === user?.id)?.id ?? players[0].id); navigate(`/run/${run.id}`) }}
-                className="pk-card p-4 text-left hover:border-slate-600 transition-all group">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-white font-black truncate">{run.name}</div>
-                    <div className="text-slate-500 text-xs">{run.game}</div>
+            {myRuns.map((vm) => {
+              const amOwner = vm.run.owner_user_id === user?.id
+              const activeMembers = vm.players.filter((p) => p.auth_user_id)
+              const soleOwner = amOwner && activeMembers.length <= 1
+              return (
+                <div key={vm.run.id} className="pk-card p-4 relative">
+                  <div className="flex items-start justify-between gap-2">
+                    <button onClick={() => openRun(vm)} className="text-left min-w-0 flex-1 group">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-white font-black truncate">{vm.run.name}</span>
+                        {amOwner && <Crown className="w-3.5 h-3.5 text-pk-yellow shrink-0" />}
+                      </div>
+                      <div className="text-slate-500 text-xs">{vm.run.game}</div>
+                    </button>
+                    <div className="relative shrink-0">
+                      <button onClick={() => setMenuFor(menuFor === vm.run.id ? null : vm.run.id)} className="p-1.5 rounded-lg hover:bg-white/5 text-slate-500 hover:text-white transition-colors" aria-label="Aktionen">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                      {menuFor === vm.run.id && (
+                        <>
+                          <div className="fixed inset-0 z-[40]" onClick={() => setMenuFor(null)} />
+                          <div className="absolute right-0 top-full mt-1 z-[50] bg-[#1c1c26] border border-[#2e2e42] rounded-xl shadow-2xl overflow-hidden min-w-48">
+                            <button onClick={() => { setMenuFor(null); openRun(vm) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
+                              <ArrowRight className="w-4 h-4" /> Öffnen
+                            </button>
+                            {!soleOwner && (
+                              <button onClick={() => onLeaveClick(vm)} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
+                                <LogOut className="w-4 h-4" /> Run verlassen
+                              </button>
+                            )}
+                            {amOwner && (
+                              <button onClick={() => { setMenuFor(null); setDeleteFor(vm) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-red-400 hover:text-red-300 hover:bg-red-400/5 transition-colors border-t border-[#2e2e42]">
+                                <Trash2 className="w-4 h-4" /> Run dauerhaft löschen
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-pk-red transition-colors shrink-0 mt-1" />
+                  <button onClick={() => openRun(vm)} className="w-full text-left">
+                    <div className="flex items-center gap-3 mt-3 text-xs flex-wrap">
+                      <span className="flex items-center gap-1 text-slate-400"><Link2 className="w-3 h-3 text-pk-red/60" /> {vm.partnerName}</span>
+                      <span className="font-mono text-slate-500">{vm.run.share_code}</span>
+                      <span className="flex items-center gap-1 text-slate-600 ml-auto"><Clock className="w-3 h-3" /> {timeAgo(vm.lastActivity)}</span>
+                    </div>
+                  </button>
+                  {soleOwner && (
+                    <p className="text-slate-600 text-[10px] mt-2">Als alleiniger Owner kannst du den Run nur dauerhaft löschen.</p>
+                  )}
                 </div>
-                <div className="flex items-center gap-3 mt-3 text-xs flex-wrap">
-                  <span className="flex items-center gap-1 text-slate-400"><Link2 className="w-3 h-3 text-pk-red/60" /> {partnerName}</span>
-                  <span className="font-mono text-slate-500">{run.share_code}</span>
-                  <span className="flex items-center gap-1 text-slate-600 ml-auto"><Clock className="w-3 h-3" /> {timeAgo(lastActivity)}</span>
-                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {deleteFor && <DeleteConfirmModal vm={deleteFor} busy={actionBusy} onCancel={() => setDeleteFor(null)} onConfirm={() => doDelete(deleteFor)} />}
+      {transferFor && user && <TransferOwnerModal vm={transferFor} myId={user.id} busy={actionBusy} onCancel={() => setTransferFor(null)} onConfirm={(uid) => doTransferAndLeave(transferFor, uid)} />}
+    </div>
+  )
+}
+
+function DeleteConfirmModal({ vm, busy, onCancel, onConfirm }: { vm: RunVM; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[210] p-4 anim-fade">
+      <div className="bg-[#1c1c26] rounded-3xl w-full max-w-md border border-[#2e2e42] shadow-2xl anim-pop">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[#2e2e42]">
+          <h2 className="text-white font-black text-lg flex items-center gap-2"><Trash2 className="w-5 h-5 text-red-400" /> Run löschen</h2>
+          <button onClick={onCancel} className="text-slate-500 hover:text-white p-2 hover:bg-white/5 rounded-xl transition-colors"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="px-6 py-6 space-y-4">
+          <p className="text-slate-300 text-sm">Run wirklich dauerhaft löschen? Diese Aktion kann nicht rückgängig gemacht werden.</p>
+          <div className="rounded-xl px-4 py-3 bg-[#16161f] border border-[#2e2e42]">
+            <div className="text-white font-bold">{vm.run.name}</div>
+            <div className="text-slate-500 text-xs">{vm.run.game} · {vm.run.share_code}</div>
+          </div>
+          <p className="text-slate-600 text-xs">Alle Pokémon, SoulLinks, Team-Slots, Anfragen und das Protokoll werden entfernt.</p>
+          <div className="flex gap-3 pt-1">
+            <button onClick={onCancel} disabled={busy} className="btn-ghost flex-1">Abbrechen</button>
+            <button onClick={onConfirm} disabled={busy} className="flex-1 rounded-[14px] font-bold py-3.5 text-white" style={{ background: '#CC0000' }}>{busy ? 'Wird gelöscht…' : 'Dauerhaft löschen'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TransferOwnerModal({ vm, myId, busy, onCancel, onConfirm }: { vm: RunVM; myId: string; busy: boolean; onCancel: () => void; onConfirm: (newOwnerId: string) => void }) {
+  const others = vm.players.filter((p) => p.auth_user_id && p.auth_user_id !== myId)
+  const [sel, setSel] = useState(others[0]?.auth_user_id ?? '')
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[210] p-4 anim-fade">
+      <div className="bg-[#1c1c26] rounded-3xl w-full max-w-md border border-[#2e2e42] shadow-2xl anim-pop">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[#2e2e42]">
+          <h2 className="text-white font-black text-lg flex items-center gap-2"><Crown className="w-5 h-5 text-pk-yellow" /> Wähle einen neuen Owner</h2>
+          <button onClick={onCancel} className="text-slate-500 hover:text-white p-2 hover:bg-white/5 rounded-xl transition-colors"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="px-6 py-6 space-y-4">
+          <p className="text-slate-400 text-sm">Du bist Owner von <span className="text-white font-bold">{vm.run.name}</span>. Übertrage den Besitz, bevor du den Run verlässt.</p>
+          <div className="space-y-2">
+            {others.map((p) => (
+              <button key={p.id} onClick={() => setSel(p.auth_user_id!)}
+                className="w-full flex items-center gap-3 rounded-xl px-4 py-3 border transition-all text-left"
+                style={{ background: sel === p.auth_user_id ? 'rgba(255,203,5,0.08)' : '#16161f', borderColor: sel === p.auth_user_id ? 'rgba(255,203,5,0.5)' : '#2e2e42' }}>
+                <span className="w-8 h-8 rounded-full bg-[#1c1c26] border border-[#2e2e42] flex items-center justify-center text-pk-yellow font-black">{p.name.charAt(0).toUpperCase()}</span>
+                <span className="text-white font-bold">{p.name}</span>
+                {sel === p.auth_user_id && <Crown className="w-4 h-4 text-pk-yellow ml-auto" />}
               </button>
             ))}
           </div>
-        )}
+          <div className="flex gap-3 pt-1">
+            <button onClick={onCancel} disabled={busy} className="btn-ghost flex-1">Abbrechen</button>
+            <button onClick={() => sel && onConfirm(sel)} disabled={busy || !sel} className="btn-primary flex-1">{busy ? 'Übertrage…' : 'Übertragen & verlassen'}</button>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -354,7 +514,6 @@ function Dashboard() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const { user, loading } = useAuth()
-
   if (loading) {
     return (
       <div className="min-h-screen pokeball-bg flex items-center justify-center">
@@ -362,6 +521,5 @@ export default function HomePage() {
       </div>
     )
   }
-
   return <Shell showMenu={!!user}>{user ? <Dashboard /> : <AuthView />}</Shell>
 }
