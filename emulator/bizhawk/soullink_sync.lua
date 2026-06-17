@@ -5,8 +5,8 @@
   Validierung), liest das Team und sendet es per HTTP an die Website. Keine
   manuelle RAM-Suche, keine Eingaben. KEINE ROM-/Save-Dateien, KEINE Supabase.
 
-  Ablauf: BizHawk → Platinum laden → dieses Script in der Lua Console starten.
-          Es scannt automatisch, findet das Team und sendet es live.
+  Robust: jeder Speicherzugriff ist nil-sicher, jeder Frame ist in pcall gekapselt
+  → das Script stürzt niemals mit einem nil-Wert ab, sondern scannt weiter.
 
   Voraussetzung: BizHawk 2.8+ (Lua 5.4 / NLua — native Bit-Operatoren).
 ============================================================================]]--
@@ -18,7 +18,7 @@ local CONFIG = {
   file_path       = "soullink_team.json",
   interval_frames = 30,            -- ~2x pro Sekunde
   trainer_name    = "Trainer",
-  scan_chunk      = 0x20000,       -- Bytes pro Frame beim Auto-Scan (Performance)
+  scan_chunk      = 0x20000,       -- Bytes pro Frame beim Auto-Scan
 }
 
 -- Gen-4 Block-Reihenfolge (Permutation per ((PID>>13)&0x1F)%24)
@@ -40,25 +40,27 @@ local function statusToStr(w)
   return "ok"
 end
 
--- ── Byte-Array-Helfer (1-indiziert; off = 0-basierter Byte-Offset) ──────────
-local function u16(a, off) return a[off + 1] + a[off + 2] * 0x100 end
-local function u32(a, off) return a[off + 1] + a[off + 2] * 0x100 + a[off + 3] * 0x10000 + a[off + 4] * 0x1000000 end
+-- ── nil-sichere Array-Zugriffe (i = absoluter Array-Index) ──────────────────
+-- Fehlende/aus-dem-Bereich-Bytes werden als 0 behandelt → niemals nil-Arithmetik.
+local function U16(a, i) return (a[i] or 0) + (a[i + 1] or 0) * 0x100 end
+local function U32(a, i)
+  return (a[i] or 0) + (a[i + 1] or 0) * 0x100 + (a[i + 2] or 0) * 0x10000 + (a[i + 3] or 0) * 0x1000000
+end
 
--- Validiert einen Gen-4-Party-Mon ab Array-Offset o. Nutzt die Prüfsumme als
--- starken Filter → praktisch keine Fehltreffer. Gibt Mon-Tabelle oder nil.
-local function validateGen4(a, o, maxSpecies)
-  local pid = u32(a, o)
+-- Validiert einen Gen-4-Party-Mon. `s` = Array-Index des ersten Mon-Bytes.
+-- Nutzt die Pokémon-Prüfsumme als starken Filter. Gibt Mon-Tabelle oder nil.
+local function validateGen4(a, s, maxSpecies)
+  local pid = U32(a, s)
   if pid == 0 then return nil end
-  local storedChk = u16(a, o + 6)
+  local storedChk = U16(a, s + 6)
 
   -- Hauptblöcke (0x08..0x87): 64 Words entschlüsseln (Seed = Checksumme) + summieren
-  local seed = storedChk
+  local seed, sum = storedChk, 0
   local words = {}
-  local sum = 0
   for i = 0, 63 do
     seed = (seed * 0x41C64E6D + 0x6073) & 0xFFFFFFFF
     local key = (seed >> 16) & 0xFFFF
-    local w = u16(a, o + 8 + i * 2) ~ key
+    local w = U16(a, s + 8 + i * 2) ~ key
     words[i] = w
     sum = (sum + w) & 0xFFFF
   end
@@ -75,7 +77,7 @@ local function validateGen4(a, o, maxSpecies)
   for i = 0, 4 do
     seed = (seed * 0x41C64E6D + 0x6073) & 0xFFFFFFFF
     local key = (seed >> 16) & 0xFFFF
-    pd[i] = u16(a, o + 0x88 + i * 2) ~ key
+    pd[i] = U16(a, s + 0x88 + i * 2) ~ key
   end
   local level, curHp, maxHp = pd[2] & 0xFF, pd[3], pd[4]
   if level < 1 or level > 100 then return nil end
@@ -85,36 +87,61 @@ local function validateGen4(a, o, maxSpecies)
            status = statusToStr(pd[0]), fainted = (curHp == 0) }
 end
 
+-- Liest einen Speicherbereich als Byte-Array und erkennt die Index-Basis
+-- (0- oder 1-indiziert, je nach BizHawk-Version). Gibt arr, baseIndex oder nil.
+local function readArray(addr, len)
+  local arr
+  local ok = pcall(function() arr = memory.read_bytes_as_array(addr, len) end)
+  if not ok or type(arr) ~= "table" then return nil, 0 end
+  local bi = (arr[0] ~= nil) and 0 or 1
+  return arr, bi
+end
+
 -- ── Auto-Detect: Speicher in Frame-Chunks scannen ───────────────────────────
 local DET = { running = false, base = 0, found = {}, size = 0 }
 
 local function detectStart(profile)
   DET.running = true; DET.base = 0; DET.found = {}
-  DET.size = memory.getmemorydomainsize(profile.domain)
-  console.log(string.format("[scan] Suche Party automatisch … (%d KB)", DET.size // 1024))
+  local sz
+  pcall(function() sz = memory.getmemorydomainsize(profile.domain) end)
+  if not sz then pcall(function() sz = memory.getmemorydomainsize() end) end
+  DET.size = sz or 0
+  console.log(string.format("[scan] Suche Party automatisch ... (%d KB)", DET.size // 1024))
+  if DET.size == 0 then
+    console.log("[scan] Domain '" .. profile.domain .. "' nicht lesbar. Verfügbar: "
+      .. table.concat(memory.getmemorydomainlist(), ", "))
+  end
 end
 
 -- Liest einen Chunk und prüft jeden 4-Byte-Offset. Gibt true zurück wenn fertig.
+-- Wirft NIE: bei fehlgeschlagenem Read wird der Chunk übersprungen.
 local function detectStep(profile)
-  local chunkLen = math.min(CONFIG.scan_chunk, DET.size - DET.base)
+  if DET.size <= 0 then return true end
+  local remaining = DET.size - DET.base
+  local chunkLen = math.min(CONFIG.scan_chunk, remaining)
   if chunkLen <= 0 then return true end
   -- + mon_size Überlappung, damit ein an der Chunk-Grenze beginnender Mon komplett ist
-  local readLen = math.min(chunkLen + profile.mon_size, DET.size - DET.base)
-  local arr = memory.read_bytes_as_array(DET.base, readLen, profile.domain)
-  for o = 0, chunkLen - 1, 4 do
-    local mon = validateGen4(arr, o, profile.max_species)
-    if mon then DET.found[#DET.found + 1] = { addr = DET.base + o, hp = mon.hp } end
+  local readLen = math.min(chunkLen + profile.mon_size, remaining)
+  local arr, bi = readArray(DET.base, readLen)
+  if arr then
+    local maxO = readLen - profile.mon_size      -- nur Offsets, an denen ein ganzer Mon passt
+    local lastO = math.min(chunkLen - 1, maxO)
+    local o = 0
+    while o <= lastO do
+      local mon = validateGen4(arr, bi + o, profile.max_species)
+      if mon then DET.found[#DET.found + 1] = { addr = DET.base + o, hp = mon.hp } end
+      o = o + 4
+    end
   end
-  DET.base = DET.base + chunkLen
+  DET.base = DET.base + chunkLen                  -- IMMER weiterrücken (auch bei Read-Fehler)
   return DET.base >= DET.size
 end
 
--- Wählt aus allen gefundenen Mons den längsten zusammenhängenden Party-Lauf
--- (Abstand = mon_size). Setzt profile.party_addr.
+-- Wählt den längsten zusammenhängenden Party-Lauf (Abstand = mon_size).
 local function detectFinish(profile)
   DET.running = false
   table.sort(DET.found, function(x, y) return x.addr < y.addr end)
-  local best, bestLen, bestHp = nil, 0, 0
+  local best, bestLen, bestHp = nil, 0, -1
   local i = 1
   while i <= #DET.found do
     local j = i
@@ -127,19 +154,21 @@ local function detectFinish(profile)
   end
   if best then
     profile.party_addr = best
-    console.log(string.format("[scan] ✓ Party gefunden @ 0x%X · %d Pokémon", best, bestLen))
+    console.log(string.format("[scan] OK Party gefunden @ 0x%X · %d Pokemon", best, bestLen))
     local f = io.open("soullink_party_addr.txt", "w")
     if f then f:write(string.format("%s party_addr = 0x%X (team %d)\n", CONFIG.game, best, bestLen)); f:close() end
   else
-    console.log("[scan] Kein Team gefunden — läuft das Spiel mit einem Pokémon im Team? Neuer Versuch in Kürze.")
+    console.log("[scan] Kein Team gefunden — ist mind. 1 Pokemon im Team? Neuer Versuch folgt.")
   end
 end
 
--- ── Sync-Phase: Mon direkt aus dem Speicher lesen ───────────────────────────
+-- ── Sync-Phase: Mon direkt lesen (nil-sicher) ───────────────────────────────
 local function readMon(profile, slot)
+  if not profile.party_addr then return nil end
   local base = profile.party_addr + slot * profile.mon_size
-  local arr = memory.read_bytes_as_array(base, profile.mon_size, profile.domain)
-  return validateGen4(arr, 0, profile.max_species)
+  local arr, bi = readArray(base, profile.mon_size)
+  if not arr then return nil end
+  return validateGen4(arr, bi, profile.max_species)
 end
 
 local function buildJson(profile)
@@ -152,29 +181,28 @@ local function buildJson(profile)
         slot + 1, m.speciesId, m.level, m.hp, m.maxHp, m.status, tostring(m.fainted))
     end
   end
-  return #parts, string.format(
+  return string.format(
     '{"game":"%s","trainer":"%s","capturedAt":%d,"team":[%s]}',
     CONFIG.game, CONFIG.trainer_name, os.time() * 1000, table.concat(parts, ","))
 end
 
 local httpWarned = false
 local function emit(json)
-  -- Backup-Datei immer schreiben
-  local f = io.open(CONFIG.file_path, "w"); if f then f:write(json); f:close() end
+  local f = io.open(CONFIG.file_path, "w"); if f then f:write(json); f:close() end   -- Backup
   if CONFIG.output == "console" then console.log(json); return end
   if CONFIG.output ~= "http" then return end
   local ok = pcall(function()
     if comm.httpSetPostUrl then pcall(comm.httpSetPostUrl, CONFIG.http_url) end
-    local sent = pcall(comm.httpPost, CONFIG.http_url, json)   -- httpPost(url, payload)
-    if not sent then comm.httpPost(json) end                   -- ältere Signatur: httpPost(payload)
+    local sent = pcall(comm.httpPost, CONFIG.http_url, json)
+    if not sent then comm.httpPost(json) end
   end)
   if not ok and not httpWarned then
     httpWarned = true
-    console.log("[sync] comm.httpPost nicht verfügbar — Daten liegen in " .. CONFIG.file_path)
+    console.log("[sync] comm.httpPost nicht verfuegbar — Daten liegen in " .. CONFIG.file_path)
   end
 end
 
--- ── Init + Loop ─────────────────────────────────────────────────────────────
+-- ── Init ────────────────────────────────────────────────────────────────────
 local profile = PROFILES[CONFIG.game]
 assert(profile, "Unbekanntes Spiel: " .. tostring(CONFIG.game))
 pcall(function() memory.usememorydomain(profile.domain) end)
@@ -182,27 +210,31 @@ pcall(function() memory.usememorydomain(profile.domain) end)
 console.log("SoulLink Sync gestartet · Spiel=" .. CONFIG.game .. " · Output=" .. CONFIG.output)
 detectStart(profile)
 
-local frame = 0
-while true do
+-- Ein Frame Arbeit (wird vom Loop in pcall ausgeführt)
+local function stepOnce(frame)
+  pcall(function() memory.usememorydomain(profile.domain) end)
   if DET.running then
-    -- Auto-Scan über mehrere Frames verteilt (Emulator bleibt bedienbar)
     if detectStep(profile) then detectFinish(profile) end
   elseif not profile.party_addr then
-    -- nichts gefunden → in 2 s erneut scannen (z.B. Team war noch leer)
-    if frame % 120 == 0 then detectStart(profile) end
+    if frame % 120 == 0 then detectStart(profile) end          -- alle ~2s neu versuchen
   else
     if frame % CONFIG.interval_frames == 0 then
-      -- Validieren: bei Save-Block-Wechsel (DPPt) wird die Adresse ungültig → neu scannen
       if readMon(profile, 0) then
-        local _, json = buildJson(profile)
-        emit(json)
+        emit(buildJson(profile))
       else
-        console.log("[sync] Party-Adresse ungültig (Save-Block-Wechsel?) — scanne neu …")
+        console.log("[sync] Party-Adresse ungueltig (Save-Block-Wechsel?) — scanne neu ...")
         profile.party_addr = nil
         detectStart(profile)
       end
     end
   end
+end
+
+-- ── Loop (stürzt nie ab) ─────────────────────────────────────────────────────
+local frame = 0
+while true do
+  local ok, err = pcall(stepOnce, frame)
+  if not ok then console.log("[sync] Frame uebersprungen: " .. tostring(err)) end
   frame = frame + 1
   emu.frameadvance()
 end
