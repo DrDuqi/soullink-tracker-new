@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Plus, Link2, Copy, Check, ArrowLeft, Heart, Skull,
-  LayoutGrid, List, Zap, User, LogOut, Eye, Lock,
+  LayoutGrid, List, Zap, Eye, Lock,
 } from 'lucide-react'
 import { useRunStore } from '../store/runStore'
 import { useEncounters, useReorderEncounters } from '../hooks/useEncounters'
@@ -25,6 +25,8 @@ import RouteChecklist from '../components/RouteChecklist'
 import TeamAnalysisPanel from '../components/TeamAnalysisPanel'
 import PokemonDetailModal from '../components/PokemonDetailModal'
 import SlotPickerModal from '../components/SlotPickerModal'
+import UserMenu from '../components/UserMenu'
+import { useAuth } from '../contexts/AuthContext'
 import type { Encounter, Run, Player, SoulLinkPair, LinkRequest, ActivityLogEntry } from '../types/database'
 
 // ─── Background artworks (large, floating, glowing) ───────────────────────────
@@ -165,7 +167,8 @@ function EmptyState({ icon, title, desc }: { icon: React.ReactNode; title: strin
 export default function RunPage() {
   const { runId } = useParams<{ runId: string }>()
   const navigate = useNavigate()
-  const { currentRun, players, myPlayerId, setCurrentRun, clearRun } = useRunStore()
+  const { currentRun, players, myPlayerId, setCurrentRun } = useRunStore()
+  const { user, loading: authLoading } = useAuth()
 
   const [showAddEncounter, setShowAddEncounter] = useState(false)
   const [addEncounterRoute, setAddEncounterRoute] = useState<string | undefined>(undefined)
@@ -175,7 +178,6 @@ export default function RunPage() {
   const [mainView, setMainView] = useState<'encounters' | 'pairs'>('encounters')
   const [selectedEncounter, setSelectedEncounter] = useState<Encounter | null>(null)
   const [slotPickerEncounter, setSlotPickerEncounter] = useState<Encounter | null>(null)
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [dragOverEncId, setDragOverEncId] = useState<string | null>(null)
   const [focusedPlayerId, setFocusedPlayerId] = useState<string | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
@@ -206,6 +208,21 @@ export default function RunPage() {
   useEffect(() => {
     if (myPlayerId && focusedPlayerId === null) setFocusedPlayerId(myPlayerId)
   }, [myPlayerId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Not logged in → back to the login/landing page.
+  useEffect(() => {
+    if (!authLoading && !user) navigate('/', { replace: true })
+  }, [authLoading, user, navigate])
+
+  // Identity comes from Supabase Auth: bind myPlayerId to the player row whose
+  // auth_user_id matches the logged-in user (never a free-typed name).
+  useEffect(() => {
+    if (!user || !currentRun || players.length === 0) return
+    const bound = players.find((p) => p.auth_user_id === user.id)
+    if (bound && bound.id !== myPlayerId) setCurrentRun(currentRun, players, bound.id)
+  }, [user, players, myPlayerId, currentRun, setCurrentRun])
+
+  const isMember = !!user && players.some((p) => p.auth_user_id === user.id)
 
   const isMyFocus = !focusedPlayerId || focusedPlayerId === myPlayerId
   const focusedPlayer = isMyFocus ? myPlayer : partnerPlayer
@@ -294,11 +311,14 @@ export default function RunPage() {
     async function loadRun() {
       const { data: run } = await supabase.from('runs').select('*').eq('id', runId).single()
       const { data: runPlayers } = await supabase.from('players').select('*').eq('run_id', runId)
-      if (run && runPlayers)
-        setCurrentRun(run as Run, runPlayers as Player[], (runPlayers as Player[])[0]?.id ?? '')
+      if (run && runPlayers) {
+        const ps = runPlayers as Player[]
+        const bound = ps.find((p) => p.auth_user_id === user?.id)
+        setCurrentRun(run as Run, ps, bound?.id ?? '')
+      }
     }
     loadRun()
-  }, [runId, currentRun?.id, setCurrentRun])
+  }, [runId, currentRun?.id, setCurrentRun, user?.id])
 
   // ─ Helper functions ───────────────────────────────────────────────────────
   function getLinkedEncounter(enc: Encounter): { enc: Encounter; playerName: string } | null {
@@ -398,6 +418,20 @@ export default function RunPage() {
     return (
       <div className="min-h-screen pokeball-bg flex items-center justify-center">
         <div className="text-slate-400 text-lg">Run wird geladen…</div>
+      </div>
+    )
+  }
+
+  // Logged in but not a member of this run → no access (only members see a run).
+  if (user && players.length > 0 && !isMember) {
+    return (
+      <div className="min-h-screen pokeball-bg flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center bg-[#1c1c26] border border-[#2e2e42] rounded-3xl p-8 shadow-2xl">
+          <div className="text-5xl mb-4">🔒</div>
+          <h1 className="text-white font-black text-xl mb-2">Kein Zugriff</h1>
+          <p className="text-slate-400 text-sm mb-5">Du bist kein Mitglied dieses Runs. Tritt ihm über das Dashboard mit dem Run-Code bei.</p>
+          <button onClick={() => navigate('/')} className="btn-primary w-full">Zum Dashboard</button>
+        </div>
       </div>
     )
   }
@@ -584,38 +618,8 @@ export default function RunPage() {
                   {currentRun.share_code}
                 </button>
 
-                {/* Profile menu */}
-                <div className="relative">
-                  {profileMenuOpen && <div className="fixed inset-0 z-[190]" onClick={() => setProfileMenuOpen(false)} />}
-                  <button
-                    onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                    className="flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl transition-all border"
-                    style={{ background: '#1c1c26', borderColor: '#2e2e42', color: '#94a3b8' }}
-                  >
-                    <User className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{myPlayer?.name ?? '…'}</span>
-                  </button>
-                  {profileMenuOpen && (
-                    <div className="absolute right-0 top-full mt-2 z-[200] bg-[#1c1c26] border border-[#2e2e42] rounded-2xl shadow-2xl overflow-hidden min-w-44">
-                      <div className="px-4 py-3 border-b border-[#2e2e42]">
-                        <div className="text-white font-black text-sm">{myPlayer?.name ?? '…'}</div>
-                        <div className="text-slate-500 text-xs mt-0.5">{currentRun.name}</div>
-                      </div>
-                      <button
-                        onClick={() => { setProfileMenuOpen(false); clearRun(); navigate('/') }}
-                        className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
-                      >
-                        <ArrowLeft className="w-4 h-4" /> Run verlassen
-                      </button>
-                      <button
-                        onClick={() => { setProfileMenuOpen(false); navigate('/') }}
-                        className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-bold text-red-400 hover:text-red-300 hover:bg-red-400/5 transition-colors"
-                      >
-                        <LogOut className="w-4 h-4" /> Abmelden
-                      </button>
-                    </div>
-                  )}
-                </div>
+                {/* Account menu (Profil · Meine Runs · Einstellungen · Abmelden) */}
+                <UserMenu />
               </div>
             </div>
           </div>

@@ -24,5 +24,11 @@ const fetchWithTimeout: typeof fetch = (input, init) => {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    // Identity comes exclusively from Supabase Auth and persists across reloads.
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true, // handles the OAuth redirect (Google) when enabled
+  },
   global: { fetch: fetchWithTimeout },
 })

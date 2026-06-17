@@ -3,12 +3,22 @@ export type RequestType = 'link' | 'death' | 'team_sync' | 'team_remove' | 'team
 export type RequestStatus = 'pending' | 'accepted' | 'rejected'
 export type RouteMatchType = 'exact' | 'similar' | 'manual_exception'
 
+export interface Profile {
+  user_id: string
+  username: string
+  display_name: string
+  avatar_url: string | null
+  created_at: string
+  last_seen: string | null
+}
+
 export interface Run {
   id: string
   name: string
   game: string
   created_at: string
   share_code: string
+  owner_user_id?: string | null
 }
 
 export interface Player {
@@ -17,6 +27,7 @@ export interface Player {
   name: string
   player_number: 1 | 2
   created_at: string
+  auth_user_id?: string | null
 }
 
 export interface Encounter {

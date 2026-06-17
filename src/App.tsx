@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import ToastContainer from './components/Toast'
 import ErrorBoundary from './components/ErrorBoundary'
+import { AuthProvider } from './contexts/AuthContext'
 import './index.css'
 
 // Route-level code splitting: the landing page no longer ships the heavy
@@ -25,19 +26,21 @@ function PageLoader() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/run/:runId" element={<RunPage />} />
-              {/* Unknown paths fall back to the landing page instead of a blank screen. */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-          <ToastContainer />
-        </BrowserRouter>
-      </QueryClientProvider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/run/:runId" element={<RunPage />} />
+                {/* Unknown paths fall back to the landing page instead of a blank screen. */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+            <ToastContainer />
+          </BrowserRouter>
+        </QueryClientProvider>
+      </AuthProvider>
     </ErrorBoundary>
   )
 }
