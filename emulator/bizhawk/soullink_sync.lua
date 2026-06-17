@@ -100,11 +100,19 @@ local function readArray(addr, len)
   return arr, bi
 end
 
+-- Einzelner u32-Lesezugriff (nil-sicher) für Header-/Anker-Prüfungen.
+local function safeU32(addr)
+  local v
+  pcall(function() v = memory.read_u32_le(addr) end)
+  return v
+end
+
 -- ── Auto-Detect: Speicher in Frame-Chunks scannen ───────────────────────────
 local DET = { running = false, base = 0, found = {}, size = 0 }
 
 local function detectStart(profile)
   DET.running = true; DET.base = 0; DET.found = {}
+  profile.party_addr = nil; profile.team_size = nil
   local sz
   pcall(function() sz = memory.getmemorydomainsize(profile.domain) end)
   if not sz then pcall(function() sz = memory.getmemorydomainsize() end) end
@@ -140,28 +148,51 @@ local function detectStep(profile)
   return DET.base >= DET.size
 end
 
--- Wählt den längsten zusammenhängenden Party-Lauf (Abstand = mon_size).
+-- Wählt die SPIELER-Party: der zusammenhängende Lauf, dem ein gültiger
+-- Party-Count-Header (u32 bei addr-4, 1..6) vorausgeht (Save-Block-Signatur).
+-- Gegner-Party, wilde Pokémon, Boxen und Battle-Puffer haben diesen Header nicht.
 local function detectFinish(profile)
   DET.running = false
   table.sort(DET.found, function(x, y) return x.addr < y.addr end)
-  local best, bestLen, bestHp = nil, 0, -1
-  local i = 1
+
+  -- zusammenhängende Läufe (Abstand = mon_size) bilden
+  local runs, i = {}, 1
   while i <= #DET.found do
     local j = i
     while j + 1 <= #DET.found and (DET.found[j + 1].addr - DET.found[j].addr) == profile.mon_size do j = j + 1 end
-    local len = j - i + 1
-    if len > bestLen or (len == bestLen and DET.found[i].hp > bestHp) then
-      best, bestLen, bestHp = DET.found[i].addr, len, DET.found[i].hp
-    end
+    runs[#runs + 1] = { addr = DET.found[i].addr, len = j - i + 1, hp = DET.found[i].hp }
     i = j + 1
   end
-  if best then
-    profile.party_addr = best
-    console.log(string.format("[scan] OK Party gefunden @ 0x%X · %d Pokemon", best, bestLen))
+
+  local best, bestScore = nil, 0
+  for _, r in ipairs(runs) do
+    local count = (r.addr >= 4) and safeU32(r.addr - 4) or nil
+    local anchored = (count ~= nil and count >= 1 and count <= 6)
+    r.team = anchored and count or r.len
+    local score = 0
+    if anchored then
+      score = 1000                                              -- Save-Block-Party-Header vorhanden
+      if count == r.len then score = score + 500 end            -- Count passt exakt zur Anzahl
+      local clean = true                                        -- ungenutzte Slots im Save-Block sind 0
+      for k = count, 5 do if (safeU32(r.addr + k * profile.mon_size) or 0) ~= 0 then clean = false; break end end
+      if clean then score = score + 300 end
+      if r.hp and r.hp > 0 then score = score + 10 end          -- lebende Lead-Mon
+    end
+    console.log(string.format("[scan] Kandidat @ 0x%X · %d Mon · count(-4)=%s · score=%d",
+      r.addr, r.len, tostring(count), score))
+    if score > bestScore then best, bestScore = r, score end
+  end
+
+  if best and bestScore >= 1000 then
+    profile.party_addr = best.addr
+    profile.team_size  = best.team
+    console.log(string.format("[scan] OK Spieler-Party @ 0x%X · %d Pokemon", best.addr, best.team))
     local f = io.open("soullink_party_addr.txt", "w")
-    if f then f:write(string.format("%s party_addr = 0x%X (team %d)\n", CONFIG.game, best, bestLen)); f:close() end
+    if f then f:write(string.format("%s party_addr = 0x%X (team %d)\n", CONFIG.game, best.addr, best.team)); f:close() end
   else
-    console.log("[scan] Kein Team gefunden — ist mind. 1 Pokemon im Team? Neuer Versuch folgt.")
+    profile.party_addr = nil; profile.team_size = nil
+    console.log("[scan] Keine eindeutige SPIELER-Party (Save-Block-Header) gefunden — neuer Versuch folgt.")
+    console.log("[scan] Tipp: mind. 1 Pokemon im Team? Falls weiter falsch: obiges Kandidaten-Log senden.")
   end
 end
 
@@ -176,7 +207,7 @@ end
 
 local function buildJson(profile)
   local parts = {}
-  for slot = 0, 5 do
+  for slot = 0, (profile.team_size or 6) - 1 do
     local m = readMon(profile, slot)
     if m then
       parts[#parts + 1] = string.format(
@@ -237,11 +268,13 @@ local function stepOnce(frame)
     if frame % 120 == 0 then detectStart(profile) end          -- alle ~2s neu versuchen
   else
     if frame % CONFIG.interval_frames == 0 then
-      if readMon(profile, 0) then
+      -- Anker erneut prüfen: gültiger Count-Header + lesbare Lead-Mon
+      local count = safeU32(profile.party_addr - 4)
+      if readMon(profile, 0) and count and count >= 1 and count <= 6 then
+        profile.team_size = count
         emit(buildJson(profile))
       else
         console.log("[sync] Party-Adresse ungueltig (Save-Block-Wechsel?) — scanne neu ...")
-        profile.party_addr = nil
         detectStart(profile)
       end
     end

@@ -48,9 +48,15 @@ entschlüsselt jeden Kandidaten und akzeptiert ihn nur, wenn
 - die **Prüfsumme** stimmt (starker Filter → praktisch keine Fehltreffer),
 - **Spezies** 1–493, **Level** 1–100, **0 < max. KP ≤ 1000**, aktuelle KP ≤ max. KP.
 
-Aus allen Treffern wird der längste **zusammenhängende** Lauf (Abstand =
-236 Byte) als Party gewählt und die Adresse gesetzt — und in
-`soullink_party_addr.txt` notiert (nur zur Info).
+**Spieler-Party-Erkennung (nicht „erste gültige Party"):** Aus den Treffern
+wird die **Spieler-Party** anhand des **Party-Count-Headers** gewählt — ein
+`u32` mit der Team-Größe (1–6) **direkt vor** dem Party-Array, wie es der
+Save-Block ablegt (so liest es auch PKHeX). Zusätzlich müssen die ungenutzten
+Slots genullt sein. **Gegner-Party, wilde Pokémon, Boxen und Battle-Puffer**
+besitzen diesen Save-Block-Header nicht und werden nie ausgewählt. Die Konsole
+loggt alle Kandidaten (`[scan] Kandidat @ … count(-4)=…`); die gewählte Adresse
+steht in `soullink_party_addr.txt`. Funktioniert auch mit Randomizer-ROMs (die
+RAM-Struktur bleibt gleich).
 
 DPPt wechselt beim Speichern den aktiven Save-Block, wodurch die Adresse
 wandern kann. Das Script erkennt das (Validierung schlägt fehl) und **scannt
