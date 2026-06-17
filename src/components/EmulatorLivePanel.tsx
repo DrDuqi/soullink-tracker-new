@@ -1,11 +1,86 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Wifi, WifiOff, Loader2, Gamepad2, Heart, Skull, Play, Pause } from 'lucide-react'
-import { getSpriteUrl } from '../lib/pokemon-api'
-import { STATUS_LABEL_DE } from '../lib/emulatorSync'
+import { getSpriteUrl, getTypeColor, fetchMoveById, fetchItemName, fetchAbilityName } from '../lib/pokemon-api'
+import { STATUS_LABEL_DE, natureName } from '../lib/emulatorSync'
+import type { EmulatorMon } from '../lib/emulatorSync'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
 
 const ENABLED_KEY = 'soullink-emusync-enabled'
 const GAME_LABEL: Record<string, string> = { platinum: 'Platinum', heartgold: 'HeartGold', firered: 'FireRed', emerald: 'Emerald', black: 'Black' }
+
+// Resolves ability / item / move names (by id, cached) for one Pokémon and
+// renders the enriched detail. Keyed on the ids so the 1s status ticker doesn't
+// cause refetches; cache makes repeats free.
+function MonRich({ mon }: { mon: EmulatorMon }) {
+  const [moves, setMoves] = useState<({ name: string; type: string } | null)[]>([])
+  const [ability, setAbility] = useState<string | null>(null)
+  const [item, setItem] = useState<string | null>(null)
+  const moveKey = (mon.moveIds ?? []).join(',')
+
+  useEffect(() => {
+    let cancelled = false
+    const ids = (mon.moveIds ?? []).filter((x) => x > 0)
+    Promise.all(ids.map((id) => fetchMoveById(id))).then((r) => { if (!cancelled) setMoves(r) })
+    if (mon.abilityId) fetchAbilityName(mon.abilityId).then((n) => { if (!cancelled) setAbility(n) })
+    if (mon.heldItemId) fetchItemName(mon.heldItemId).then((n) => { if (!cancelled) setItem(n) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moveKey, mon.abilityId, mon.heldItemId])
+
+  const hpPct = mon.maxHp > 0 ? Math.round((mon.hp / mon.maxHp) * 100) : 0
+  const hpColor = hpPct > 50 ? '#4ade80' : hpPct > 20 ? '#fbbf24' : '#f87171'
+  const nature = natureName(mon.natureId)
+  const title = mon.nickname || `#${mon.speciesId}`
+
+  return (
+    <div className={`rounded-xl border p-3 ${mon.fainted ? 'border-red-900/40 bg-red-950/15 opacity-70' : 'border-[#2e2e42] bg-[#1c1c26]'}`}>
+      <div className="flex items-center gap-3">
+        <img src={getSpriteUrl(mon.speciesId)} alt="" className={`w-12 h-12 object-contain shrink-0 ${mon.fainted ? 'grayscale' : ''}`} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-white text-sm font-bold capitalize truncate">{title}</span>
+            {mon.nickname && <span className="text-slate-500 text-[10px]">#{mon.speciesId}</span>}
+            {mon.fainted ? <Skull className="w-3.5 h-3.5 text-red-400 shrink-0" /> : <Heart className="w-3.5 h-3.5 text-green-400 shrink-0" />}
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+            <span>Lv {mon.level}</span>
+            {mon.status !== 'ok' && <span className="font-bold" style={{ color: '#fbbf24' }}>{STATUS_LABEL_DE[mon.status]}</span>}
+          </div>
+          {/* HP bar */}
+          <div className="mt-1 flex items-center gap-1.5">
+            <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+              <div className="h-1.5 rounded-full" style={{ width: `${hpPct}%`, background: hpColor }} />
+            </div>
+            <span className="text-[10px] text-slate-500 tabular-nums shrink-0">{mon.hp}/{mon.maxHp}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Enriched detail */}
+      <div className="mt-2 pt-2 border-t border-[#2e2e42] space-y-1 text-[10px]">
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-400">
+          <span>Wesen: <span className="text-slate-200">{nature ?? '—'}</span></span>
+          <span>Fähigkeit: <span className="text-slate-200">{ability ?? (mon.abilityId ? '…' : '—')}</span></span>
+          <span>Item: <span className="text-slate-200">{item ?? (mon.heldItemId ? '…' : '—')}</span></span>
+        </div>
+        <div className="flex flex-wrap gap-1 pt-0.5">
+          {(mon.moveIds ?? []).filter((x) => x > 0).length === 0 ? (
+            <span className="text-slate-600">Keine Attacken</span>
+          ) : (
+            (mon.moveIds ?? []).filter((x) => x > 0).map((id, i) => {
+              const mv = moves[i]
+              return (
+                <span key={id} className="px-1.5 py-0.5 rounded text-[9px] font-bold text-white" style={{ background: mv ? getTypeColor(mv.type) : '#3e3e52' }}>
+                  {mv ? mv.name : `#${id}`}
+                </span>
+              )
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 /** Live in-game party from the local emulator sync. Additive & non-destructive:
  *  it does NOT touch tracked encounters / soul links / the team system. */
@@ -23,7 +98,6 @@ export default function EmulatorLivePanel({ game }: { game?: string }) {
 
   const gameName = GAME_LABEL[(liveGame ?? game ?? '').toLowerCase()] ?? (liveGame ?? game ?? 'Spiel')
 
-  // Status banner (point 7)
   let icon = <Gamepad2 className="w-4 h-4" />
   let title = ''
   let color = '#64748b'
@@ -38,7 +112,6 @@ export default function EmulatorLivePanel({ game }: { game?: string }) {
 
   return (
     <div className="rounded-2xl border overflow-hidden" style={{ borderColor: `${color}40` }}>
-      {/* Header / status */}
       <div className="flex items-center gap-2 px-4 py-3" style={{ background: '#1c1c26' }}>
         <span style={{ color }}>{icon}</span>
         <div className="flex-1 min-w-0">
@@ -58,24 +131,9 @@ export default function EmulatorLivePanel({ game }: { game?: string }) {
         </button>
       </div>
 
-      {/* Team */}
       {enabled && team.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3" style={{ background: '#161620' }}>
-          {team.map((m) => (
-            <div key={m.slot} className={`rounded-xl border p-2 flex items-center gap-2 ${m.fainted ? 'border-red-900/40 bg-red-950/15 opacity-70' : 'border-[#2e2e42] bg-[#1c1c26]'}`}>
-              <img src={getSpriteUrl(m.speciesId)} alt="" className={`w-10 h-10 object-contain shrink-0 ${m.fainted ? 'grayscale' : ''}`} />
-              <div className="min-w-0">
-                <div className="flex items-center gap-1">
-                  <span className="text-white text-xs font-bold">#{m.speciesId}</span>
-                  {m.fainted ? <Skull className="w-3 h-3 text-red-400" /> : <Heart className="w-3 h-3 text-green-400" />}
-                </div>
-                <div className="text-slate-400 text-[10px]">Lv {m.level} · {m.hp}/{m.maxHp}</div>
-                {m.status !== 'ok' && (
-                  <div className="text-[9px] font-bold" style={{ color: '#fbbf24' }}>{STATUS_LABEL_DE[m.status]}</div>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3" style={{ background: '#161620' }}>
+          {team.map((m) => <MonRich key={m.slot} mon={m} />)}
         </div>
       )}
 

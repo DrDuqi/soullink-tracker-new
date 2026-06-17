@@ -237,6 +237,57 @@ export async function fetchMoveDetails(moveName: string): Promise<MoveDetail | n
   }
 }
 
+// ── By-id name resolvers for emulator live-team enrichment (German-preferred) ──
+interface NamedEntry { names?: Array<{ name: string; language: { name: string } }> }
+function pickLocalized(data: NamedEntry, fallback: string): string {
+  const names = data.names ?? []
+  return (names.find((n) => n.language.name === 'de')?.name)
+    ?? (names.find((n) => n.language.name === 'en')?.name)
+    ?? fallback
+}
+
+const moveByIdCache = new Map<number, { name: string; type: string } | null>()
+export async function fetchMoveById(id: number): Promise<{ name: string; type: string } | null> {
+  if (!id) return null
+  if (moveByIdCache.has(id)) return moveByIdCache.get(id)!
+  try {
+    const res = await fetch(`${POKE_API}/move/${id}`)
+    if (!res.ok) { moveByIdCache.set(id, null); return null }
+    const data = await res.json()
+    const out = { name: pickLocalized(data, formatMoveName(data.name ?? `#${id}`)), type: data.type?.name ?? 'normal' }
+    moveByIdCache.set(id, out)
+    return out
+  } catch { return null }
+}
+
+const itemNameCache = new Map<number, string | null>()
+export async function fetchItemName(id: number): Promise<string | null> {
+  if (!id) return null
+  if (itemNameCache.has(id)) return itemNameCache.get(id)!
+  try {
+    const res = await fetch(`${POKE_API}/item/${id}`)
+    if (!res.ok) { itemNameCache.set(id, null); return null }
+    const data = await res.json()
+    const name = pickLocalized(data, formatMoveName(data.name ?? `#${id}`))
+    itemNameCache.set(id, name)
+    return name
+  } catch { return null }
+}
+
+const abilityNameCache = new Map<number, string | null>()
+export async function fetchAbilityName(id: number): Promise<string | null> {
+  if (!id) return null
+  if (abilityNameCache.has(id)) return abilityNameCache.get(id)!
+  try {
+    const res = await fetch(`${POKE_API}/ability/${id}`)
+    if (!res.ok) { abilityNameCache.set(id, null); return null }
+    const data = await res.json()
+    const name = pickLocalized(data, formatMoveName(data.name ?? `#${id}`))
+    abilityNameCache.set(id, name)
+    return name
+  } catch { return null }
+}
+
 export function getSpriteUrl(pokemonId: number): string {
   return `${SPRITE_BASE}/${pokemonId}.png`
 }

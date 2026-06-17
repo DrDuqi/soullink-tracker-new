@@ -205,14 +205,98 @@ local function readMon(profile, slot)
   return validateGen4(arr, bi, profile.max_species)
 end
 
+-- Gen-4 Western-Zeichensatz für Spitznamen (konservativ; A-Z/a-z/0-9/Space).
+-- Bei unbekannten Zeichen → nil, damit nie „Müll" angezeigt wird (best-effort).
+local function decodeNick(w, base)
+  local out = {}
+  for i = 0, 10 do
+    local c = w[base + i] or 0xFFFF
+    if c == 0xFFFF or c == 0 then break end
+    local ch
+    if     c == 0x0001                   then ch = " "
+    elseif c >= 0x0002 and c <= 0x000B   then ch = string.char(48 + (c - 0x0002))   -- 0-9
+    elseif c >= 0x000C and c <= 0x0025   then ch = string.char(65 + (c - 0x000C))   -- A-Z
+    elseif c >= 0x0026 and c <= 0x003F   then ch = string.char(97 + (c - 0x0026))   -- a-z
+    else return nil end
+    out[#out + 1] = ch
+  end
+  if #out == 0 then return nil end
+  return table.concat(out)
+end
+
+-- Voll-Auslesen eines Mons (nur für die ≤6 Team-Slots; nicht im Scan).
+-- Zuverlässig: species, level, hp/maxHp, status, moves, heldItem, ability, nature.
+-- Best-effort: nickname.  Noch null (Roadmap): metLocation/metLevel (Block-D-Offsets
+-- je Edition unverifiziert) — bewusst null statt unsichere Werte.
+local function readMonRich(a, s, maxSpecies)
+  local pid = U32(a, s)
+  if pid == 0 then return nil end
+  local chk = U16(a, s + 6)
+  local seed, sum = chk, 0
+  local w = {}
+  for i = 0, 63 do
+    seed = (seed * 0x41C64E6D + 0x6073) & 0xFFFFFFFF
+    w[i] = U16(a, s + 8 + i * 2) ~ ((seed >> 16) & 0xFFFF)
+    sum = (sum + w[i]) & 0xFFFF
+  end
+  if sum ~= chk then return nil end
+
+  local ord = ORDERS[((pid >> 13) & 0x1F) % 24 + 1]
+  local pA = (ord:find("A") - 1) * 16    -- Growth
+  local pB = (ord:find("B") - 1) * 16    -- Attacks
+  local pC = (ord:find("C") - 1) * 16    -- Misc/Condition (Nickname @ 0x48)
+
+  local species = w[pA + 0]
+  if species < 1 or species > maxSpecies then return nil end
+
+  seed = pid
+  local pd = {}
+  for i = 0, 4 do
+    seed = (seed * 0x41C64E6D + 0x6073) & 0xFFFFFFFF
+    pd[i] = U16(a, s + 0x88 + i * 2) ~ ((seed >> 16) & 0xFFFF)
+  end
+  local level, curHp, maxHp = pd[2] & 0xFF, pd[3], pd[4]
+  if level < 1 or level > 100 then return nil end
+  if maxHp < 1 or maxHp > 1000 or curHp > maxHp then return nil end
+
+  return {
+    speciesId = species, level = level, hp = curHp, maxHp = maxHp,
+    status = statusToStr(pd[0]), fainted = (curHp == 0),
+    heldItemId = w[pA + 1],
+    abilityId  = (w[pA + 6] >> 8) & 0xFF,        -- 0x0D
+    natureId   = pid % 25,                        -- Gen 4: Wesen aus PID
+    nickname   = decodeNick(w, pC),
+    move1 = w[pB + 0], move2 = w[pB + 1], move3 = w[pB + 2], move4 = w[pB + 3],
+    metLocationId = nil, metLevel = nil,          -- Roadmap (Block D)
+  }
+end
+
+local function readMonRichAt(profile, slot)
+  if not profile.party_addr then return nil end
+  local arr, bi = readArray(profile.party_addr + slot * profile.mon_size, profile.mon_size)
+  if not arr then return nil end
+  return readMonRich(arr, bi, profile.max_species)
+end
+
+-- JSON-Helfer
+local function jnum(v) return v == nil and "null" or tostring(v) end
+local function jstr(s)
+  if s == nil then return "null" end
+  return '"' .. s:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"'
+end
+
 local function buildJson(profile)
   local parts = {}
   for slot = 0, (profile.team_size or 6) - 1 do
-    local m = readMon(profile, slot)
+    local m = readMonRichAt(profile, slot)
     if m then
       parts[#parts + 1] = string.format(
-        '{"slot":%d,"speciesId":%d,"level":%d,"hp":%d,"maxHp":%d,"status":"%s","fainted":%s}',
-        slot + 1, m.speciesId, m.level, m.hp, m.maxHp, m.status, tostring(m.fainted))
+        '{"slot":%d,"speciesId":%d,"level":%d,"hp":%d,"maxHp":%d,"status":"%s","fainted":%s,'
+        .. '"nickname":%s,"natureId":%s,"abilityId":%s,"heldItemId":%s,'
+        .. '"moveIds":[%d,%d,%d,%d],"metLocationId":%s,"metLevel":%s}',
+        slot + 1, m.speciesId, m.level, m.hp, m.maxHp, m.status, tostring(m.fainted),
+        jstr(m.nickname), jnum(m.natureId), jnum(m.abilityId), jnum(m.heldItemId),
+        m.move1, m.move2, m.move3, m.move4, jnum(m.metLocationId), jnum(m.metLevel))
     end
   end
   return string.format(
