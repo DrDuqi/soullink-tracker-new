@@ -26,6 +26,7 @@ import TeamAnalysisPanel from '../components/TeamAnalysisPanel'
 import PokemonDetailModal from '../components/PokemonDetailModal'
 import SlotPickerModal from '../components/SlotPickerModal'
 import UserMenu from '../components/UserMenu'
+import EmulatorLivePanel from '../components/EmulatorLivePanel'
 import { useAuth } from '../contexts/AuthContext'
 import type { Encounter, Run, Player, SoulLinkPair, LinkRequest, ActivityLogEntry } from '../types/database'
 
@@ -723,6 +724,9 @@ export default function RunPage() {
                   </button>
                 </div>
               )}
+
+              {/* Emulator live-team (local dev sync; additive, never overwrites tracked data) */}
+              {isMyFocus && import.meta.env.DEV && <EmulatorLivePanel game={currentRun.game} />}
 
               {/* Focus-dependent block (framed yellow when viewing partner) */}
               <div className={`space-y-5 ${!isMyFocus ? 'partner-frame p-4 lg:p-5' : ''}`}>
