@@ -754,7 +754,9 @@ export default function RunPage() {
                   teamSlots={teamSlots}
                   players={players}
                   myPlayerId={myPlayerId ?? ''}
+                  game={currentRun.game}
                   onSelectEncounter={(e) => setSelectedEncounter(e)}
+                  onImport={(p, route) => { setEmuPrefill(p); setAddEncounterRoute(route); setShowAddEncounter(true) }}
                 />
               )}
 
