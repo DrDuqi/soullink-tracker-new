@@ -257,9 +257,15 @@ end
 -- Best-effort: nickname.  Noch null (Roadmap): metLocation/metLevel (Block-D-Offsets
 -- je Edition unverifiziert) — bewusst null statt unsichere Werte.
 local _dbgNickDone = false
-local function readMonRich(a, s, maxSpecies)
+-- strict=true  (Scan / Identitäts-Suche): verwirft bei Prüfsummen- ODER Range-Fehler.
+-- strict=false (bekannte Party-Slots): die party_addr wurde vom Scan bereits
+--   verifiziert → ein Slot mit pid≠0 und plausibler species IST ein Team-Mitglied.
+--   Prüfsumme/Level/HP werden dann best-effort gelesen (geklemmt statt verworfen),
+--   damit ein echtes Pokémon (z. B. frisch gefangenes) NIE aus dem Team fällt.
+local function readMonRich(a, s, maxSpecies, strict)
+  if strict == nil then strict = true end
   local pid = U32(a, s)
-  if pid == 0 then return nil end
+  if pid == 0 then return nil end                        -- leerer Slot → immer überspringen
   local chk = U16(a, s + 6)
   local seed, sum = chk, 0
   local w = {}
@@ -268,7 +274,7 @@ local function readMonRich(a, s, maxSpecies)
     w[i] = U16(a, s + 8 + i * 2) ~ ((seed >> 16) & 0xFFFF)
     sum = (sum + w[i]) & 0xFFFF
   end
-  if sum ~= chk then return nil end
+  if strict and sum ~= chk then return nil end           -- Prüfsumme nur im Scan harter Filter
 
   local ord = ORDERS[((pid >> 13) & 0x1F) % 24 + 1]
   local pA = (ord:find("A") - 1) * 16    -- Growth
@@ -295,8 +301,16 @@ local function readMonRich(a, s, maxSpecies)
     pd[i] = U16(a, s + 0x88 + i * 2) ~ ((seed >> 16) & 0xFFFF)
   end
   local level, curHp, maxHp = pd[2] & 0xFF, pd[3], pd[4]
-  if level < 1 or level > 100 then return nil end
-  if maxHp < 1 or maxHp > 1000 or curHp > maxHp then return nil end
+  if strict then
+    if level < 1 or level > 100 then return nil end
+    if maxHp < 1 or maxHp > 1000 or curHp > maxHp then return nil end
+  else
+    -- best-effort für die bereits verifizierte Party: klemmen statt verwerfen
+    if level < 1 then level = 1 elseif level > 100 then level = 100 end
+    if maxHp < 0 then maxHp = 0 end
+    if curHp < 0 then curHp = 0 end
+    if maxHp > 0 and curHp > maxHp then curHp = maxHp end
+  end
 
   return {
     speciesId = species, level = level, hp = curHp, maxHp = maxHp,
@@ -315,7 +329,7 @@ local function readMonRichAt(profile, slot)
   if not profile.party_addr then return nil end
   local arr, bi = readArray(profile.party_addr + slot * profile.mon_size, profile.mon_size)
   if not arr then return nil end
-  return readMonRich(arr, bi, profile.max_species)
+  return readMonRich(arr, bi, profile.max_species, false)   -- bekannte Party → lenient (nie ein echtes Mon verwerfen)
 end
 
 -- JSON-Helfer
@@ -325,9 +339,9 @@ local function jstr(s)
   return '"' .. s:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"'
 end
 
--- Slot-Diagnose (nur für CONFIG.debug). Gibt einen lesbaren Status-String zurück,
--- der exakt zeigt, WARUM ein Slot nil zurückgibt (oder dass er OK ist).
--- Dupliziert die Entschlüsselung, läuft aber nur wenn debug=true.
+-- Slot-Diagnose: gibt einen lesbaren Status-String zurück, der exakt zeigt, WARUM
+-- ein Slot bei STRIKTER Validierung scheitern würde (Prüfsumme / species / level /
+-- maxHp / curHp). buildJson nutzt das für übersprungene Slots im Pipeline-Log.
 local function diagSlot(profile, slot)
   if not profile.party_addr then return "kein party_addr" end
   local addr = profile.party_addr + slot * profile.mon_size
@@ -368,18 +382,20 @@ local function diagSlot(profile, slot)
     species, pid, level, curHp, maxHp, addr)
 end
 
+local _lastBuildKey = nil
 local function buildJson(profile)
   local parts = {}
+  local diag = {}                          -- pro Slot: lesbarer Status (Übernahme oder Grund)
+  local got = 0
   -- Immer alle 6 Slots prüfen. Leere/freigegebene Slots sind in Gen 4 komplett genullt
   -- (pid == 0 → readMonRich gibt nil zurück → wird übersprungen). So werden auch
   -- neu gefangene Pokémon sofort gezeigt, ohne dass team_size korrekt aktualisiert
   -- sein muss (die Zahl bei party_addr-4 ist nicht immer der echte Live-Party-Zähler).
   for slot = 0, 5 do
     local m = readMonRichAt(profile, slot)
-    if CONFIG.debug then
-      console.log(string.format("[slot %d] %s", slot + 1, diagSlot(profile, slot)))
-    end
     if m then
+      got = got + 1
+      diag[#diag + 1] = string.format("Slot %d: ✓ species=%d pid=0x%08X lv=%d", slot + 1, m.speciesId, m.pid, m.level)
       parts[#parts + 1] = string.format(
         '{"slot":%d,"speciesId":%d,"pid":%s,"level":%d,"hp":%d,"maxHp":%d,"status":"%s","fainted":%s,'
         .. '"nickname":%s,"natureId":%s,"abilityId":%s,"heldItemId":%s,'
@@ -387,7 +403,17 @@ local function buildJson(profile)
         slot + 1, m.speciesId, jnum(m.pid), m.level, m.hp, m.maxHp, m.status, tostring(m.fainted),
         jstr(m.nickname), jnum(m.natureId), jnum(m.abilityId), jnum(m.heldItemId),
         m.move1, m.move2, m.move3, m.move4, jnum(m.metLocationId), jstr(m.metLocationName), jnum(m.metLevel))
+    else
+      diag[#diag + 1] = string.format("Slot %d: – %s", slot + 1, diagSlot(profile, slot))
     end
+  end
+  -- Pipeline-Diagnose: NUR bei Änderung loggen (kein 2x/Sekunde-Spam).
+  local key = table.concat(diag, " | ")
+  if key ~= _lastBuildKey then
+    _lastBuildKey = key
+    console.log(string.format("[buildJson] party_addr=0x%X · team_size=%s · %d Pokemon ins team-Array:",
+      profile.party_addr or 0, tostring(profile.team_size), got))
+    for _, line in ipairs(diag) do console.log("   " .. line) end
   end
   -- Aktueller Ort (optional, via CONFIG.location_addr; sonst null)
   local locId = CONFIG.location_addr and safeU16(CONFIG.location_addr) or nil
@@ -413,8 +439,15 @@ local OUT_FILE = resolveOutFile()
 console.log("[sync] Schreibe Team nach: " .. OUT_FILE)
 
 local httpWarned = false
+local _lastWrittenCount = -1
 local function emit(json)
   local f = io.open(OUT_FILE, "w"); if f then f:write(json); f:close() end   -- primäre Datei (Live-Sync)
+  -- writeJson-Verifikation: wie viele "slot"-Einträge stehen WIRKLICH in der Datei?
+  local _, n = json:gsub('"slot":', '')
+  if n ~= _lastWrittenCount then
+    _lastWrittenCount = n
+    console.log(string.format("[writeJson] %d Pokemon nach %s geschrieben", n, OUT_FILE))
+  end
   if CONFIG.output == "console" then console.log(json); return end
   if CONFIG.output ~= "http" then return end
   local ok = pcall(function()
