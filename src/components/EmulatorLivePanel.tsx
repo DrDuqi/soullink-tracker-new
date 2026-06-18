@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Wifi, WifiOff, Loader2, Gamepad2, Heart, Skull, Play, Pause, Plus, Check } from 'lucide-react'
+import { Wifi, WifiOff, Loader2, Gamepad2, Heart, Skull, Play, Pause, Plus, Check, MapPin } from 'lucide-react'
 import { getSpriteUrl, getTypeColor, fetchPokemon, fetchMoveById, fetchItemName, fetchAbilityName } from '../lib/pokemon-api'
 import { STATUS_LABEL_DE, natureName } from '../lib/emulatorSync'
 import type { EmulatorMon } from '../lib/emulatorSync'
@@ -150,7 +150,11 @@ export default function EmulatorLivePanel({
     try { return localStorage.getItem(ENABLED_KEY) !== '0' } catch { return true }
   })
   const { phase, team, game: liveGame, currentLocationName, currentLocationId, ageSec } = useEmulatorSync(enabled)
-  const locLabel = currentLocationName ?? (currentLocationId != null ? `#${currentLocationId}` : null)
+  // Aktueller Ort: Name wenn (sicher) gemappt, sonst ID, sonst unbekannt.
+  const matchedRoute = currentLocationName ? matchRoute(currentLocationName, (liveGame ?? game ?? '')) : null
+  const locText = currentLocationName
+    ? currentLocationName
+    : currentLocationId != null ? `unbekannt (ID ${currentLocationId})` : 'unbekannt'
 
   function toggle() {
     const v = !enabled
@@ -180,7 +184,6 @@ export default function EmulatorLivePanel({
           <div className="text-slate-200 text-xs font-black uppercase tracking-widest">Emulator Live-Team</div>
           <div className="text-[11px] font-bold" style={{ color }}>
             {title}
-            {phase === 'connected' && locLabel && <span className="text-slate-500 font-medium"> · Ort: {locLabel}</span>}
             {showAge && <span className="text-slate-500 font-medium"> · vor {ageSec}s</span>}
           </div>
         </div>
@@ -194,6 +197,15 @@ export default function EmulatorLivePanel({
           {enabled ? <><Pause className="w-3 h-3" /> Sync stoppen</> : <><Play className="w-3 h-3" /> Sync starten</>}
         </button>
       </div>
+
+      {enabled && phase === 'connected' && (
+        <div className="flex items-center gap-1.5 px-4 py-2 text-[11px] border-t" style={{ background: '#16161f', borderColor: '#2e2e42' }}>
+          <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: matchedRoute ? '#4ade80' : '#64748b' }} />
+          <span className="text-slate-400 font-medium">Aktueller Ort:</span>
+          <span className="font-bold" style={{ color: matchedRoute ? '#4ade80' : currentLocationName ? '#cbd5e1' : '#64748b' }}>{locText}</span>
+          {matchedRoute && <span className="text-slate-500">→ Route wird beim Import vorgeschlagen</span>}
+        </div>
+      )}
 
       {enabled && team.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3" style={{ background: '#161620' }}>

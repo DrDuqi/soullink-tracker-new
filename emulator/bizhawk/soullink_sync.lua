@@ -23,9 +23,13 @@ local CONFIG = {
   trainer_name    = "Trainer",
   scan_chunk      = 0x20000,       -- Bytes pro Frame beim Auto-Scan
   -- Aktuelle Map-/Location-ID: Main-RAM-Offset (u16). Standard nil → currentLocation
-  -- bleibt null. Finden via RAM-Search (2-Byte): Wert beobachten, der sich beim
-  -- Wechsel zwischen Karten ändert. Danach die IDs unten in LOCATIONS eintragen.
+  -- bleibt null. Adresse mit find_location (siehe unten) finden, hier eintragen.
+  -- Sobald gesetzt, loggt das Script die ID bei jedem Ortswechsel → IDs in LOCATIONS
+  -- eintragen. currentLocationId wird dann immer geliefert, der Name nur bei Mapping.
   location_addr   = nil,
+  -- Kalibrierhilfe: findet die Location-Adresse per Differenz-Suche (Tasten 1/2/3 im
+  -- Emu-Fenster, Anleitung erscheint in der Lua-Console). Aktivieren → Script neu laden.
+  find_location   = false,
   -- Kalibrier-Hilfe: einmaliges Loggen der Spitznamen-Rohwerte des 1. Pokemon in
   -- die BizHawk-Konsole (Lua Console). Damit lässt sich der Zeichensatz exakt
   -- prüfen/fixen. Aktivieren → Script neu laden → Zeile + echten Namen melden.
@@ -122,17 +126,123 @@ local function safeU16(addr)
 end
 
 -- Location-ID → lesbarer Name (pro Edition). NOCH NICHT VERVOLLSTÄNDIGT:
--- verifizierte Platinum-Location-IDs hier eintragen (per RAM-Search ermittelt).
--- Solange leer, wird im JSON nur die ID geliefert (currentLocationName = null) —
--- das Frontend füllt dann keine Route automatisch vor (kein Fehl-Match).
+-- verifizierte Platinum-Location-IDs hier eintragen (per find_location ermittelt).
+-- Solange eine ID nicht gemappt ist, wird im JSON nur die ID geliefert
+-- (currentLocationName = null) — das Frontend füllt dann KEINE Route automatisch
+-- vor (kein Fehl-Match). NUR sicher beobachtete IDs eintragen — nichts raten!
+--
+-- Vorgehen: find_location → Adresse finden → location_addr setzen → auf jeder
+-- Route stehen, die geloggte "[location] ID=NN" ablesen und unten als
+-- [NN] = "Route 205" eintragen. Der Name MUSS exakt zu einem Eintrag der
+-- Encounter-Checkliste passen (siehe src/lib/routes.ts → Sinnoh), z. B.:
+--   "Route 201" .. "Route 230", "Jubelstadt", "Erzelingen", "Ewigenau",
+--   "Fleetburg", "Herzhofen", "Weideburg", "Schleiede", "Blizzach", "Sandgem",
+--   "Zweiblattdorf", "See der Wahrheit" usw.  matchRoute() normalisiert tolerant.
 local LOCATIONS = {
   platinum = {
-    -- [<id>] = "Route 205",   -- Beispiel — echte IDs hier ergänzen
+    -- [<beobachtete ID>] = "Route 205",
+    -- [<beobachtete ID>] = "Jubelstadt",
   },
 }
 local function locationName(game, id)
   local t = LOCATIONS[game]
   return (t and id ~= nil and t[id]) or nil
+end
+
+-- ── Kalibrierhilfe: Location-Adresse per Differenz-Suche finden ──────────────
+-- Klassische RAM-Suche nach einem "kleinen u16-Wert, der sich beim Routenwechsel
+-- ändert", direkt im Script (kein geratenes Mapping). Tasten im EMU-Fenster:
+--   [1] Basis-Aufnahme auf der AKTUELLEN Route (merkt sich alle kleinen u16-Werte)
+--   [2] Auf einer ANDEREN Route drücken → behält nur Adressen, deren Wert sich änderte
+--   [3] (optional) beim Stehenbleiben → behält nur Adressen, die GLEICH blieben
+-- Nach 2–3 Routenwechseln bleiben wenige Adressen übrig → das ist die Location-ID.
+local LF = { addr = {}, val = {}, prev = {}, ready = false }
+local LOC_last = nil       -- zuletzt geloggte Location-ID (für Änderungs-Log)
+
+local function lfDown(keys, names)
+  for _, n in ipairs(names) do if keys[n] then return true end end
+  return false
+end
+local function lfEdge(keys, names)
+  return lfDown(keys, names) and not lfDown(LF.prev, names)
+end
+
+local function lfDomainSize(profile)
+  local sz = 0
+  pcall(function() sz = memory.getmemorydomainsize(profile.domain) end)
+  if sz == 0 then pcall(function() sz = memory.getmemorydomainsize() end) end
+  return sz
+end
+
+local function lfBaseline(profile)
+  local size = lfDomainSize(profile)
+  LF.addr, LF.val = {}, {}
+  local base = 0
+  while base < size do
+    local readlen = math.min(CONFIG.scan_chunk + 2, size - base)
+    local arr, bi = readArray(base, readlen)
+    if arr then
+      local maxo, o = readlen - 2, 0
+      while o <= maxo do
+        local v = (arr[bi + o] or 0) + (arr[bi + o + 1] or 0) * 0x100
+        if v >= 1 and v <= 0x3FF then                 -- nur kleine Werte (plausible Map-IDs)
+          LF.addr[#LF.addr + 1] = base + o
+          LF.val[#LF.val + 1] = v
+        end
+        o = o + 2
+      end
+    end
+    base = base + math.min(CONFIG.scan_chunk, size - base)
+  end
+  LF.ready = true
+  console.log(string.format("[locfind] Basis aufgenommen: %d Kandidaten. → Auf eine ANDERE Route gehen und [2] druecken.", #LF.addr))
+end
+
+local function lfFilter(changed)
+  if not LF.ready or #LF.addr == 0 then
+    console.log("[locfind] Noch keine Basis. Zuerst auf einer Route stehen und [1] druecken.")
+    return
+  end
+  local na, nv = {}, {}
+  for i = 1, #LF.addr do
+    local cur = safeU16(LF.addr[i])
+    local keep
+    if changed then keep = (cur ~= nil and cur ~= LF.val[i] and cur >= 1 and cur <= 0x3FF)
+    else            keep = (cur == LF.val[i]) end
+    if keep then na[#na + 1] = LF.addr[i]; nv[#nv + 1] = (cur or LF.val[i]) end
+  end
+  LF.addr, LF.val = na, nv
+  console.log(string.format("[locfind] %s → %d Kandidaten uebrig.", changed and "geaendert" or "gleich geblieben", #LF.addr))
+  if #LF.addr > 0 and #LF.addr <= 16 then
+    for i = 1, #LF.addr do
+      console.log(string.format("   Kandidat: location_addr = 0x%X   (aktueller Wert %d)", LF.addr[i], LF.val[i]))
+    end
+    console.log("   → Vermutete Adresse in CONFIG.location_addr eintragen, Script neu laden.")
+  elseif #LF.addr > 16 then
+    console.log("   Noch zu viele — weiteren Routenwechsel + [2] (oder beim Stehen [3]).")
+  end
+end
+
+local function lfStep()
+  local keys
+  local ok = pcall(function() keys = input.get() end)
+  if not ok or type(keys) ~= "table" then return end
+  if lfEdge(keys, {"Number1", "NumberPad1"}) then lfBaseline(PROFILES[CONFIG.game]) end
+  if lfEdge(keys, {"Number2", "NumberPad2"}) then lfFilter(true) end
+  if lfEdge(keys, {"Number3", "NumberPad3"}) then lfFilter(false) end
+  LF.prev = keys
+end
+
+-- Loggt die Location-ID bei jedem Wechsel (nur wenn location_addr gesetzt) →
+-- Route ↔ ID festhalten und in LOCATIONS eintragen.
+local function logLocationChange()
+  if not CONFIG.location_addr then return end
+  local lid = safeU16(CONFIG.location_addr)
+  if lid ~= LOC_last then
+    LOC_last = lid
+    local nm = locationName(CONFIG.game, lid)
+    console.log(string.format("[location] ID=%s  name=%s", tostring(lid), nm or "(noch nicht gemappt)"))
+  end
 end
 
 -- ── Auto-Detect: Speicher in Frame-Chunks scannen ───────────────────────────
@@ -467,11 +577,24 @@ assert(profile, "Unbekanntes Spiel: " .. tostring(CONFIG.game))
 pcall(function() memory.usememorydomain(profile.domain) end)
 
 console.log("SoulLink Sync gestartet · Spiel=" .. CONFIG.game .. " · Output=" .. CONFIG.output)
+if CONFIG.find_location then
+  console.log("[locfind] AKTIV — Location-Adresse finden:")
+  console.log("[locfind]   1) Auf einer Route STEHEN, Taste [1] = Basis-Aufnahme")
+  console.log("[locfind]   2) Auf eine ANDERE Route gehen, Taste [2] = nur Geaendertes behalten")
+  console.log("[locfind]   3) Schritt 2 mit weiteren Routen wiederholen, bis wenige Adressen bleiben")
+  console.log("[locfind]   (optional) Taste [3] beim Stehen = nur Gleichgebliebenes behalten)")
+  console.log("[locfind]   Tasten im EMULATOR-Fenster druecken (nicht in der Lua-Console).")
+end
+if CONFIG.location_addr then
+  console.log(string.format("[location] location_addr = 0x%X gesetzt — IDs werden bei Wechsel geloggt.", CONFIG.location_addr))
+end
 detectStart(profile)
 
 -- Ein Frame Arbeit (wird vom Loop in pcall ausgeführt)
 local function stepOnce(frame)
   pcall(function() memory.usememorydomain(profile.domain) end)
+  if CONFIG.find_location then lfStep() end                  -- Kalibrierhilfe (nur Lesen + Log)
+  if frame % CONFIG.interval_frames == 0 then logLocationChange() end
   if DET.running then
     if detectStep(profile) then detectFinish(profile) end
   elseif not profile.party_addr then
