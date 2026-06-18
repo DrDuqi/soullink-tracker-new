@@ -29,7 +29,7 @@ local CONFIG = {
   location_addr   = nil,
   -- Kalibrierhilfe: findet die Location-Adresse per Differenz-Suche (Tasten 1/2/3 im
   -- Emu-Fenster, Anleitung erscheint in der Lua-Console). Aktivieren → Script neu laden.
-  find_location   = false,
+  find_location   = true,
   -- Kalibrier-Hilfe: einmaliges Loggen der Spitznamen-Rohwerte des 1. Pokemon in
   -- die BizHawk-Konsole (Lua Console). Damit lässt sich der Zeichensatz exakt
   -- prüfen/fixen. Aktivieren → Script neu laden → Zeile + echten Namen melden.
@@ -149,14 +149,20 @@ local function locationName(game, id)
   return (t and id ~= nil and t[id]) or nil
 end
 
--- ── Kalibrierhilfe: Location-Adresse per Differenz-Suche finden ──────────────
--- Klassische RAM-Suche nach einem "kleinen u16-Wert, der sich beim Routenwechsel
--- ändert", direkt im Script (kein geratenes Mapping). Tasten im EMU-Fenster:
---   [1] Basis-Aufnahme auf der AKTUELLEN Route (merkt sich alle kleinen u16-Werte)
---   [2] Auf einer ANDEREN Route drücken → behält nur Adressen, deren Wert sich änderte
---   [3] (optional) beim Stehenbleiben → behält nur Adressen, die GLEICH blieben
--- Nach 2–3 Routenwechseln bleiben wenige Adressen übrig → das ist die Location-ID.
-local LF = { addr = {}, val = {}, prev = {}, ready = false }
+-- ── Kalibrierhilfe: Location-Adresse EINDEUTIG bestimmen ─────────────────────
+-- RAM-Suche nach genau dem u16-Wert, der pro Gebiet konstant, zwischen Gebieten
+-- verschieden ist und bei Rückkehr exakt denselben Wert wieder annimmt — also
+-- die echte Map-/Location-ID (kein geratenes Mapping).
+--
+-- Bedienung (Tasten 1..6 IM EMULATOR-Fenster):
+--   • Für JEDES neue Gebiet eine EIGENE Zahl drücken (Gebiet 1 → [1], Gebiet 2 → [2], …).
+--   • Wenn du in ein bereits erfasstes Gebiet ZURÜCKKEHRST, die GLEICHE Zahl erneut drücken.
+--   • [0] = alles zurücksetzen und neu beginnen.
+-- Zwei Filter laufen automatisch und schließen sich gegenseitig auf:
+--   – Konsistenz: bei Rückkehr muss der Wert wieder identisch sein (killt Zähler/RNG).
+--   – Injektivität: zwei verschiedene Gebiete dürfen NICHT denselben Wert haben (killt Zufall).
+-- Bleibt genau 1 Adresse übrig, setzt das Script CONFIG.location_addr sofort selbst.
+local LF = { addr = {}, slots = {}, seen = {}, prev = {} }   -- slots[r][i] = Wert von Kandidat i in Gebiet r
 local LOC_last = nil       -- zuletzt geloggte Location-ID (für Änderungs-Log)
 
 local function lfDown(keys, names)
@@ -174,9 +180,15 @@ local function lfDomainSize(profile)
   return sz
 end
 
-local function lfBaseline(profile)
+local function lfReset()
+  LF.addr, LF.slots, LF.seen = {}, {}, {}
+  console.log("[locfind] Zurueckgesetzt. Auf einem Gebiet stehen und [1] druecken.")
+end
+
+-- Erst-Aufnahme: alle kleinen u16-Werte (plausible Map-IDs) als Kandidaten.
+local function lfInit(profile)
   local size = lfDomainSize(profile)
-  LF.addr, LF.val = {}, {}
+  LF.addr, LF.slots, LF.seen = {}, {}, {}
   local base = 0
   while base < size do
     local readlen = math.min(CONFIG.scan_chunk + 2, size - base)
@@ -185,41 +197,60 @@ local function lfBaseline(profile)
       local maxo, o = readlen - 2, 0
       while o <= maxo do
         local v = (arr[bi + o] or 0) + (arr[bi + o + 1] or 0) * 0x100
-        if v >= 1 and v <= 0x3FF then                 -- nur kleine Werte (plausible Map-IDs)
-          LF.addr[#LF.addr + 1] = base + o
-          LF.val[#LF.val + 1] = v
-        end
+        if v >= 1 and v <= 0x3FF then LF.addr[#LF.addr + 1] = base + o end
         o = o + 2
       end
     end
     base = base + math.min(CONFIG.scan_chunk, size - base)
   end
-  LF.ready = true
-  console.log(string.format("[locfind] Basis aufgenommen: %d Kandidaten. → Auf eine ANDERE Route gehen und [2] druecken.", #LF.addr))
+  console.log(string.format("[locfind] Basis: %d Kandidaten. Pro Gebiet eine eigene Zahl 1..6; bei Rueckkehr die GLEICHE.", #LF.addr))
 end
 
-local function lfFilter(changed)
-  if not LF.ready or #LF.addr == 0 then
-    console.log("[locfind] Noch keine Basis. Zuerst auf einer Route stehen und [1] druecken.")
-    return
-  end
-  local na, nv = {}, {}
+-- Ein Gebiet erfassen/prüfen. r = Gebiets-Slot (1..6).
+local function lfArea(r, profile)
+  if #LF.addr == 0 then lfInit(profile) end
+  local keepIdx, keepCur = {}, {}
   for i = 1, #LF.addr do
     local cur = safeU16(LF.addr[i])
-    local keep
-    if changed then keep = (cur ~= nil and cur ~= LF.val[i] and cur >= 1 and cur <= 0x3FF)
-    else            keep = (cur == LF.val[i]) end
-    if keep then na[#na + 1] = LF.addr[i]; nv[#nv + 1] = (cur or LF.val[i]) end
-  end
-  LF.addr, LF.val = na, nv
-  console.log(string.format("[locfind] %s → %d Kandidaten uebrig.", changed and "geaendert" or "gleich geblieben", #LF.addr))
-  if #LF.addr > 0 and #LF.addr <= 16 then
-    for i = 1, #LF.addr do
-      console.log(string.format("   Kandidat: location_addr = 0x%X   (aktueller Wert %d)", LF.addr[i], LF.val[i]))
+    local keep = (cur ~= nil and cur >= 0 and cur <= 0x3FF)
+    -- Konsistenz: schon in Gebiet r gemessen → Wert MUSS wieder gleich sein.
+    if keep and LF.seen[r] and LF.slots[r][i] ~= cur then keep = false end
+    -- Injektivität: kein anderes Gebiet darf denselben Wert tragen.
+    if keep then
+      for r2, s in pairs(LF.slots) do
+        if r2 ~= r and s[i] == cur then keep = false; break end
+      end
     end
-    console.log("   → Vermutete Adresse in CONFIG.location_addr eintragen, Script neu laden.")
-  elseif #LF.addr > 16 then
-    console.log("   Noch zu viele — weiteren Routenwechsel + [2] (oder beim Stehen [3]).")
+    if keep then keepIdx[#keepIdx + 1] = i; keepCur[#keepCur + 1] = cur end
+  end
+  -- Überlebende + ihre Gebiets-Werte neu aufbauen.
+  local na, nslots = {}, {}
+  for r2 in pairs(LF.slots) do nslots[r2] = {} end
+  nslots[r] = nslots[r] or {}
+  for k = 1, #keepIdx do
+    local i = keepIdx[k]
+    na[k] = LF.addr[i]
+    for r2, s in pairs(LF.slots) do nslots[r2][k] = s[i] end
+    nslots[r][k] = keepCur[k]
+  end
+  LF.addr, LF.slots = na, nslots
+  LF.seen[r] = true
+
+  local areas = 0; for _ in pairs(LF.seen) do areas = areas + 1 end
+  console.log(string.format("[locfind] Gebiet %d erfasst · %d Gebiete besucht · %d Kandidaten uebrig.", r, areas, #LF.addr))
+  if #LF.addr == 1 then
+    CONFIG.location_addr = LF.addr[1]; LOC_last = nil
+    local f = io.open("soullink_location_addr.txt", "w")
+    if f then f:write(string.format("%s location_addr = 0x%X\n", CONFIG.game, LF.addr[1])); f:close() end
+    console.log(string.format("[locfind] EINDEUTIG! location_addr = 0x%X ist ab sofort AKTIV (auch in CONFIG eintragen fuer Reloads).", LF.addr[1]))
+    console.log("[locfind] Jetzt jede Route ablaufen — die geloggte '[location] ID=NN' je Route in LOCATIONS eintragen.")
+  elseif #LF.addr <= 12 and #LF.addr > 1 then
+    for k = 1, #LF.addr do
+      local vec = {}
+      for r2 = 0, 9 do if LF.slots[r2] then vec[#vec + 1] = string.format("G%d=%d", r2, LF.slots[r2][k]) end end
+      console.log(string.format("   0x%X  [%s]", LF.addr[k], table.concat(vec, " ")))
+    end
+    console.log("   → Weiteres NEUES Gebiet (neue Zahl) ODER ein besuchtes erneut (gleiche Zahl), bis 1 bleibt.")
   end
 end
 
@@ -227,9 +258,11 @@ local function lfStep()
   local keys
   local ok = pcall(function() keys = input.get() end)
   if not ok or type(keys) ~= "table" then return end
-  if lfEdge(keys, {"Number1", "NumberPad1"}) then lfBaseline(PROFILES[CONFIG.game]) end
-  if lfEdge(keys, {"Number2", "NumberPad2"}) then lfFilter(true) end
-  if lfEdge(keys, {"Number3", "NumberPad3"}) then lfFilter(false) end
+  local profile = PROFILES[CONFIG.game]
+  if lfEdge(keys, {"Number0", "NumberPad0"}) then lfReset() end
+  for r = 1, 6 do
+    if lfEdge(keys, {"Number" .. r, "NumberPad" .. r}) then lfArea(r, profile) end
+  end
   LF.prev = keys
 end
 
@@ -578,12 +611,12 @@ pcall(function() memory.usememorydomain(profile.domain) end)
 
 console.log("SoulLink Sync gestartet · Spiel=" .. CONFIG.game .. " · Output=" .. CONFIG.output)
 if CONFIG.find_location then
-  console.log("[locfind] AKTIV — Location-Adresse finden:")
-  console.log("[locfind]   1) Auf einer Route STEHEN, Taste [1] = Basis-Aufnahme")
-  console.log("[locfind]   2) Auf eine ANDERE Route gehen, Taste [2] = nur Geaendertes behalten")
-  console.log("[locfind]   3) Schritt 2 mit weiteren Routen wiederholen, bis wenige Adressen bleiben")
-  console.log("[locfind]   (optional) Taste [3] beim Stehen = nur Gleichgebliebenes behalten)")
-  console.log("[locfind]   Tasten im EMULATOR-Fenster druecken (nicht in der Lua-Console).")
+  console.log("[locfind] AKTIV — Location-Adresse EINDEUTIG bestimmen:")
+  console.log("[locfind]   • Pro Gebiet eine EIGENE Zahl druecken: Gebiet 1 -> [1], Gebiet 2 -> [2], usw.")
+  console.log("[locfind]   • Bei RUECKKEHR in ein erfasstes Gebiet die GLEICHE Zahl erneut druecken.")
+  console.log("[locfind]   • Am besten 3-4 klar verschiedene Gebiete + 1-2 Rueckkehrungen.")
+  console.log("[locfind]   • [0] = zuruecksetzen. Tasten IM EMULATOR-Fenster (nicht in der Console).")
+  console.log("[locfind]   Bei genau 1 Treffer setzt das Script location_addr automatisch.")
 end
 if CONFIG.location_addr then
   console.log(string.format("[location] location_addr = 0x%X gesetzt — IDs werden bei Wechsel geloggt.", CONFIG.location_addr))
