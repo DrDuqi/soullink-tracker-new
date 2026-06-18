@@ -325,6 +325,49 @@ local function jstr(s)
   return '"' .. s:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"'
 end
 
+-- Slot-Diagnose (nur für CONFIG.debug). Gibt einen lesbaren Status-String zurück,
+-- der exakt zeigt, WARUM ein Slot nil zurückgibt (oder dass er OK ist).
+-- Dupliziert die Entschlüsselung, läuft aber nur wenn debug=true.
+local function diagSlot(profile, slot)
+  if not profile.party_addr then return "kein party_addr" end
+  local addr = profile.party_addr + slot * profile.mon_size
+  local arr, bi = readArray(addr, profile.mon_size)
+  if not arr then return string.format("Speicher unlesbar @ 0x%X", addr) end
+  local pid = U32(arr, bi)
+  if pid == 0 then return string.format("leer (pid=0 @ 0x%X)", addr) end
+  local chk = U16(arr, bi + 6)
+  local seed, sum, w = chk, 0, {}
+  for i = 0, 63 do
+    seed = (seed * 0x41C64E6D + 0x6073) & 0xFFFFFFFF
+    w[i] = U16(arr, bi + 8 + i * 2) ~ ((seed >> 16) & 0xFFFF)
+    sum = (sum + w[i]) & 0xFFFF
+  end
+  if sum ~= chk then
+    return string.format("FAIL Pruefsumme: pid=0x%08X chk=%04X sum=%04X @ 0x%X", pid, chk, sum, addr)
+  end
+  local ord = ORDERS[((pid >> 13) & 0x1F) % 24 + 1]
+  local pA = (ord:find("A") - 1) * 16
+  local species = w[pA]
+  seed = pid
+  local pd = {}
+  for i = 0, 4 do
+    seed = (seed * 0x41C64E6D + 0x6073) & 0xFFFFFFFF
+    pd[i] = U16(arr, bi + 0x88 + i * 2) ~ ((seed >> 16) & 0xFFFF)
+  end
+  local level, curHp, maxHp = pd[2] & 0xFF, pd[3], pd[4]
+  if species < 1 or species > profile.max_species then
+    return string.format("FAIL species=%d ausserhalb 1..%d  pid=0x%08X", species, profile.max_species, pid)
+  elseif level < 1 or level > 100 then
+    return string.format("FAIL level=%d ausserhalb 1..100  species=%d  pid=0x%08X", level, species, pid)
+  elseif maxHp < 1 or maxHp > 1000 then
+    return string.format("FAIL maxHp=%d ausserhalb 1..1000  species=%d lv=%d  pid=0x%08X", maxHp, species, level, pid)
+  elseif curHp > maxHp then
+    return string.format("FAIL curHp=%d > maxHp=%d  species=%d lv=%d  pid=0x%08X", curHp, maxHp, species, level, pid)
+  end
+  return string.format("OK  species=%-3d  pid=0x%08X  lv=%-3d  hp=%d/%d  addr=0x%X",
+    species, pid, level, curHp, maxHp, addr)
+end
+
 local function buildJson(profile)
   local parts = {}
   -- Immer alle 6 Slots prüfen. Leere/freigegebene Slots sind in Gen 4 komplett genullt
@@ -333,6 +376,9 @@ local function buildJson(profile)
   -- sein muss (die Zahl bei party_addr-4 ist nicht immer der echte Live-Party-Zähler).
   for slot = 0, 5 do
     local m = readMonRichAt(profile, slot)
+    if CONFIG.debug then
+      console.log(string.format("[slot %d] %s", slot + 1, diagSlot(profile, slot)))
+    end
     if m then
       parts[#parts + 1] = string.format(
         '{"slot":%d,"speciesId":%d,"pid":%s,"level":%d,"hp":%d,"maxHp":%d,"status":"%s","fainted":%s,'
