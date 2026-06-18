@@ -5,6 +5,8 @@ import { STATUS_LABEL_DE, natureName } from '../lib/emulatorSync'
 import type { EmulatorMon } from '../lib/emulatorSync'
 import type { EncounterPrefill } from './AddEncounterModal'
 import { matchRoute } from '../lib/routes'
+import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
+import LocationMapManager from './LocationMapManager'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
 
 const ENABLED_KEY = 'soullink-emusync-enabled'
@@ -13,11 +15,12 @@ const GAME_LABEL: Record<string, string> = { platinum: 'Platinum', heartgold: 'H
 // Resolves ability / item / move names (by id, cached) for one Pokémon and
 // renders the enriched detail. Keyed on the ids so the 1s status ticker doesn't
 // cause refetches; cache makes repeats free.
-function MonRich({ mon, imported, game, currentLocationName, onImport }: {
+function MonRich({ mon, imported, game, currentLocationName, currentLocationId, onImport }: {
   mon: EmulatorMon
   imported: boolean
   game?: string
   currentLocationName?: string | null
+  currentLocationId?: number | null
   onImport?: (p: EncounterPrefill, suggestedRoute?: string) => void
 }) {
   const [moves, setMoves] = useState<({ name: string; type: string } | null)[]>([])
@@ -46,8 +49,12 @@ function MonRich({ mon, imported, game, currentLocationName, onImport }: {
       if (!poke) return
       const ids = (mon.moveIds ?? []).filter((x) => x > 0)
       const mv = await Promise.all(ids.map((id) => fetchMoveById(id)))
-      // Prefer the per-mon catch location, fall back to the current map; match to a checklist route.
-      const route = matchRoute(mon.metLocationName ?? currentLocationName ?? null, game ?? '') ?? undefined
+      // Route-Quelle: gelernte Orts-ID zuerst (vom Nutzer bestätigt), dann Fangort,
+      // dann aktueller Ort via matchRoute. Kein sicherer Treffer → manuell.
+      const route =
+        getLearnedRoute(game ?? '', currentLocationId) ??
+        matchRoute(mon.metLocationName ?? currentLocationName ?? null, game ?? '') ??
+        undefined
       onImport({
         pokemon: poke,
         nickname: mon.nickname ?? null,
@@ -55,6 +62,7 @@ function MonRich({ mon, imported, game, currentLocationName, onImport }: {
         moves: mv.map((m) => m?.name ?? null),
         note: `Aus Emulator · Lv ${mon.level}`,
         emuPid: mon.pid != null ? String(mon.pid) : null,
+        emuLocationId: currentLocationId ?? null,
       }, route)
     } finally {
       setImporting(false)
@@ -150,11 +158,14 @@ export default function EmulatorLivePanel({
     try { return localStorage.getItem(ENABLED_KEY) !== '0' } catch { return true }
   })
   const { phase, team, game: liveGame, currentLocationName, currentLocationId, ageSec } = useEmulatorSync(enabled)
-  // Aktueller Ort: Name wenn (sicher) gemappt, sonst ID, sonst unbekannt.
-  const matchedRoute = currentLocationName ? matchRoute(currentLocationName, (liveGame ?? game ?? '')) : null
-  const locText = currentLocationName
-    ? currentLocationName
-    : currentLocationId != null ? `unbekannt (ID ${currentLocationId})` : 'unbekannt'
+  const gameKey = liveGame ?? game ?? ''
+  useLocationMap(gameKey)   // reaktiv: Ort-Anzeige aktualisiert sich nach dem Lernen
+  // Aktueller Ort: gelernte Zuordnung zuerst, sonst (sicherer) Lua-Name, sonst ID.
+  const learnedLoc = currentLocationId != null ? getLearnedRoute(gameKey, currentLocationId) : null
+  const matchedRoute = learnedLoc ?? (currentLocationName ? matchRoute(currentLocationName, gameKey) : null)
+  const locText = learnedLoc
+    ?? currentLocationName
+    ?? (currentLocationId != null ? `Unbekannter Ort (ID ${currentLocationId})` : 'unbekannt')
 
   function toggle() {
     const v = !enabled
@@ -202,8 +213,10 @@ export default function EmulatorLivePanel({
         <div className="flex items-center gap-1.5 px-4 py-2 text-[11px] border-t" style={{ background: '#16161f', borderColor: '#2e2e42' }}>
           <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: matchedRoute ? '#4ade80' : '#64748b' }} />
           <span className="text-slate-400 font-medium">Aktueller Ort:</span>
-          <span className="font-bold" style={{ color: matchedRoute ? '#4ade80' : currentLocationName ? '#cbd5e1' : '#64748b' }}>{locText}</span>
-          {matchedRoute && <span className="text-slate-500">→ Route wird beim Import vorgeschlagen</span>}
+          <span className="font-bold" style={{ color: matchedRoute ? '#4ade80' : '#cbd5e1' }}>{locText}</span>
+          {matchedRoute
+            ? <span className="text-slate-500">→ Route wird beim Import vorgeschlagen</span>
+            : currentLocationId != null && <span className="text-slate-500">→ beim Import lernt die App diese Route</span>}
         </div>
       )}
 
@@ -216,11 +229,14 @@ export default function EmulatorLivePanel({
               imported={(m.pid != null && !!importedPids?.has(String(m.pid))) || !!importedSpeciesIds?.has(m.speciesId)}
               game={game}
               currentLocationName={currentLocationName}
+              currentLocationId={currentLocationId}
               onImport={onImport}
             />
           ))}
         </div>
       )}
+
+      {enabled && <LocationMapManager game={gameKey} />}
 
       {enabled && team.length === 0 && phase !== 'init' && (
         <div className="px-4 py-3 text-slate-600 text-[11px]" style={{ background: '#161620' }}>

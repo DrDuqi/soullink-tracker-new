@@ -3,6 +3,7 @@ import { X, MapPin, PenLine, AlertTriangle } from 'lucide-react'
 import PokemonSearch from './PokemonSearch'
 import { useAddEncounter } from '../hooks/useEncounters'
 import { getRoutesForGame } from '../lib/routes'
+import { getLearnedRoute, useLocationMapStore } from '../lib/locationMap'
 import { getTypeColor, getSpriteUrl } from '../lib/pokemon-api'
 import type { Encounter, Player, PokemonStatus } from '../types/database'
 import type { PokemonBasic } from '../lib/pokemon-api'
@@ -16,6 +17,7 @@ export interface EncounterPrefill {
   moves?: (string | null)[]   // up to 4 move names → move_1..4
   note?: string               // seeded into the notes field (e.g. level, since encounters have no level column)
   emuPid?: string | null      // stable emulator identity → stored on the encounter (evolution-proof)
+  emuLocationId?: number | null  // current emulator location id → auto-learn id→route on save
 }
 
 interface Props {
@@ -52,6 +54,10 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
   const isCustom = location === 'Eigene Route...'
   const finalLocation = isCustom ? customLocation.trim() : location
 
+  // Auto-Learning-Hinweis: aktuelle Emulator-Orts-ID und ihr (evtl. schon gelerntes) Mapping.
+  const emuLocId = prefill?.emuLocationId ?? null
+  const emuLocMapped = emuLocId != null ? getLearnedRoute(game, emuLocId) : null
+
   // PID = eindeutige Identität: existiert bereits ein Encounter mit derselben
   // Emulator-PID, wird NIE ein zweiter angelegt — stattdessen der vorhandene geöffnet.
   function findByPid(): Encounter | null {
@@ -82,6 +88,12 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
         move_4: prefill?.moves?.[3] ?? null,
         emu_pid: prefill?.emuPid ?? null,
       })
+      // Auto-Learning: unbekannte Emulator-Orts-ID mit der gewählten Route verknüpfen
+      // (nur wenn noch nicht gelernt — Korrekturen laufen über den Orte-Manager).
+      const locId = prefill?.emuLocationId
+      if (locId != null && !getLearnedRoute(game, locId)) {
+        useLocationMapStore.getState().setMapping(game, locId, finalLocation)
+      }
       onClose()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Fehler beim Hinzufügen')
@@ -204,6 +216,17 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
                 required
                 autoFocus
               />
+            )}
+            {emuLocId != null && (
+              emuLocMapped ? (
+                <p className="text-slate-500 text-[11px] mt-1.5">
+                  Ort-ID {emuLocId} ist als „{emuLocMapped}" gespeichert (im Orte-Manager änderbar).
+                </p>
+              ) : (
+                <p className="text-emerald-500/80 text-[11px] mt-1.5">
+                  Diese Auswahl wird mit Ort-ID {emuLocId} verknüpft und beim nächsten Mal automatisch erkannt.
+                </p>
+              )
             )}
           </div>
 

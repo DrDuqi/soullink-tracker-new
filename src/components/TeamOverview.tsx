@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Users, Box, Skull, Swords, Heart, MapPin, Gamepad2 } from 'lucide-react'
 import { getSpriteUrl, getTypeColor, fetchItemName, fetchPokemon, fetchMoveById } from '../lib/pokemon-api'
 import { matchRoute } from '../lib/routes'
+import { getLearnedRoute } from '../lib/locationMap'
 import EncounterCard from './EncounterCard'
 import { useEmuTeamStore } from '../store/emuTeamStore'
 import { deriveTeamGroups } from '../lib/teamGroups'
@@ -68,7 +69,7 @@ function TeamSlot({ enc, mon, onClick }: { enc: Encounter; mon?: EmulatorMon; on
 }
 
 // Live emulator mon that hasn't been imported yet as an encounter.
-function GhostSlot({ mon, game, currentLocationName, onImport }: { mon: EmulatorMon; game: string; currentLocationName: string | null; onImport: (prefill: EncounterPrefill, route?: string) => void }) {
+function GhostSlot({ mon, game, currentLocationName, currentLocationId, onImport }: { mon: EmulatorMon; game: string; currentLocationName: string | null; currentLocationId: number | null; onImport: (prefill: EncounterPrefill, route?: string) => void }) {
   const [speciesName, setSpeciesName] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
 
@@ -88,8 +89,11 @@ function GhostSlot({ mon, game, currentLocationName, onImport }: { mon: Emulator
       if (!poke) return
       const ids = (mon.moveIds ?? []).filter((x) => x > 0)
       const mv = await Promise.all(ids.map((id) => fetchMoveById(id)))
-      // Sichere Route-Quelle: Fangort (metLocation) zuerst, sonst aktueller Ort.
-      const route = matchRoute(mon.metLocationName ?? currentLocationName ?? null, game) ?? undefined
+      // Route-Quelle: gelernte Orts-ID zuerst, dann Fangort, dann aktueller Ort.
+      const route =
+        getLearnedRoute(game, currentLocationId) ??
+        matchRoute(mon.metLocationName ?? currentLocationName ?? null, game) ??
+        undefined
       onImport({
         pokemon: poke,
         nickname: mon.nickname ?? null,
@@ -97,6 +101,7 @@ function GhostSlot({ mon, game, currentLocationName, onImport }: { mon: Emulator
         moves: mv.map((m) => m?.name ?? null),
         note: `Aus Emulator · Lv ${mon.level}`,
         emuPid: mon.pid != null ? String(mon.pid) : null,
+        emuLocationId: currentLocationId ?? null,
       }, route)
     } finally {
       setImporting(false)
@@ -155,7 +160,7 @@ interface Props {
 }
 
 export default function TeamOverview({ myEncounters, partnerEncounters, teamSlots, players, myPlayerId, game, onSelectEncounter, onImport }: Props) {
-  const { team: liveTeam, connected, currentLocationName } = useEmuTeamStore()
+  const { team: liveTeam, connected, currentLocationName, currentLocationId } = useEmuTeamStore()
   const partner = players.find((p) => p.id !== myPlayerId)
 
   const { team: teamEncs, box: boxEncs, dead: deadEncs, liveByPid } = deriveTeamGroups(myEncounters, teamSlots, myPlayerId, liveTeam, connected)
@@ -224,7 +229,7 @@ export default function TeamOverview({ myEncounters, partnerEncounters, teamSlot
               return <TeamSlot key={slot.enc.id} enc={slot.enc} mon={slot.mon} onClick={() => onSelectEncounter(slot.enc)} />
             }
             if (slot.type === 'ghost') {
-              return <GhostSlot key={`ghost-${slot.mon.slot}`} mon={slot.mon} game={game} currentLocationName={currentLocationName} onImport={onImport} />
+              return <GhostSlot key={`ghost-${slot.mon.slot}`} mon={slot.mon} game={game} currentLocationName={currentLocationName} currentLocationId={currentLocationId} onImport={onImport} />
             }
             return (
               <div key={`empty-${slot.idx}`} className="rounded-xl border border-dashed border-[#2e2e42] min-h-[96px] flex items-center justify-center text-slate-700 text-[10px]">
