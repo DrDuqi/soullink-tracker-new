@@ -6,6 +6,7 @@ import {
 import type { PokemonStats } from '../lib/pokemon-api'
 import { buildMembers, analyzeTeam, analyzeSoulLinks, analyzeGym } from '../lib/analysis/teamAnalysis'
 import { getGymsForGame } from '../lib/analysis/gyms'
+import { useEmuTeamStore } from '../store/emuTeamStore'
 import type { Encounter, Player, SoulLinkPair, TeamSlot } from '../types/database'
 
 const de = (t: string) => TYPE_NAMES_DE[t] ?? t
@@ -49,14 +50,20 @@ interface Props {
   teamSlots: TeamSlot[]
   soulLinkPairs: SoulLinkPair[]
   onSelectEncounter?: (enc: Encounter) => void
+  /** Analyse the current live emulator team (when connected) instead of team_slots. */
+  useLiveTeam?: boolean
   collapsible?: boolean
   defaultOpen?: boolean
 }
 
 export default function TeamAnalysisPanel({
   runId, game, players, myPlayerId, encounters, teamSlots, soulLinkPairs,
-  onSelectEncounter, collapsible = true, defaultOpen = true,
+  onSelectEncounter, useLiveTeam, collapsible = true, defaultOpen = true,
 }: Props) {
+  // Composition-only selector: re-renders the panel only when the team line-up
+  // (pids) or connection changes — NOT on every HP tick.
+  const liveTeamPids = useEmuTeamStore((s) =>
+    useLiveTeam && s.connected ? s.team.filter((m) => m.pid != null).map((m) => String(m.pid)).sort().join(',') : '')
   const [open, setOpen] = useState(defaultOpen)
   const [statsMap, setStatsMap] = useState<Record<number, PokemonStats>>({})
   const [moveTypesMap, setMoveTypesMap] = useState<Record<string, string[]>>({})
@@ -82,7 +89,14 @@ export default function TeamAnalysisPanel({
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const myTeamEncs = useMemo(() => teamEncsFor(myPlayerId), [teamSlots, encounters, myPlayerId])
+  const myTeamEncs = useMemo(() => {
+    if (useLiveTeam && liveTeamPids) {
+      const pidSet = new Set(liveTeamPids.split(',').filter(Boolean))
+      return encounters.filter((e) => e.player_id === myPlayerId && !!e.emu_pid && pidSet.has(e.emu_pid))
+    }
+    return teamEncsFor(myPlayerId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useLiveTeam, liveTeamPids, teamSlots, encounters, myPlayerId])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const partnerTeamEncs = useMemo(() => teamEncsFor(partnerId), [teamSlots, encounters, partnerId])
   const combinedEncs = useMemo(() => [...myTeamEncs, ...partnerTeamEncs], [myTeamEncs, partnerTeamEncs])

@@ -26,6 +26,10 @@ local CONFIG = {
   -- bleibt null. Finden via RAM-Search (2-Byte): Wert beobachten, der sich beim
   -- Wechsel zwischen Karten ändert. Danach die IDs unten in LOCATIONS eintragen.
   location_addr   = nil,
+  -- Kalibrier-Hilfe: einmaliges Loggen der Spitznamen-Rohwerte des 1. Pokemon in
+  -- die BizHawk-Konsole (Lua Console). Damit lässt sich der Zeichensatz exakt
+  -- prüfen/fixen. Aktivieren → Script neu laden → Zeile + echten Namen melden.
+  debug           = false,
 }
 
 -- Gen-4 Block-Reihenfolge (Permutation per ((PID>>13)&0x1F)%24)
@@ -252,6 +256,7 @@ end
 -- Zuverlässig: species, level, hp/maxHp, status, moves, heldItem, ability, nature.
 -- Best-effort: nickname.  Noch null (Roadmap): metLocation/metLevel (Block-D-Offsets
 -- je Edition unverifiziert) — bewusst null statt unsichere Werte.
+local _dbgNickDone = false
 local function readMonRich(a, s, maxSpecies)
   local pid = U32(a, s)
   if pid == 0 then return nil end
@@ -272,6 +277,16 @@ local function readMonRich(a, s, maxSpecies)
 
   local species = w[pA + 0]
   if species < 1 or species > maxSpecies then return nil end
+
+  -- Einmalige Kalibrier-Ausgabe für den Spitznamen-Zeichensatz (Block C).
+  if CONFIG.debug and not _dbgNickDone then
+    _dbgNickDone = true
+    local hex = {}
+    for i = 0, 10 do hex[#hex + 1] = string.format("%04X", w[pC + i] or 0) end
+    console.log("[SoulLink debug] Spitzname-Rohwerte (Block C): " .. table.concat(hex, " "))
+    console.log("[SoulLink debug] Decode-Versuch: " .. tostring(decodeNick(w, pC)))
+    console.log("[SoulLink debug] -> Diese 2 Zeilen + den echten Namen des 1. Pokemon melden = Zeichensatz wird exakt kalibriert.")
+  end
 
   seed = pid
   local pd = {}

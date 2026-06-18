@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { fetchPokemon, fetchEvolutionChain, fetchMoveById } from '../lib/pokemon-api'
 import { useUpdateEncounter, useUpdateMoves } from '../hooks/useEncounters'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
+import { useEmuTeamStore } from '../store/emuTeamStore'
 import type { Encounter } from '../types/database'
 
 /**
@@ -17,13 +18,19 @@ import type { Encounter } from '../types/database'
  * match) are never touched.
  */
 export default function EmulatorReconciler({ encounters, runId }: { encounters: Encounter[]; runId: string }) {
-  const { team } = useEmulatorSync(true)
+  const { team, phase } = useEmulatorSync(true)
   const updateEncounter = useUpdateEncounter()
   const updateMoves = useUpdateMoves()
+  const setEmuTeam = useEmuTeamStore((s) => s.setTeam)
 
   // Re-run only when identity-relevant data changes (not on the 1s age ticker).
   const teamKey = team.map((m) => `${m.pid ?? ''}:${m.speciesId}:${(m.moveIds ?? []).join('|')}`).join(',')
   const encKey = encounters.map((e) => `${e.emu_pid ?? ''}#${e.pokemon_id}#${e.move_1}|${e.move_2}|${e.move_3}|${e.move_4}`).join(',')
+
+  // Publish the live team to the shared store (drives the Team/Box overview).
+  // Keyed incl. HP/level/item so the overview shows them live.
+  const liveKey = team.map((m) => `${m.pid ?? ''}:${m.speciesId}:${m.level}:${m.hp}:${m.maxHp}:${m.heldItemId ?? ''}:${(m.moveIds ?? []).join('|')}`).join(',')
+  useEffect(() => { setEmuTeam(team, phase === 'connected') }, [liveKey, phase, setEmuTeam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let cancelled = false

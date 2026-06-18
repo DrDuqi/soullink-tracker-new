@@ -28,6 +28,7 @@ import SlotPickerModal from '../components/SlotPickerModal'
 import UserMenu from '../components/UserMenu'
 import EmulatorLivePanel from '../components/EmulatorLivePanel'
 import EmulatorReconciler from '../components/EmulatorReconciler'
+import TeamOverview from '../components/TeamOverview'
 import { useAuth } from '../contexts/AuthContext'
 import type { Encounter, Run, Player, SoulLinkPair, LinkRequest, ActivityLogEntry } from '../types/database'
 
@@ -745,6 +746,18 @@ export default function RunPage() {
                 />
               )}
 
+              {/* Team / Box / Besiegt / Partner — derived from the live emulator team (by PID), fallback to team_slots */}
+              {isMyFocus && (
+                <TeamOverview
+                  myEncounters={myEncounters}
+                  partnerEncounters={partnerEncounters}
+                  teamSlots={teamSlots}
+                  players={players}
+                  myPlayerId={myPlayerId ?? ''}
+                  onSelectEncounter={(e) => setSelectedEncounter(e)}
+                />
+              )}
+
               {/* Focus-dependent block (framed yellow when viewing partner) */}
               <div className={`space-y-5 ${!isMyFocus ? 'partner-frame p-4 lg:p-5' : ''}`}>
                 {/* View toggle row */}
@@ -903,6 +916,7 @@ export default function RunPage() {
                 teamSlots={teamSlots}
                 soulLinkPairs={pairs}
                 onSelectEncounter={(enc) => setSelectedEncounter(enc)}
+                useLiveTeam
                 collapsible
                 defaultOpen
               />
