@@ -327,7 +327,11 @@ end
 
 local function buildJson(profile)
   local parts = {}
-  for slot = 0, (profile.team_size or 6) - 1 do
+  -- Immer alle 6 Slots prüfen. Leere/freigegebene Slots sind in Gen 4 komplett genullt
+  -- (pid == 0 → readMonRich gibt nil zurück → wird übersprungen). So werden auch
+  -- neu gefangene Pokémon sofort gezeigt, ohne dass team_size korrekt aktualisiert
+  -- sein muss (die Zahl bei party_addr-4 ist nicht immer der echte Live-Party-Zähler).
+  for slot = 0, 5 do
     local m = readMonRichAt(profile, slot)
     if m then
       parts[#parts + 1] = string.format(
@@ -395,10 +399,12 @@ local function stepOnce(frame)
     if frame % 120 == 0 then detectStart(profile) end          -- alle ~2s neu versuchen
   else
     if frame % CONFIG.interval_frames == 0 then
-      -- Anker erneut prüfen: gültiger Count-Header + lesbare Lead-Mon
+      -- Anker erneut prüfen: Lead-Mon muss lesbar sein.
+      -- count(-4) wird aktualisiert, wenn er einen sinnvollen Wert hat, beeinflusst
+      -- aber die Ausgabe NICHT mehr (buildJson liest immer alle 6 Slots).
       local count = safeU32(profile.party_addr - 4)
-      if readMon(profile, 0) and count and count >= 1 and count <= 6 then
-        profile.team_size = count
+      if readMon(profile, 0) then
+        if count and count >= 1 and count <= 6 then profile.team_size = count end
         emit(buildJson(profile))
       else
         console.log("[sync] Party-Adresse ungueltig (Save-Block-Wechsel?) — scanne neu ...")
