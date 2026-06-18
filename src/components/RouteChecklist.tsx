@@ -19,6 +19,8 @@ interface RouteInfo {
   state: RouteState
   p1Enc: Encounter | null
   p2Enc: Encounter | null
+  p1All: Encounter[]
+  p2All: Encounter[]
   pair: SoulLinkPair | null
 }
 
@@ -62,8 +64,10 @@ export default function RouteChecklist({
 
   const buildInfo = (route: string): RouteInfo => {
     const here = encounters.filter((e) => e.location === route)
-    const p1Enc = p1 ? here.find((e) => e.player_id === p1.id) ?? null : null
-    const p2Enc = p2 ? here.find((e) => e.player_id === p2.id) ?? null : null
+    const p1All = p1 ? here.filter((e) => e.player_id === p1.id) : []
+    const p2All = p2 ? here.filter((e) => e.player_id === p2.id) : []
+    const p1Enc = p1All[0] ?? null
+    const p2Enc = p2All[0] ?? null
     const pair = soulLinkPairs.find(
       (pr) => pr.location === route || pr.encounter1.location === route || pr.encounter2.location === route
     ) ?? null
@@ -75,7 +79,7 @@ export default function RouteChecklist({
     else if (p1Enc || p2Enc) state = 'partial'
     else state = 'open'
 
-    return { route, state, p1Enc, p2Enc, pair }
+    return { route, state, p1Enc, p2Enc, p1All, p2All, pair }
   }
 
   const officialInfos = useMemo(
@@ -116,6 +120,8 @@ export default function RouteChecklist({
     const canQuickLink = info.state === 'both' && bothAlive && !!onRequestSoulLink
     const pending = !!(pendingLinkEncIds && info.p1Enc && info.p2Enc &&
       (pendingLinkEncIds.has(info.p1Enc.id) || pendingLinkEncIds.has(info.p2Enc.id)))
+    const totalCount = info.p1All.length + info.p2All.length
+    const hasDup = info.p1All.length > 1 || info.p2All.length > 1
 
     return (
       <div
@@ -127,35 +133,45 @@ export default function RouteChecklist({
         className="w-full text-left px-3 py-2 rounded-xl border transition-all hover:border-slate-500 hover:bg-white/5 cursor-pointer"
         style={{
           background: info.state === 'open' ? 'transparent' : '#16161f',
-          borderColor: info.state === 'open' ? 'rgba(46,46,66,0.5)' : `${cfg.color}33`,
+          borderColor: hasDup ? 'rgba(251,191,36,0.4)' : info.state === 'open' ? 'rgba(46,46,66,0.5)' : `${cfg.color}33`,
         }}
       >
         <div className="flex items-center gap-2">
-          <span className="text-sm leading-none">{cfg.icon}</span>
+          <span className="text-sm leading-none">{hasDup ? '⚠️' : cfg.icon}</span>
           <span className={`flex-1 text-xs font-bold truncate ${info.state === 'open' ? 'text-slate-500' : 'text-slate-100'}`}>
             {info.route}
+            {hasDup && (
+              <span className="ml-1.5 text-[9px] font-black px-1 py-0.5 rounded" style={{ color: '#fbbf24', background: 'rgba(251,191,36,0.15)' }}>
+                {totalCount} Encounters
+              </span>
+            )}
           </span>
           {info.state === 'open'
             ? <Plus className="w-3 h-3 text-slate-600 shrink-0" />
-            : <span className="text-[9px] font-bold shrink-0" style={{ color: cfg.color }}>{cfg.label}</span>}
+            : <span className="text-[9px] font-bold shrink-0" style={{ color: hasDup ? '#fbbf24' : cfg.color }}>{hasDup ? 'Mehrfach' : cfg.label}</span>}
         </div>
 
         {hasAny && (
           <div className="mt-1.5 pl-6 space-y-0.5">
-            {[{ pl: p1, enc: info.p1Enc }, { pl: p2, enc: info.p2Enc }].map(({ pl, enc }, idx) =>
+            {[{ pl: p1, encs: info.p1All }, { pl: p2, encs: info.p2All }].map(({ pl, encs }, idx) =>
               pl ? (
-                <div key={idx} className="flex items-center gap-1.5 text-[10px] min-w-0">
-                  <span className="font-bold shrink-0" style={{ color: pl.id === myPlayerId ? '#CC0000' : '#94a3b8' }}>
-                    {pl.name}:
-                  </span>
-                  {enc ? (
-                    <span className={`flex items-center gap-1 capitalize truncate ${enc.status === 'dead' ? 'text-red-400 line-through' : 'text-slate-300'}`}>
-                      {enc.pokemon_id && <img src={getSpriteUrl(enc.pokemon_id)} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                      {enc.nickname ?? enc.pokemon_name}
-                    </span>
-                  ) : (
-                    <span className="text-slate-600 italic">fehlt</span>
-                  )}
+                <div key={idx} className="min-w-0">
+                  {encs.length === 0 ? (
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <span className="font-bold shrink-0" style={{ color: pl.id === myPlayerId ? '#CC0000' : '#94a3b8' }}>{pl.name}:</span>
+                      <span className="text-slate-600 italic">fehlt</span>
+                    </div>
+                  ) : encs.map((enc, ei) => (
+                    <div key={enc.id} className="flex items-center gap-1.5 text-[10px] min-w-0">
+                      {ei === 0
+                        ? <span className="font-bold shrink-0" style={{ color: pl.id === myPlayerId ? '#CC0000' : '#94a3b8' }}>{pl.name}:</span>
+                        : <span className="shrink-0 text-yellow-600">↳</span>}
+                      <span className={`flex items-center gap-1 capitalize truncate ${enc.status === 'dead' ? 'text-red-400 line-through' : 'text-slate-300'}`}>
+                        {enc.pokemon_id && <img src={getSpriteUrl(enc.pokemon_id)} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                        {enc.nickname ?? enc.pokemon_name}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               ) : null
             )}

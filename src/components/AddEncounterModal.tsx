@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { X, MapPin, PenLine } from 'lucide-react'
+import { X, MapPin, PenLine, AlertTriangle } from 'lucide-react'
 import PokemonSearch from './PokemonSearch'
 import { useAddEncounter } from '../hooks/useEncounters'
 import { getRoutesForGame } from '../lib/routes'
-import { getTypeColor } from '../lib/pokemon-api'
-import type { Player, PokemonStatus } from '../types/database'
+import { getTypeColor, getSpriteUrl } from '../lib/pokemon-api'
+import type { Encounter, Player, PokemonStatus } from '../types/database'
 import type { PokemonBasic } from '../lib/pokemon-api'
 
 /** Optional pre-fill (e.g. when importing from the emulator live-team).
@@ -26,9 +26,11 @@ interface Props {
   /** Pre-selected route (e.g. from the encounter checklist). */
   defaultRoute?: string
   prefill?: EncounterPrefill
+  /** My existing encounters — used to detect route duplicates before saving. */
+  myEncounters?: Encounter[]
 }
 
-export default function AddEncounterModal({ runId, player, game, onClose, defaultRoute, prefill }: Props) {
+export default function AddEncounterModal({ runId, player, game, onClose, defaultRoute, prefill, myEncounters }: Props) {
   const addEncounter = useAddEncounter()
   const routes = getRoutesForGame(game)
   const routeInList = !!defaultRoute && routes.includes(defaultRoute)
@@ -42,12 +44,12 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
   const [customLocation, setCustomLocation] = useState(routeInList ? '' : defaultRoute ?? '')
   const [notes, setNotes] = useState(prefill?.note ?? '')
   const [error, setError] = useState('')
+  const [dupWarning, setDupWarning] = useState<Encounter | null>(null)
 
   const isCustom = location === 'Eigene Route...'
   const finalLocation = isCustom ? customLocation.trim() : location
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function doSave() {
     if (!selectedPokemon || !finalLocation) return
     setError('')
     try {
@@ -73,6 +75,17 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedPokemon || !finalLocation) return
+    const existing = myEncounters?.find((enc) => enc.location === finalLocation) ?? null
+    if (existing) {
+      setDupWarning(existing)
+      return
+    }
+    await doSave()
+  }
+
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4 anim-fade">
       <div className="bg-[#1c1c26] rounded-3xl w-full max-w-lg border border-[#2e2e42] shadow-2xl anim-pop">
@@ -92,6 +105,44 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
         <form onSubmit={handleSubmit} className="px-7 py-6 space-y-5">
           {error && (
             <div className="bg-red-950/50 border border-red-800 text-red-400 rounded-xl p-4 text-sm">{error}</div>
+          )}
+
+          {/* Duplicate-Route-Warnung */}
+          {dupWarning && selectedPokemon && (
+            <div className="rounded-2xl border border-yellow-700/50 bg-yellow-950/30 p-5 space-y-4">
+              <div className="flex items-center gap-2 text-yellow-400 font-black text-sm">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                Route bereits verwendet
+              </div>
+              <p className="text-slate-400 text-xs">
+                Für diese Route existiert bereits ein Encounter. Nach klassischen Nuzlocke-Regeln ist nur der erste Encounter einer Route erlaubt.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-[#16161f] border border-[#2e2e42] p-3 text-center">
+                  <div className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">Bereits gespeichert</div>
+                  {dupWarning.pokemon_id != null && (
+                    <img src={getSpriteUrl(dupWarning.pokemon_id)} alt="" className="w-14 h-14 object-contain mx-auto" />
+                  )}
+                  <div className="text-white text-xs font-bold capitalize mt-1">{dupWarning.nickname ?? dupWarning.pokemon_name}</div>
+                </div>
+                <div className="rounded-xl bg-[#16161f] border border-[#2e2e42] p-3 text-center">
+                  <div className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">Neues Pokémon</div>
+                  <img src={selectedPokemon.sprite} alt="" className="w-14 h-14 object-contain mx-auto" />
+                  <div className="text-white text-xs font-bold capitalize mt-1">{nickname.trim() || selectedPokemon.name}</div>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setDupWarning(null)} className="btn-ghost flex-1">Abbrechen</button>
+                <button
+                  type="button"
+                  onClick={doSave}
+                  disabled={addEncounter.isPending}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold transition-all bg-red-700 hover:bg-red-600 text-white disabled:opacity-50"
+                >
+                  {addEncounter.isPending ? 'Wird gespeichert…' : 'Trotzdem speichern'}
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Pokémon */}

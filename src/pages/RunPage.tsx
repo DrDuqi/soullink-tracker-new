@@ -962,6 +962,7 @@ export default function RunPage() {
           runId={currentRun.id} player={myPlayer} game={currentRun.game}
           defaultRoute={addEncounterRoute}
           prefill={emuPrefill}
+          myEncounters={myEncounters}
           onClose={() => { setShowAddEncounter(false); setAddEncounterRoute(undefined); setEmuPrefill(undefined) }}
         />
       )}
