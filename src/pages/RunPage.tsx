@@ -965,6 +965,7 @@ export default function RunPage() {
           defaultRoute={addEncounterRoute}
           prefill={emuPrefill}
           myEncounters={myEncounters}
+          onOpenExisting={(enc) => setSelectedEncounter(enc)}
           onClose={() => { setShowAddEncounter(false); setAddEncounterRoute(undefined); setEmuPrefill(undefined) }}
         />
       )}

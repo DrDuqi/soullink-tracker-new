@@ -7,11 +7,25 @@ import type { EmulatorMon } from '../lib/emulatorSync'
 interface EmuTeamStore {
   team: EmulatorMon[]
   connected: boolean
-  setTeam: (team: EmulatorMon[], connected: boolean) => void
+  currentLocationName: string | null
+  currentLocationId: number | null
+  setTeam: (
+    team: EmulatorMon[],
+    connected: boolean,
+    location?: { name: string | null; id: number | null },
+  ) => void
 }
 
 export const useEmuTeamStore = create<EmuTeamStore>((set) => ({
   team: [],
   connected: false,
-  setTeam: (team, connected) => set({ team, connected }),
+  currentLocationName: null,
+  currentLocationId: null,
+  setTeam: (team, connected, location) =>
+    set({
+      team,
+      connected,
+      currentLocationName: location?.name ?? null,
+      currentLocationId: location?.id ?? null,
+    }),
 }))

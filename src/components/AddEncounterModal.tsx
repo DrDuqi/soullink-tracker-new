@@ -26,11 +26,14 @@ interface Props {
   /** Pre-selected route (e.g. from the encounter checklist). */
   defaultRoute?: string
   prefill?: EncounterPrefill
-  /** My existing encounters — used to detect route duplicates before saving. */
+  /** My existing encounters — used to detect route + PID duplicates before saving. */
   myEncounters?: Encounter[]
+  /** Called instead of inserting when the same emulator PID already exists
+   *  (PID is the unique identity) — open the existing encounter rather than duplicating. */
+  onOpenExisting?: (enc: Encounter) => void
 }
 
-export default function AddEncounterModal({ runId, player, game, onClose, defaultRoute, prefill, myEncounters }: Props) {
+export default function AddEncounterModal({ runId, player, game, onClose, defaultRoute, prefill, myEncounters, onOpenExisting }: Props) {
   const addEncounter = useAddEncounter()
   const routes = getRoutesForGame(game)
   const routeInList = !!defaultRoute && routes.includes(defaultRoute)
@@ -49,8 +52,18 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
   const isCustom = location === 'Eigene Route...'
   const finalLocation = isCustom ? customLocation.trim() : location
 
+  // PID = eindeutige Identität: existiert bereits ein Encounter mit derselben
+  // Emulator-PID, wird NIE ein zweiter angelegt — stattdessen der vorhandene geöffnet.
+  function findByPid(): Encounter | null {
+    const pid = prefill?.emuPid
+    if (!pid) return null
+    return myEncounters?.find((enc) => enc.emu_pid === pid) ?? null
+  }
+
   async function doSave() {
     if (!selectedPokemon || !finalLocation) return
+    const pidMatch = findByPid()
+    if (pidMatch) { onOpenExisting?.(pidMatch); onClose(); return }
     setError('')
     try {
       await addEncounter.mutateAsync({
@@ -78,6 +91,9 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedPokemon || !finalLocation) return
+    // Schon übernommen (gleiche PID)? → vorhandenen Encounter öffnen, nicht duplizieren.
+    const pidMatch = findByPid()
+    if (pidMatch) { onOpenExisting?.(pidMatch); onClose(); return }
     const existing = myEncounters?.find((enc) => enc.location === finalLocation) ?? null
     if (existing) {
       setDupWarning(existing)

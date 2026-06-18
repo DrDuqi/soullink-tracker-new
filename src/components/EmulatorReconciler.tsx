@@ -18,7 +18,7 @@ import type { Encounter } from '../types/database'
  * match) are never touched.
  */
 export default function EmulatorReconciler({ encounters, runId }: { encounters: Encounter[]; runId: string }) {
-  const { team, phase } = useEmulatorSync(true)
+  const { team, phase, currentLocationName, currentLocationId } = useEmulatorSync(true)
   const updateEncounter = useUpdateEncounter()
   const updateMoves = useUpdateMoves()
   const setEmuTeam = useEmuTeamStore((s) => s.setTeam)
@@ -30,7 +30,9 @@ export default function EmulatorReconciler({ encounters, runId }: { encounters: 
   // Publish the live team to the shared store (drives the Team/Box overview).
   // Keyed incl. HP/level/item so the overview shows them live.
   const liveKey = team.map((m) => `${m.pid ?? ''}:${m.speciesId}:${m.level}:${m.hp}:${m.maxHp}:${m.heldItemId ?? ''}:${(m.moveIds ?? []).join('|')}`).join(',')
-  useEffect(() => { setEmuTeam(team, phase === 'connected') }, [liveKey, phase, setEmuTeam]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setEmuTeam(team, phase === 'connected', { name: currentLocationName, id: currentLocationId })
+  }, [liveKey, phase, currentLocationName, currentLocationId, setEmuTeam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let cancelled = false
