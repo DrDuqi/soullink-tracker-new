@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Skull, Heart, Box, HelpCircle, Trash2, ChevronDown, Link2, Eye, Star, Plus, Lock } from 'lucide-react'
+import { Skull, Heart, Box, HelpCircle, Trash2, ChevronDown, Link2, Eye, Star, Plus, Lock, AlertTriangle } from 'lucide-react'
 import { getSpriteUrl, getTypeColor } from '../lib/pokemon-api'
+import { routeMismatchesEdition } from '../lib/routes'
 import { useUpdateEncounterStatus, useDeleteEncounter } from '../hooks/useEncounters'
 import ConfirmDialog from './ConfirmDialog'
 import type { Encounter, PokemonStatus } from '../types/database'
@@ -26,6 +27,8 @@ interface Props {
   teamEligible?: boolean
   /** Tooltip shown on the disabled team button when not eligible. */
   teamBlockReason?: string
+  /** Current run edition — when set, routes of a different edition get a warning badge. */
+  editionGame?: string
   // Callbacks
   onAddToTeam?: () => void
   onDeathRequest?: () => void
@@ -35,7 +38,7 @@ interface Props {
 
 export default function EncounterCard({
   encounter, isLinked, isInTeam, compact, onClick, draggable,
-  isMyEncounter = true, linkedInfo, teamEligible = true, teamBlockReason,
+  isMyEncounter = true, linkedInfo, teamEligible = true, teamBlockReason, editionGame,
   onAddToTeam, onDeathRequest, onReviveRequest, onNavigateToPairs,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -45,6 +48,8 @@ export default function EncounterCard({
   const cfg = STATUS_CFG[encounter.status]
   const spriteUrl = encounter.pokemon_id ? getSpriteUrl(encounter.pokemon_id) : null
   const isDead = encounter.status === 'dead'
+  const routeMismatch = editionGame ? routeMismatchesEdition(encounter.location, editionGame) : false
+  const routeWarnTitle = 'Route passt nicht zur aktuellen Edition'
 
   async function setStatus(s: PokemonStatus) {
     setMenuOpen(false)
@@ -87,6 +92,11 @@ export default function EncounterCard({
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="text-slate-500 text-xs">{encounter.location}</span>
+            {routeMismatch && (
+              <span title={routeWarnTitle} className="inline-flex items-center" style={{ color: '#fbbf24' }}>
+                <AlertTriangle className="w-3 h-3" />
+              </span>
+            )}
             {linkedInfo && (
               <span
                 className="text-[10px] font-bold px-1.5 py-0.5 rounded-md cursor-pointer hover:opacity-80 transition-opacity"
@@ -191,6 +201,13 @@ export default function EncounterCard({
             </div>
 
             <div className="text-slate-500 text-xs mt-1.5 font-medium">{encounter.location}</div>
+            {routeMismatch && (
+              <div className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-lg"
+                style={{ color: '#fbbf24', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)' }}
+                title={routeWarnTitle}>
+                <AlertTriangle className="w-2.5 h-2.5" /> {routeWarnTitle}
+              </div>
+            )}
 
             {/* Soul Link partner badge */}
             {linkedInfo && (

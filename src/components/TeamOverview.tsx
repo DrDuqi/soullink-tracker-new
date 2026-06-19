@@ -235,7 +235,7 @@ export default function TeamOverview({ myEncounters, partnerEncounters, teamSlot
           <Label icon={<Box className="w-4 h-4" />} text="In Box / Nicht im Team" count={boxEncs.length} color="#fbbf24" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {boxEncs.map((e) => (
-              <EncounterCard key={e.id} encounter={e} compact isMyEncounter onClick={() => onSelectEncounter(e)} />
+              <EncounterCard key={e.id} encounter={e} compact isMyEncounter editionGame={game} onClick={() => onSelectEncounter(e)} />
             ))}
           </div>
         </div>
@@ -247,7 +247,7 @@ export default function TeamOverview({ myEncounters, partnerEncounters, teamSlot
           <Label icon={<Skull className="w-4 h-4" />} text="Besiegt" count={deadEncs.length} color="#f87171" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {deadEncs.map((e) => (
-              <EncounterCard key={e.id} encounter={e} compact isMyEncounter onClick={() => onSelectEncounter(e)} />
+              <EncounterCard key={e.id} encounter={e} compact isMyEncounter editionGame={game} onClick={() => onSelectEncounter(e)} />
             ))}
           </div>
         </div>

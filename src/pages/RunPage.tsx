@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Plus, Link2, Copy, Check, ArrowLeft, Heart, Skull,
-  LayoutGrid, List, Zap, Eye, Lock,
+  LayoutGrid, List, Zap, Eye, Lock, Pencil,
 } from 'lucide-react'
 import { useRunStore } from '../store/runStore'
 import { useEncounters, useReorderEncounters } from '../hooks/useEncounters'
@@ -29,6 +29,7 @@ import UserMenu from '../components/UserMenu'
 import EmulatorLivePanel from '../components/EmulatorLivePanel'
 import EmulatorReconciler from '../components/EmulatorReconciler'
 import TeamOverview from '../components/TeamOverview'
+import ChangeEditionModal from '../components/ChangeEditionModal'
 import { useAuth } from '../contexts/AuthContext'
 import type { Encounter, Run, Player, SoulLinkPair, LinkRequest, ActivityLogEntry } from '../types/database'
 
@@ -176,6 +177,8 @@ export default function RunPage() {
   const [showAddEncounter, setShowAddEncounter] = useState(false)
   const [addEncounterRoute, setAddEncounterRoute] = useState<string | undefined>(undefined)
   const [emuPrefill, setEmuPrefill] = useState<EncounterPrefill | undefined>(undefined)
+  const [showEditEdition, setShowEditEdition] = useState(false)
+  const [savingEdition, setSavingEdition] = useState(false)
   const [showSoulLink, setShowSoulLink] = useState(false)
   const [copied, setCopied] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -227,6 +230,22 @@ export default function RunPage() {
   }, [user, players, myPlayerId, currentRun, setCurrentRun])
 
   const isMember = !!user && players.some((p) => p.auth_user_id === user.id)
+  // Only the run owner may change the edition (RLS allows owner-only run updates).
+  const isOwner = !!user && !!currentRun?.owner_user_id && currentRun.owner_user_id === user.id
+
+  // Change run edition after creation. Encounters are kept; routes that no longer
+  // fit are only marked (EncounterCard badge). currentRun.game drives routes,
+  // checklist, emulator compatibility and the region-based team analysis.
+  async function changeEdition(newGame: string) {
+    if (!currentRun || newGame === currentRun.game) { setShowEditEdition(false); return }
+    setSavingEdition(true)
+    const { error } = await supabase.from('runs').update({ game: newGame }).eq('id', currentRun.id)
+    setSavingEdition(false)
+    if (error) { toast.show('Edition konnte nicht geändert werden: ' + error.message, 'error'); return }
+    setCurrentRun({ ...currentRun, game: newGame }, players, myPlayerId ?? '')
+    setShowEditEdition(false)
+    toast.show(`Run-Edition auf „${newGame}" geändert.`, 'success')
+  }
 
   const isMyFocus = !focusedPlayerId || focusedPlayerId === myPlayerId
   const focusedPlayer = isMyFocus ? myPlayer : partnerPlayer
@@ -501,6 +520,7 @@ export default function RunPage() {
           linkedInfo={getLinkedInfo(enc)}
           teamEligible={elig.eligible}
           teamBlockReason={elig.reason}
+          editionGame={currentRun?.game}
           onClick={() => setSelectedEncounter(enc)}
           draggable={false}
           onAddToTeam={isEditable && enc.status !== 'dead' ? () => handleAddToTeam(enc) : undefined}
@@ -610,7 +630,17 @@ export default function RunPage() {
                 <PokeBall className="w-7 h-7 text-pk-red hidden sm:block" />
                 <div>
                   <h1 className="text-white font-black text-lg leading-tight">{currentRun.name}</h1>
-                  <div className="text-slate-500 text-xs font-medium">{currentRun.game}</div>
+                  {isOwner ? (
+                    <button
+                      onClick={() => setShowEditEdition(true)}
+                      className="text-slate-500 hover:text-slate-200 text-xs font-medium flex items-center gap-1 transition-colors"
+                      title="Run-Edition ändern"
+                    >
+                      {currentRun.game} <Pencil className="w-3 h-3" />
+                    </button>
+                  ) : (
+                    <div className="text-slate-500 text-xs font-medium">{currentRun.game}</div>
+                  )}
                 </div>
               </div>
 
@@ -866,6 +896,7 @@ export default function RunPage() {
                               isInTeam={teamEncounterIds.has(e.id)}
                               teamEligible={false}
                               teamBlockReason="Pokémon muss zuerst mit dem Partner verlinkt werden."
+                              editionGame={currentRun?.game}
                               onClick={() => setSelectedEncounter(e as Encounter)}
                               draggable={false}
                               onAddToTeam={
@@ -959,6 +990,14 @@ export default function RunPage() {
       )}
 
       {/* ══ Modals ════════════════════════════════════════════════════════ */}
+      {showEditEdition && (
+        <ChangeEditionModal
+          currentGame={currentRun.game}
+          busy={savingEdition}
+          onConfirm={changeEdition}
+          onCancel={() => setShowEditEdition(false)}
+        />
+      )}
       {showAddEncounter && myPlayer && (
         <AddEncounterModal
           runId={currentRun.id} player={myPlayer} game={currentRun.game}

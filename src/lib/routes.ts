@@ -114,6 +114,29 @@ export function getRoutesForGame(game: string): string[] {
   return [...new Set(routes), 'Eigene Route...']
 }
 
+// Set of every official route name across all editions (built once). Used to tell
+// "route of another edition" apart from a user's free-text custom route.
+let _allOfficial: Set<string> | null = null
+function allOfficialRoutes(): Set<string> {
+  if (!_allOfficial) {
+    _allOfficial = new Set<string>()
+    for (const g of GAME_LIST) {
+      for (const r of getRoutesForGame(g)) if (r !== 'Eigene Route...') _allOfficial.add(r)
+    }
+  }
+  return _allOfficial
+}
+
+/** True when `location` is an official route of a DIFFERENT edition than `game`
+ *  (i.e. it no longer fits the current edition). Custom/free-text routes that are
+ *  not official in ANY edition are never flagged — they are intentional. */
+export function routeMismatchesEdition(location: string | null | undefined, game: string): boolean {
+  if (!location) return false
+  const fitsCurrent = getRoutesForGame(game).some((r) => r !== 'Eigene Route...' && r === location)
+  if (fitsCurrent) return false
+  return allOfficialRoutes().has(location)
+}
+
 // Emulator game codes (Lua CONFIG.game, lowercase English) → run edition label (German).
 const EMU_GAME_TO_LABEL: Record<string, string> = {
   red: 'Rot', blue: 'Blau', yellow: 'Gelb',
