@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Users, Box, Skull, Swords, Heart, MapPin, Gamepad2 } from 'lucide-react'
-import { getSpriteUrl, getTypeColor, fetchItemName, fetchPokemon, fetchMoveById } from '../lib/pokemon-api'
-import { matchRoute, isGameMismatch } from '../lib/routes'
-import { getLearnedRoute } from '../lib/locationMap'
+import { getSpriteUrl, getTypeColor, fetchItemName, fetchPokemon } from '../lib/pokemon-api'
+import { isGameMismatch } from '../lib/routes'
 import EncounterCard from './EncounterCard'
 import { useEmuTeamStore } from '../store/emuTeamStore'
 import { deriveTeamGroups } from '../lib/teamGroups'
+import { buildLivePrefill, type EncounterPrefill } from '../lib/liveSync'
 import type { EmulatorMon } from '../lib/emulatorSync'
 import type { Encounter, Player, TeamSlot } from '../types/database'
-import type { EncounterPrefill } from './AddEncounterModal'
 
 const STATUS_COLOR: Record<string, string> = { alive: '#4ade80', dead: '#f87171', boxed: '#fbbf24', missing: '#94a3b8' }
 const STATUS_DE: Record<string, string> = { alive: 'Am Leben', dead: 'Besiegt', boxed: 'In Box', missing: 'Vermisst' }
@@ -85,31 +84,13 @@ function GhostSlot({ mon, game, currentLocationName, currentLocationId, suppress
   async function handleImport() {
     setImporting(true)
     try {
-      const poke = await fetchPokemon(mon.speciesId)
-      if (!poke) return
-      const ids = (mon.moveIds ?? []).filter((x) => x > 0)
-      const mv = await Promise.all(ids.map((id) => fetchMoveById(id)))
-      const itemName = mon.heldItemId ? await fetchItemName(mon.heldItemId) : null
-      // Route-Quelle: gelernte Orts-ID zuerst, dann Fangort/aktueller Ort.
-      // Bei Spiel-Mismatch GAR keine Vorauswahl und kein Lernen.
-      const route = suppressLocation
-        ? undefined
-        : getLearnedRoute(game, currentLocationId) ??
-          matchRoute(mon.metLocationName ?? currentLocationName ?? null, game) ??
-          undefined
-      onImport({
-        pokemon: poke,
-        nickname: mon.nickname ?? null,
-        status: mon.fainted ? 'dead' : 'alive',
-        moves: mv.map((m) => m?.name ?? null),
-        note: `Aus Emulator · Lv ${mon.level}`,
-        emuPid: mon.pid != null ? String(mon.pid) : null,
-        emuLocationId: suppressLocation ? null : currentLocationId ?? null,
-        level: mon.level,
-        hp: mon.hp,
-        maxHp: mon.maxHp,
-        item: itemName,
-      }, route)
+      const res = await buildLivePrefill(mon, {
+        game,
+        currentLocationName,
+        currentLocationId,
+        suppressLocation,
+      })
+      if (res) onImport(res.prefill, res.route)
     } finally {
       setImporting(false)
     }

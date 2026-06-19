@@ -13,6 +13,7 @@ import {
 } from '../lib/pokemon-api'
 import { useUpdateEncounter, useUpdateMoves } from '../hooks/useEncounters'
 import { useToastStore } from '../store/toastStore'
+import { isLiveSynced, editPermissions, LIVE_SYNC_NOTICE, LIVE_SYNC_DETAIL } from '../lib/liveSync'
 import type { Encounter } from '../types/database'
 import type { PokemonDetails, EvolutionStage, MoveDetail } from '../lib/pokemon-api'
 
@@ -143,10 +144,11 @@ export default function PokemonDetailModal({ encounter, linkedEncounter, linkedP
   const types = details?.types ?? encounter.types ?? []
   const statusInfo = STATUS_ICONS[encounter.status] ?? STATUS_ICONS.alive
   // Mit dem Emulator verbunden → Art/Level/Attacken/Status/Entwicklung kommen aus
-  // Lua und werden automatisch synchronisiert; hier nicht manuell editierbar.
-  const isLiveSynced = !!encounter.emu_pid
-  const canEditMoves = myEncounter && !isLiveSynced
-  const canEvolveManually = myEncounter && !isLiveSynced
+  // Lua (single source of truth in liveSync.ts); hier nicht manuell editierbar.
+  const live = isLiveSynced(encounter)
+  const perms = editPermissions(encounter)
+  const canEditMoves = myEncounter && perms.moves
+  const canEvolveManually = myEncounter && perms.species
 
   async function handleDevolve() {
     if (!prevEvolution || !myEncounter) return
@@ -266,11 +268,11 @@ export default function PokemonDetailModal({ encounter, linkedEncounter, linkedP
 
         <div className="px-6 pb-6 space-y-5">
           {/* Emulator-Sync-Hinweis */}
-          {isLiveSynced && (
+          {live && (
             <div className="rounded-2xl border border-emerald-700/40 bg-emerald-950/20 px-4 py-3 flex items-start gap-2">
               <Wifi className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
               <p className="text-emerald-300/90 text-xs">
-                Dieses Pokémon ist mit dem Emulator synchronisiert. Art, Level, Attacken, HP, Status, Item und Entwicklung kommen aus Lua und werden automatisch aktualisiert. Manuell änderbar bleiben Route, Spitzname und Notizen.
+                <span className="font-semibold">{LIVE_SYNC_NOTICE}</span> {LIVE_SYNC_DETAIL}
               </p>
             </div>
           )}

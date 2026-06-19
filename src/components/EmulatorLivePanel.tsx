@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Wifi, WifiOff, Loader2, Gamepad2, Heart, Skull, Play, Pause, Plus, Check, MapPin, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
-import { getSpriteUrl, getTypeColor, fetchPokemon, fetchMoveById, fetchItemName, fetchAbilityName } from '../lib/pokemon-api'
+import { getSpriteUrl, getTypeColor, fetchMoveById, fetchItemName, fetchAbilityName } from '../lib/pokemon-api'
 import { STATUS_LABEL_DE, natureName } from '../lib/emulatorSync'
 import type { EmulatorMon } from '../lib/emulatorSync'
-import type { EncounterPrefill } from './AddEncounterModal'
+import { buildLivePrefill, type EncounterPrefill } from '../lib/liveSync'
 import { matchRoute, isGameMismatch, emulatorGameLabel } from '../lib/routes'
 import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
 import LocationMapManager from './LocationMapManager'
@@ -41,37 +41,19 @@ function MonRich({ mon, imported, game, currentLocationName, currentLocationId, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moveKey, mon.abilityId, mon.heldItemId])
 
-  // Build a prefill from data the emulator reliably provides, then hand it to the
-  // EXISTING encounter modal/save-flow (no new system). The user still picks the route.
+  // Build the prefill via the shared live-sync model, then hand it to the EXISTING
+  // encounter modal/save-flow (no new system). The user still picks the route.
   async function doImport() {
     if (!onImport) return
     setImporting(true)
     try {
-      const poke = await fetchPokemon(mon.speciesId)
-      if (!poke) return
-      const ids = (mon.moveIds ?? []).filter((x) => x > 0)
-      const mv = await Promise.all(ids.map((id) => fetchMoveById(id)))
-      const itemName = mon.heldItemId ? await fetchItemName(mon.heldItemId) : null
-      // Route-Quelle: gelernte Orts-ID zuerst (vom Nutzer bestätigt), dann Fangort,
-      // dann aktueller Ort via matchRoute. Bei Spiel-Mismatch GAR keine Vorauswahl.
-      const route = suppressLocation
-        ? undefined
-        : getLearnedRoute(game ?? '', currentLocationId) ??
-          matchRoute(mon.metLocationName ?? currentLocationName ?? null, game ?? '') ??
-          undefined
-      onImport({
-        pokemon: poke,
-        nickname: mon.nickname ?? null,
-        status: mon.fainted ? 'dead' : 'alive',
-        moves: mv.map((m) => m?.name ?? null),
-        note: `Aus Emulator · Lv ${mon.level}`,
-        emuPid: mon.pid != null ? String(mon.pid) : null,
-        emuLocationId: suppressLocation ? null : currentLocationId ?? null,
-        level: mon.level,
-        hp: mon.hp,
-        maxHp: mon.maxHp,
-        item: itemName,
-      }, route)
+      const res = await buildLivePrefill(mon, {
+        game: game ?? '',
+        currentLocationName: currentLocationName ?? null,
+        currentLocationId: currentLocationId ?? null,
+        suppressLocation: !!suppressLocation,
+      })
+      if (res) onImport(res.prefill, res.route)
     } finally {
       setImporting(false)
     }

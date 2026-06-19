@@ -4,26 +4,14 @@ import PokemonSearch from './PokemonSearch'
 import { useAddEncounter } from '../hooks/useEncounters'
 import { getRoutesForGame } from '../lib/routes'
 import { getLearnedRoute, useLocationMapStore } from '../lib/locationMap'
+import { LIVE_SYNC_NOTICE, LIVE_SYNC_DETAIL } from '../lib/liveSync'
 import { getTypeColor, getSpriteUrl } from '../lib/pokemon-api'
-import type { Encounter, Player, PokemonStatus } from '../types/database'
+import type { Encounter, Player } from '../types/database'
 import type { PokemonBasic } from '../lib/pokemon-api'
+import type { EncounterPrefill } from '../lib/liveSync'
 
-/** Optional pre-fill (e.g. when importing from the emulator live-team).
- *  Only what the encounter model can store is used — the user still picks the route. */
-export interface EncounterPrefill {
-  pokemon?: PokemonBasic
-  nickname?: string | null
-  status?: PokemonStatus
-  moves?: (string | null)[]   // up to 4 move names → move_1..4
-  note?: string               // seeded into the notes field (e.g. level, since encounters have no level column)
-  emuPid?: string | null      // stable emulator identity → stored on the encounter (evolution-proof)
-  emuLocationId?: number | null  // current emulator location id → auto-learn id→route on save
-  // Read-only live data shown in the import modal (comes from Lua, not editable):
-  level?: number | null
-  hp?: number | null
-  maxHp?: number | null
-  item?: string | null
-}
+// Re-export so existing imports (`from './AddEncounterModal'`) keep working.
+export type { EncounterPrefill }
 
 interface Props {
   runId: string
@@ -220,7 +208,7 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
                 )}
                 <p className="flex items-start gap-1.5 text-[11px] text-slate-500 pt-0.5">
                   <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  Diese Daten kommen aus dem Emulator und werden automatisch synchronisiert. Editierbar bleiben Route, Spitzname und Notizen.
+                  <span><span className="text-slate-300 font-semibold">{LIVE_SYNC_NOTICE}</span> {LIVE_SYNC_DETAIL}</span>
                 </p>
               </div>
             ) : (
