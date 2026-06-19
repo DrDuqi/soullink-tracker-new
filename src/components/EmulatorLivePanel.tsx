@@ -182,13 +182,14 @@ export default function EmulatorLivePanel({
   }, [launching, phase])
   useEffect(() => () => { if (launchTimer.current) clearTimeout(launchTimer.current) }, [])
 
-  async function launchSync() {
+  async function launchSync(restart = false) {
     if (!configured) { setShowWizard(true); return }
     if (phase === 'connected') return                          // already connected
     if (!enabled) { setEnabled(true); try { localStorage.setItem(ENABLED_KEY, '1') } catch { /* ignore */ } }
-    setLaunchErr(null); setLaunching(true); setLaunchMsg('BizHawk wird gestartet …')
+    setLaunchErr(null); setLaunching(true)
+    setLaunchMsg(restart ? 'BizHawk wird neu gestartet …' : 'Verbinde …')
 
-    const res = await launchEmulator(emuSettings)
+    const res = await launchEmulator(emuSettings, restart)
     if (!res.ok) {
       if (res.error === 'rom_not_found') {
         setLaunching(false)
@@ -196,7 +197,7 @@ export default function EmulatorLivePanel({
       } else if (res.error === 'lua_not_found') {
         // Lua fehlt → automatisch erneut suchen, sonst Wizard-Schritt für Lua/Sync.
         const d = await detectEmulator()
-        if (d?.lua) { updateSettings({ luaPath: d.lua, syncFolder: d.syncFolder }); launchSync() }
+        if (d?.lua) { updateSettings({ luaPath: d.lua, syncFolder: d.syncFolder }); launchSync(restart) }
         else { setLaunching(false); setLaunchErr({ msg: 'Sync-Script nicht gefunden.', actionLabel: 'Einrichtung öffnen', action: () => setShowWizard(true) }) }
       } else {
         setLaunching(false)
@@ -205,12 +206,29 @@ export default function EmulatorLivePanel({
       return
     }
 
-    // Launched (or already running) → wait for the live sync to connect.
-    setLaunchMsg(res.already ? 'BizHawk läuft – warte auf Verbindung …' : 'Warte auf Verbindung …')
+    if (res.already) {
+      // BizHawk runs but Lua cannot be injected into a running instance. Give the
+      // sync a short grace period (maybe it IS already connected), else offer a
+      // restart-with-Lua — the only realistic way to auto-load the script.
+      setLaunchMsg('Prüfe Verbindung …')
+      if (launchTimer.current) clearTimeout(launchTimer.current)
+      launchTimer.current = setTimeout(() => {
+        setLaunching(false)
+        setLaunchErr({
+          msg: 'BizHawk läuft bereits. Lua kann nur beim Start automatisch geladen werden. Bitte BizHawk schließen und erneut über Live-Sync starten.',
+          actionLabel: 'BizHawk mit Lua neu starten',
+          action: () => launchSync(true),
+        })
+      }, 6000)
+      return
+    }
+
+    // launched / restarted → wait for the live sync to connect.
+    setLaunchMsg(res.restarted ? 'Neu gestartet – warte auf Verbindung …' : 'Warte auf Verbindung …')
     if (launchTimer.current) clearTimeout(launchTimer.current)
     launchTimer.current = setTimeout(() => {
       setLaunching(false)
-      setLaunchErr({ msg: 'Keine Verbindung. Läuft BizHawk? Notfalls Lua über Tools → Lua Console laden.', actionLabel: 'Erneut versuchen', action: () => launchSync() })
+      setLaunchErr({ msg: 'Keine Verbindung. Läuft BizHawk mit Lua? Notfalls neu starten.', actionLabel: 'BizHawk mit Lua neu starten', action: () => launchSync(true) })
     }, 45000)
   }
 
@@ -321,16 +339,16 @@ export default function EmulatorLivePanel({
           ) : (
             <>
               <button
-                onClick={launchSync}
+                onClick={() => launchSync()}
                 disabled={launching}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-70"
                 style={{ background: '#CC0000', color: '#fff' }}
               >
                 {launching
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> {launchMsg ?? 'Starte …'}</>
-                  : <><Play className="w-4 h-4" /> Live-Sync starten</>}
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> {launchMsg ?? 'Verbinde …'}</>
+                  : <><Play className="w-4 h-4" /> Lua-Sync verbinden</>}
               </button>
-              <p className="text-slate-500 text-[11px] mt-2 text-center">Startet BizHawk mit ROM &amp; Sync-Script automatisch.</p>
+              <p className="text-slate-500 text-[11px] mt-2 text-center">Lädt das Sync-Script automatisch – startet BizHawk, falls nötig.</p>
             </>
           )}
         </div>

@@ -17,6 +17,15 @@ function isBizhawkRunning(): Promise<boolean> {
   })
 }
 
+// Close any running EmuHawk so it can be relaunched WITH the Lua script (BizHawk
+// only loads Lua at startup — it cannot be injected into a running instance).
+function killBizhawk(): Promise<void> {
+  return new Promise((resolve) => {
+    try { exec('taskkill /IM EmuHawk.exe /F', { windowsHide: true }, () => resolve()) } catch { resolve() }
+  })
+}
+const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
 // Dev-only filesystem detection so the setup wizard can auto-fill paths the user
 // would otherwise have to type (a browser file picker never reveals absolute paths).
 // Bounded scan of the project + its parent only; never touches anything else.
@@ -144,23 +153,28 @@ function emulatorSyncPlugin(): Plugin {
         let body = ''
         req.on('data', (c) => { body += c; if (body.length > 100_000) req.destroy() })
         req.on('end', async () => {
-          let cfg: { bizhawk?: string; rom?: string; lua?: string } = {}
+          let cfg: { bizhawk?: string; rom?: string; lua?: string; restart?: boolean } = {}
           try { cfg = JSON.parse(body || '{}') } catch { /* invalid */ }
           const bizhawk = String(cfg.bizhawk || '').trim()
           const rom = String(cfg.rom || '').trim()
           const lua = String(cfg.lua || '').trim()
+          const restart = !!cfg.restart
 
           if (!bizhawk || !existsSync(bizhawk)) { res.end(JSON.stringify({ ok: false, error: 'bizhawk_not_found' })); return }
           if (!rom || !existsSync(rom)) { res.end(JSON.stringify({ ok: false, error: 'rom_not_found' })); return }
           const luaOk = !!lua && existsSync(lua)
           if (!luaOk) { res.end(JSON.stringify({ ok: false, error: 'lua_not_found' })); return }
 
-          if (await isBizhawkRunning()) { res.end(JSON.stringify({ ok: true, already: true, lua: true })); return }
+          const running = await isBizhawkRunning()
+          // Already running and we are NOT restarting → Lua cannot be injected.
+          if (running && !restart) { res.end(JSON.stringify({ ok: true, already: true, lua: true })); return }
+          // Restart requested → close the running instance first, then relaunch with Lua.
+          if (running && restart) { await killBizhawk(); await delay(1200) }
           try {
             const child = spawn(bizhawk, [rom, '--lua=' + lua], { detached: true, stdio: 'ignore' })
             child.on('error', () => { /* surfaced below if it never spawns */ })
             child.unref()
-            res.end(JSON.stringify({ ok: true, launched: true, lua: true }))
+            res.end(JSON.stringify({ ok: true, launched: true, lua: true, restarted: running && restart }))
           } catch {
             res.end(JSON.stringify({ ok: false, error: 'launch_failed' }))
           }

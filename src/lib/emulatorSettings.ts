@@ -115,18 +115,20 @@ export async function findFile(name: string): Promise<string | null> {
 
 export interface LaunchResult {
   ok: boolean
-  launched?: boolean   // a new BizHawk was started
-  already?: boolean    // BizHawk was already running → not restarted
+  launched?: boolean   // a new BizHawk was started (with --lua)
+  already?: boolean    // BizHawk was already running → Lua cannot be injected
+  restarted?: boolean  // a running BizHawk was closed and relaunched with --lua
   error?: 'bizhawk_not_found' | 'rom_not_found' | 'lua_not_found' | 'launch_failed' | 'unreachable'
 }
 
-/** Ask the dev server to start BizHawk with the saved ROM + Lua (dev-only). */
-export async function launchEmulator(s: EmulatorSettings): Promise<LaunchResult> {
+/** Ask the dev server to start BizHawk with the saved ROM + Lua (dev-only).
+ *  restart=true closes a running EmuHawk first (Lua only loads at startup). */
+export async function launchEmulator(s: EmulatorSettings, restart = false): Promise<LaunchResult> {
   try {
     const r = await fetch('/api/emulator-launch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ bizhawk: s.bizhawkPath, rom: s.romPath, lua: s.luaPath }),
+      body: JSON.stringify({ bizhawk: s.bizhawkPath, rom: s.romPath, lua: s.luaPath, restart }),
     })
     return (await r.json()) as LaunchResult
   } catch {
