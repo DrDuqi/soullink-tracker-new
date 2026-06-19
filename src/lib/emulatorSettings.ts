@@ -118,7 +118,8 @@ export interface LaunchResult {
   launched?: boolean   // a new BizHawk was started (with --lua)
   already?: boolean    // BizHawk was already running → Lua cannot be injected
   restarted?: boolean  // a running BizHawk was closed and relaunched with --lua
-  error?: 'bizhawk_not_found' | 'rom_not_found' | 'lua_not_found' | 'launch_failed' | 'unreachable'
+  error?: 'bizhawk_not_found' | 'rom_not_found' | 'lua_not_found' | 'launch_failed' | 'launch_exited' | 'unreachable'
+  detail?: string      // human-readable failure detail (from the dev server)
 }
 
 /** Ask the dev server to start BizHawk with the saved ROM + Lua (dev-only).

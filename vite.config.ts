@@ -153,6 +153,7 @@ function emulatorSyncPlugin(): Plugin {
         let body = ''
         req.on('data', (c) => { body += c; if (body.length > 100_000) req.destroy() })
         req.on('end', async () => {
+          const send = (obj: unknown) => { try { res.end(JSON.stringify(obj)) } catch { /* already sent */ } }
           let cfg: { bizhawk?: string; rom?: string; lua?: string; restart?: boolean } = {}
           try { cfg = JSON.parse(body || '{}') } catch { /* invalid */ }
           const bizhawk = String(cfg.bizhawk || '').trim()
@@ -160,23 +161,52 @@ function emulatorSyncPlugin(): Plugin {
           const lua = String(cfg.lua || '').trim()
           const restart = !!cfg.restart
 
-          if (!bizhawk || !existsSync(bizhawk)) { res.end(JSON.stringify({ ok: false, error: 'bizhawk_not_found' })); return }
-          if (!rom || !existsSync(rom)) { res.end(JSON.stringify({ ok: false, error: 'rom_not_found' })); return }
-          const luaOk = !!lua && existsSync(lua)
-          if (!luaOk) { res.end(JSON.stringify({ ok: false, error: 'lua_not_found' })); return }
+          console.log('\n[launch] ── Request erhalten ───────────────────────────')
+          console.log('[launch] restart :', restart)
+          console.log('[launch] bizhawk :', bizhawk || '(leer)')
+          console.log('[launch] rom     :', rom || '(leer)')
+          console.log('[launch] lua     :', lua || '(leer)')
+
+          if (!bizhawk || !existsSync(bizhawk)) { console.error('[launch] FEHLER: BizHawk-Pfad fehlt/existiert nicht.'); send({ ok: false, error: 'bizhawk_not_found' }); return }
+          if (!rom || !existsSync(rom)) { console.error('[launch] FEHLER: ROM-Pfad fehlt/existiert nicht.'); send({ ok: false, error: 'rom_not_found' }); return }
+          if (!lua || !existsSync(lua)) { console.error('[launch] FEHLER: Lua-Pfad fehlt/existiert nicht.'); send({ ok: false, error: 'lua_not_found' }); return }
 
           const running = await isBizhawkRunning()
+          console.log('[launch] EmuHawk laeuft bereits:', running)
           // Already running and we are NOT restarting → Lua cannot be injected.
-          if (running && !restart) { res.end(JSON.stringify({ ok: true, already: true, lua: true })); return }
+          if (running && !restart) { console.log('[launch] → bereits offen, kein Neustart angefordert.'); send({ ok: true, already: true, lua: true }); return }
           // Restart requested → close the running instance first, then relaunch with Lua.
-          if (running && restart) { await killBizhawk(); await delay(1200) }
+          if (running && restart) { console.log('[launch] → schliesse laufendes EmuHawk …'); await killBizhawk(); await delay(1200) }
+
+          const cwd = dirname(bizhawk)   // BizHawk findet seine DLLs/Ressourcen relativ zum eigenen Ordner
+          const args = [rom, '--lua=' + lua]
+          console.log('[launch] cwd     :', cwd)
+          console.log('[launch] command :', `"${bizhawk}" "${rom}" --lua="${lua}"`)
+
+          let settled = false
+          let child
           try {
-            const child = spawn(bizhawk, [rom, '--lua=' + lua], { detached: true, stdio: 'ignore' })
-            child.on('error', () => { /* surfaced below if it never spawns */ })
+            child = spawn(bizhawk, args, { detached: true, stdio: 'ignore', cwd })
+          } catch (e) {
+            console.error('[launch] spawn() warf synchron:', e)
+            send({ ok: false, error: 'launch_failed', detail: String((e as Error)?.message || e) }); return
+          }
+          child.on('error', (err) => {
+            console.error('[launch] Prozess-Fehler (error-Event):', err)
+            if (!settled) { settled = true; send({ ok: false, error: 'launch_failed', detail: String(err?.message || err) }) }
+          })
+          child.on('exit', (code, signal) => {
+            console.log(`[launch] Prozess früh beendet: exitCode=${code} signal=${signal}`)
+            if (!settled && code != null && code !== 0) { settled = true; send({ ok: false, error: 'launch_exited', detail: `BizHawk endete sofort mit Code ${code}` }) }
+          })
+          // Kurz warten: ein sofortiger Fehler (ENOENT/Crash) meldet sich; bleibt der
+          // Prozess am Leben → Erfolg an das Frontend.
+          await delay(1200)
+          if (!settled) {
+            settled = true
+            console.log('[launch] OK – Prozess läuft (pid', child.pid, ')')
             child.unref()
-            res.end(JSON.stringify({ ok: true, launched: true, lua: true, restarted: running && restart }))
-          } catch {
-            res.end(JSON.stringify({ ok: false, error: 'launch_failed' }))
+            send({ ok: true, launched: true, lua: true, restarted: running && restart })
           }
         })
       })

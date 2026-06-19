@@ -201,7 +201,8 @@ export default function EmulatorLivePanel({
         else { setLaunching(false); setLaunchErr({ msg: 'Sync-Script nicht gefunden.', actionLabel: 'Einrichtung öffnen', action: () => setShowWizard(true) }) }
       } else {
         setLaunching(false)
-        setLaunchErr({ msg: 'BizHawk konnte nicht gestartet werden.', actionLabel: 'Einstellungen öffnen', action: () => setShowSettings(true) })
+        const detail = res.detail ? ` (${res.detail})` : ''
+        setLaunchErr({ msg: 'BizHawk konnte nicht gestartet werden.' + detail, actionLabel: 'Einstellungen öffnen', action: () => setShowSettings(true) })
       }
       return
     }
