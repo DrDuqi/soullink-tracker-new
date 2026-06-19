@@ -172,6 +172,7 @@ export default function EmulatorLivePanel({
   const [launchErr, setLaunchErr] = useState<{ msg: string; actionLabel: string; action: () => void } | null>(null)
   const launchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const romPick = useRef<HTMLInputElement>(null)
+  const bizPick = useRef<HTMLInputElement>(null)
 
   // Connection established while launching → success, clear the waiting state.
   useEffect(() => {
@@ -201,8 +202,8 @@ export default function EmulatorLivePanel({
         else { setLaunching(false); setLaunchErr({ msg: 'Sync-Script nicht gefunden.', actionLabel: 'Einrichtung öffnen', action: () => setShowWizard(true) }) }
       } else {
         setLaunching(false)
-        const detail = res.detail ? ` (${res.detail})` : ''
-        setLaunchErr({ msg: 'BizHawk konnte nicht gestartet werden.' + detail, actionLabel: 'Einstellungen öffnen', action: () => setShowSettings(true) })
+        const detail = res.detail ? ` ${res.detail}` : ''
+        setLaunchErr({ msg: 'BizHawk konnte nicht gestartet werden.' + detail, actionLabel: 'Andere EmuHawk.exe wählen', action: () => bizPick.current?.click() })
       }
       return
     }
@@ -238,6 +239,13 @@ export default function EmulatorLivePanel({
     const path = await findFile(file.name)
     if (path) { updateSettings({ romPath: path }); setLaunchErr(null); launchSync() }
     else setLaunchErr({ msg: 'ROM nicht gefunden. Bitte in den Einstellungen festlegen.', actionLabel: 'Einstellungen öffnen', action: () => setShowSettings(true) })
+  }
+
+  async function reselectBizhawk(file: File | undefined) {
+    if (!file) return
+    const path = await findFile(file.name)
+    if (path) { updateSettings({ bizhawkPath: path }); setLaunchErr(null); launchSync() }
+    else setLaunchErr({ msg: 'EmuHawk.exe nicht gefunden. Bitte in den Einstellungen festlegen.', actionLabel: 'Einstellungen öffnen', action: () => setShowSettings(true) })
   }
 
   // The RUN edition decides the available routes; the emulator must match it.
@@ -317,6 +325,7 @@ export default function EmulatorLivePanel({
       {showWizard && <EmulatorSetupWizard onClose={() => setShowWizard(false)} />}
       {showSettings && <EmulatorSettingsModal onClose={() => setShowSettings(false)} />}
       <input ref={romPick} type="file" accept=".nds,.gba,.gbc,.gb" className="hidden" onChange={(e) => reselectRom(e.target.files?.[0])} />
+      <input ref={bizPick} type="file" accept=".exe" className="hidden" onChange={(e) => reselectBizhawk(e.target.files?.[0])} />
 
       {/* Spiel-Mismatch — auch im eingeklappten Zustand sichtbar */}
       {enabled && mismatch && (

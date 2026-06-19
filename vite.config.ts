@@ -26,6 +26,41 @@ function killBizhawk(): Promise<void> {
 }
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
+// Does the EmuHawk.exe folder look like a COMPLETE BizHawk install (has its DLLs /
+// gamedb)? A loose copy of just EmuHawk.exe crashes at startup with a .NET
+// exception (0xE0434352) because it can't find its runtime files.
+function bizhawkFolderInfo(exeDir: string) {
+  let dllCount = 0, hasDllDir = false, hasGamedb = false
+  try {
+    for (const ent of readdirSync(exeDir, { withFileTypes: true })) {
+      const n = ent.name.toLowerCase()
+      if (ent.isFile() && n.endsWith('.dll')) dllCount++
+      if (ent.isDirectory() && n === 'dll') hasDllDir = true
+      if (ent.isDirectory() && n === 'gamedb') hasGamedb = true
+    }
+  } catch { /* unreadable */ }
+  return { complete: dllCount > 0 || hasDllDir || hasGamedb, dllCount, hasDllDir, hasGamedb }
+}
+
+interface LaunchAttempt { alive: boolean; code: number | null; signal: string | null; stdout: string; stderr: string; errEvent: string | null; pid?: number; spawnThrew?: string }
+// Spawn and OBSERVE for `ms`: capture stdout/stderr/error/exit so a crash is visible
+// instead of a silent "launched". Resolves alive=true only if it is still running.
+function tryLaunch(exe: string, args: string[], cwd: string, ms: number): Promise<LaunchAttempt> {
+  return new Promise((resolve) => {
+    let stdout = '', stderr = '', errEvent: string | null = null, exited = false
+    let code: number | null = null, signal: string | null = null
+    let child
+    try { child = spawn(exe, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] }) }
+    catch (e) { resolve({ alive: false, code: null, signal: null, stdout: '', stderr: '', errEvent: null, spawnThrew: String((e as Error)?.message || e) }); return }
+    child.stdout?.on('data', (d) => { if (stdout.length < 4000) stdout += d.toString() })
+    child.stderr?.on('data', (d) => { if (stderr.length < 4000) stderr += d.toString() })
+    child.on('error', (e) => { errEvent = String((e as Error)?.message || e) })
+    child.on('exit', (c, s) => { exited = true; code = c; signal = s })
+    setTimeout(() => resolve({ alive: !exited, code, signal, stdout, stderr, errEvent, pid: child.pid }), ms)
+  })
+}
+const hex32 = (n: number | null) => (n != null ? '0x' + (n >>> 0).toString(16).toUpperCase() : '-')
+
 // Dev-only filesystem detection so the setup wizard can auto-fill paths the user
 // would otherwise have to type (a browser file picker never reveals absolute paths).
 // Bounded scan of the project + its parent only; never touches anything else.
@@ -179,35 +214,41 @@ function emulatorSyncPlugin(): Plugin {
           if (running && restart) { console.log('[launch] → schliesse laufendes EmuHawk …'); await killBizhawk(); await delay(1200) }
 
           const cwd = dirname(bizhawk)   // BizHawk findet seine DLLs/Ressourcen relativ zum eigenen Ordner
-          const args = [rom, '--lua=' + lua]
-          console.log('[launch] cwd     :', cwd)
-          console.log('[launch] command :', `"${bizhawk}" "${rom}" --lua="${lua}"`)
+          const folder = bizhawkFolderInfo(cwd)
+          console.log('[launch] cwd     :', cwd, '· existiert:', existsSync(cwd))
+          console.log('[launch] BizHawk-Ordner:', JSON.stringify(folder), folder.complete ? '(sieht vollständig aus)' : '(UNVOLLSTÄNDIG – evtl. lose EmuHawk.exe ohne DLLs!)')
 
-          let settled = false
-          let child
-          try {
-            child = spawn(bizhawk, args, { detached: true, stdio: 'ignore', cwd })
-          } catch (e) {
-            console.error('[launch] spawn() warf synchron:', e)
-            send({ ok: false, error: 'launch_failed', detail: String((e as Error)?.message || e) }); return
+          // BizHawk akzeptiert beide Reihenfolgen; wir testen sie und nehmen die,
+          // die wirklich läuft.
+          const variants = [
+            { label: 'rom --lua', args: [rom, '--lua=' + lua] },
+            { label: '--lua rom', args: ['--lua=' + lua, rom] },
+          ]
+          let last: LaunchAttempt | null = null
+          for (const v of variants) {
+            console.log(`[launch] Variante "${v.label}" → ${JSON.stringify([bizhawk, ...v.args])}`)
+            const r = await tryLaunch(bizhawk, v.args, cwd, 2500)
+            last = r
+            console.log(`[launch]   alive=${r.alive} exitCode=${r.code} (${hex32(r.code)}) signal=${r.signal} errorEvent=${r.errEvent ?? '-'} pid=${r.pid ?? '-'}`)
+            if (r.spawnThrew) console.log('[launch]   spawn() warf:', r.spawnThrew)
+            if (r.stdout.trim()) console.log('[launch]   stdout:', r.stdout.trim())
+            if (r.stderr.trim()) console.log('[launch]   stderr:', r.stderr.trim())
+            if (r.alive) {
+              console.log(`[launch] ✅ Variante "${v.label}" läuft (pid ${r.pid}).`)
+              send({ ok: true, launched: true, lua: true, restarted: running && restart, variant: v.label })
+              return
+            }
+            console.log(`[launch] ✗ Variante "${v.label}" sofort beendet — nächste Variante …`)
           }
-          child.on('error', (err) => {
-            console.error('[launch] Prozess-Fehler (error-Event):', err)
-            if (!settled) { settled = true; send({ ok: false, error: 'launch_failed', detail: String(err?.message || err) }) }
-          })
-          child.on('exit', (code, signal) => {
-            console.log(`[launch] Prozess früh beendet: exitCode=${code} signal=${signal}`)
-            if (!settled && code != null && code !== 0) { settled = true; send({ ok: false, error: 'launch_exited', detail: `BizHawk endete sofort mit Code ${code}` }) }
-          })
-          // Kurz warten: ein sofortiger Fehler (ENOENT/Crash) meldet sich; bleibt der
-          // Prozess am Leben → Erfolg an das Frontend.
-          await delay(1200)
-          if (!settled) {
-            settled = true
-            console.log('[launch] OK – Prozess läuft (pid', child.pid, ')')
-            child.unref()
-            send({ ok: true, launched: true, lua: true, restarted: running && restart })
-          }
+
+          // Alle Varianten fehlgeschlagen → echten Fehler + Hinweise zurückgeben.
+          const code = last?.code ?? null
+          let hint = ''
+          if (hex32(code) === '0xE0434352') hint += ' .NET-Ausnahme beim Start (0xE0434352) – meist unvollständiger BizHawk-Ordner (DLLs fehlen) oder fehlende .NET-Runtime.'
+          if (!folder.complete) hint += ' Der gewählte Ordner enthält keine BizHawk-DLLs – bitte die EmuHawk.exe aus dem VOLLSTÄNDIGEN BizHawk-Ordner wählen.'
+          const detail = `Exit ${code} (${hex32(code)}).${hint}`.trim()
+          console.error('[launch] ❌ Alle Varianten fehlgeschlagen:', detail)
+          send({ ok: false, error: 'launch_exited', detail })
         })
       })
 
