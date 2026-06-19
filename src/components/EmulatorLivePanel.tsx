@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Wifi, WifiOff, Loader2, Gamepad2, Heart, Skull, Play, Pause, Plus, Check, MapPin, ChevronDown, ChevronUp, AlertTriangle, Settings } from 'lucide-react'
 import { getSpriteUrl, getTypeColor, fetchMoveById, fetchItemName, fetchAbilityName } from '../lib/pokemon-api'
 import { STATUS_LABEL_DE, natureName } from '../lib/emulatorSync'
@@ -6,6 +6,8 @@ import type { EmulatorMon } from '../lib/emulatorSync'
 import { buildLivePrefill, type EncounterPrefill } from '../lib/liveSync'
 import { matchRoute, isGameMismatch, emulatorGameLabel } from '../lib/routes'
 import EmulatorSettingsModal from './EmulatorSettingsModal'
+import EmulatorSetupWizard from './EmulatorSetupWizard'
+import { useEmulatorSettings, useEmulatorSettingsStore, isConfigured } from '../lib/emulatorSettings'
 import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
 import LocationMapManager from './LocationMapManager'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
@@ -152,6 +154,15 @@ export default function EmulatorLivePanel({
     try { return localStorage.getItem(COLLAPSED_KEY) === '1' } catch { return false }
   })
   const [showSettings, setShowSettings] = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
+  const emuSettings = useEmulatorSettings()
+  const settingsHydrated = useEmulatorSettingsStore((s) => s.hydrated)
+  const configured = isConfigured(emuSettings)
+  const autoOpened = useRef(false)
+  // First time the live-sync is used without setup → open the wizard automatically.
+  useEffect(() => {
+    if (settingsHydrated && !configured && !autoOpened.current) { autoOpened.current = true; setShowWizard(true) }
+  }, [settingsHydrated, configured])
   const { phase, team, game: liveGame, currentLocationName, currentLocationId, ageSec } = useEmulatorSync(enabled)
 
   // The RUN edition decides the available routes; the emulator must match it.
@@ -213,7 +224,7 @@ export default function EmulatorLivePanel({
           {enabled ? <><Pause className="w-3 h-3" /> Sync stoppen</> : <><Play className="w-3 h-3" /> Sync starten</>}
         </button>
         <button
-          onClick={() => setShowSettings(true)}
+          onClick={() => (configured ? setShowSettings(true) : setShowWizard(true))}
           className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
           title="Emulator-Einstellungen"
         >
@@ -228,6 +239,7 @@ export default function EmulatorLivePanel({
         </button>
       </div>
 
+      {showWizard && <EmulatorSetupWizard onClose={() => setShowWizard(false)} />}
       {showSettings && <EmulatorSettingsModal onClose={() => setShowSettings(false)} />}
 
       {/* Spiel-Mismatch — auch im eingeklappten Zustand sichtbar */}

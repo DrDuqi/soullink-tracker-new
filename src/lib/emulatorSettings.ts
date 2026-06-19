@@ -69,6 +69,50 @@ export function settingsStatus(s: EmulatorSettings) {
   }
 }
 
+/** Setup is complete once BizHawk + ROM + Lua are known. */
+export function isConfigured(s: EmulatorSettings): boolean {
+  return !!s.bizhawkPath.trim() && !!s.romPath.trim() && !!s.luaPath.trim()
+}
+
+/** Friendly file name (last path segment) — so the UI never shows full paths. */
+export function fileName(p: string): string {
+  const t = p.trim().replace(/[\\/]+$/, '')
+  const seg = t.split(/[\\/]/).pop()
+  return seg || t
+}
+
+export interface DetectResult {
+  lua: string | null
+  syncFolder: string
+  bizhawk: string | null
+  roms: { name: string; path: string }[]
+}
+
+/** Asks the dev server to auto-detect Lua / sync folder / BizHawk / ROMs (dev-only). */
+export async function detectEmulator(): Promise<DetectResult | null> {
+  try {
+    const r = await fetch('/api/emulator-detect', { cache: 'no-store' })
+    if (!r.ok) return null
+    const j = await r.json()
+    if (!j?.ok) return null
+    return {
+      lua: j.lua ?? null,
+      syncFolder: j.syncFolder ?? '',
+      bizhawk: j.bizhawk ?? null,
+      roms: Array.isArray(j.roms) ? j.roms : [],
+    }
+  } catch { return null }
+}
+
+/** Resolve a file the user picked in the browser dialog to an absolute path. */
+export async function findFile(name: string): Promise<string | null> {
+  try {
+    const r = await fetch('/api/emulator-detect?find=' + encodeURIComponent(name), { cache: 'no-store' })
+    const j = await r.json()
+    return j?.path ?? null
+  } catch { return null }
+}
+
 /** Windows .bat that launches BizHawk with the ROM and the Lua script preloaded.
  *  A browser can't start local programs, but this file can — save & double-click.
  *  Robust: validates the saved paths, prints a clear error and PAUSES so the

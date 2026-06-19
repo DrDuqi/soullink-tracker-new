@@ -1,8 +1,71 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { readFileSync, statSync, existsSync, readdirSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+
+// Dev-only filesystem detection so the setup wizard can auto-fill paths the user
+// would otherwise have to type (a browser file picker never reveals absolute paths).
+// Bounded scan of the project + its parent only; never touches anything else.
+function detectEmulatorPaths(root: string) {
+  const lua = join(root, 'emulator', 'bizhawk', 'soullink_sync.lua')
+  const parent = dirname(root)
+
+  let bizhawk: string | null = null
+  for (const base of [root, parent]) {
+    const direct = join(base, 'EmuHawk.exe')
+    if (existsSync(direct)) { bizhawk = direct; break }
+    try {
+      for (const ent of readdirSync(base, { withFileTypes: true })) {
+        if (ent.isDirectory() && /bizhawk|emuhawk/i.test(ent.name)) {
+          const cand = join(base, ent.name, 'EmuHawk.exe')
+          if (existsSync(cand)) { bizhawk = cand; break }
+        }
+      }
+    } catch { /* unreadable dir → skip */ }
+    if (bizhawk) break
+  }
+
+  const romDirs = [root, join(root, 'roms'), join(root, 'ROMs'), join(root, 'emulator'), parent, join(parent, 'roms')]
+  const roms: { name: string; path: string }[] = []
+  const seen = new Set<string>()
+  for (const dir of romDirs) {
+    try {
+      for (const ent of readdirSync(dir, { withFileTypes: true })) {
+        if (ent.isFile() && /\.(nds|gba|gbc|gb)$/i.test(ent.name)) {
+          const p = join(dir, ent.name)
+          if (!seen.has(p)) { seen.add(p); roms.push({ name: ent.name, path: p }) }
+        }
+      }
+    } catch { /* skip */ }
+    if (roms.length >= 60) break
+  }
+
+  return { lua: existsSync(lua) ? lua : null, syncFolder: join(root, 'emulator', 'bizhawk'), bizhawk, roms }
+}
+
+// Find a file by its base name under the project / parent (bounded), so a file the
+// user picked in the browser dialog can be resolved to an absolute path.
+function findFileByName(root: string, name: string): string | null {
+  if (!name || /[\\/]/.test(name)) return null
+  const skip = new Set(['node_modules', '.git', 'dist', '.vite', 'coverage'])
+  const queue: { dir: string; depth: number }[] = [root, dirname(root)].map((d) => ({ dir: d, depth: 0 }))
+  let scanned = 0
+  const target = name.toLowerCase()
+  while (queue.length && scanned < 6000) {
+    const { dir, depth } = queue.shift()!
+    let entries
+    try { entries = readdirSync(dir, { withFileTypes: true }) } catch { continue }
+    for (const ent of entries) {
+      scanned++
+      if (ent.isFile() && ent.name.toLowerCase() === target) return join(dir, ent.name)
+      if (ent.isDirectory() && depth < 2 && !skip.has(ent.name) && !ent.name.startsWith('.')) {
+        queue.push({ dir: join(dir, ent.name), depth: depth + 1 })
+      }
+    }
+  }
+  return null
+}
 
 // Dev-only local endpoint for the emulator live-sync prototype.
 //   GET  /api/emulator-sync  → returns { ok, last: { data, at } | null }
@@ -36,6 +99,21 @@ function emulatorSyncPlugin(): Plugin {
           return fileCache // file missing or mid-write → last good parse
         }
       }
+
+      // Setup-wizard helper: GET /api/emulator-detect → { lua, syncFolder, bizhawk, roms }
+      //                       GET /api/emulator-detect?find=NAME → { path }
+      server.middlewares.use('/api/emulator-detect', (req, res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('content-type', 'application/json')
+        try {
+          const u = new URL(req.originalUrl || req.url || '/', 'http://localhost')
+          const find = u.searchParams.get('find')
+          if (find) { res.end(JSON.stringify({ ok: true, path: findFileByName(server.config.root, find) })); return }
+          res.end(JSON.stringify({ ok: true, ...detectEmulatorPaths(server.config.root) }))
+        } catch {
+          res.statusCode = 500; res.end(JSON.stringify({ ok: false }))
+        }
+      })
 
       server.middlewares.use('/api/emulator-sync', (req, res) => {
         res.setHeader('Access-Control-Allow-Origin', '*')
