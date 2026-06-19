@@ -70,20 +70,73 @@ export function settingsStatus(s: EmulatorSettings) {
 }
 
 /** Windows .bat that launches BizHawk with the ROM and the Lua script preloaded.
- *  A browser can't start local programs, but this file can — save & double-click. */
+ *  A browser can't start local programs, but this file can — save & double-click.
+ *  Robust: validates the saved paths, prints a clear error and PAUSES so the
+ *  window never vanishes on failure, quotes everything (spaces) and falls back to
+ *  a no-Lua launch (with manual instructions) if the script path isn't found. */
 export function buildStartBat(s: EmulatorSettings): string {
-  const q = (p: string) => `"${p.trim()}"`
-  const parts = [q(s.bizhawkPath || 'EmuHawk.exe')]
-  if (s.romPath.trim()) parts.push(q(s.romPath))
-  if (s.luaPath.trim()) parts.push(`--lua=${q(s.luaPath)}`)
-  const cmd = parts.join(' ')
-  return [
+  const biz = s.bizhawkPath.trim()
+  const rom = s.romPath.trim()
+  const lua = s.luaPath.trim()
+  const L: string[] = [
     '@echo off',
-    'REM ── Von SoulLink Tracker generiert ─────────────────────────────',
-    'REM Startet BizHawk mit ROM und lädt das Lua-Sync-Script automatisch.',
-    'REM Voraussetzung: die Website läuft bereits (npm run dev).',
+    'setlocal',
+    'REM ─────────────────────────────────────────────────────────────',
+    'REM  start-soullink.bat — von SoulLink Tracker generiert',
+    'REM  Startet BizHawk mit deiner ROM und laedt das Lua-Sync-Script.',
+    'REM  Voraussetzung: die Website laeuft bereits (npm run dev).',
+    'REM ─────────────────────────────────────────────────────────────',
     '',
-    `start "" ${cmd}`,
+    `set "BIZHAWK=${biz}"`,
+    `set "ROM=${rom}"`,
+    `set "LUA=${lua}"`,
     '',
-  ].join('\r\n')
+    'if "%BIZHAWK%"=="" (',
+    '  echo [FEHLER] Kein BizHawk/EmuHawk-Pfad gesetzt.',
+    '  echo Bitte in den Emulator-Einstellungen der Website eintragen.',
+    '  echo.',
+    '  pause',
+    '  exit /b 1',
+    ')',
+    'if not exist "%BIZHAWK%" (',
+    '  echo [FEHLER] BizHawk/EmuHawk nicht gefunden:',
+    '  echo   "%BIZHAWK%"',
+    '  echo Bitte den Pfad in den Emulator-Einstellungen pruefen.',
+    '  echo.',
+    '  pause',
+    '  exit /b 1',
+    ')',
+    'if "%ROM%"=="" (',
+    '  echo [FEHLER] Kein ROM-Pfad gesetzt.',
+    '  echo Bitte in den Emulator-Einstellungen der Website eintragen.',
+    '  echo.',
+    '  pause',
+    '  exit /b 1',
+    ')',
+    'if not exist "%ROM%" (',
+    '  echo [FEHLER] ROM nicht gefunden:',
+    '  echo   "%ROM%"',
+    '  echo Bitte den ROM-Pfad in den Emulator-Einstellungen pruefen.',
+    '  echo.',
+    '  pause',
+    '  exit /b 1',
+    ')',
+    '',
+    'if not "%LUA%"=="" if exist "%LUA%" (',
+    '  echo Starte BizHawk mit ROM + Lua-Sync-Script ...',
+    '  start "" "%BIZHAWK%" "%ROM%" --lua="%LUA%"',
+    '  goto :done',
+    ')',
+    '',
+    'echo [HINWEIS] Lua-Script nicht gefunden oder kein Lua-Pfad gesetzt.',
+    'echo BizHawk wird OHNE automatisches Lua gestartet.',
+    'echo Lua manuell laden: Tools - Lua Console - Open Script - soullink_sync.lua',
+    'echo.',
+    'start "" "%BIZHAWK%" "%ROM%"',
+    '',
+    ':done',
+    'endlocal',
+    '',
+  ]
+  return L.join('\r\n')
 }

@@ -126,18 +126,20 @@ export default function EmulatorSettingsModal({ onClose }: { onClose: () => void
             </div>
           )}
 
-          {/* Start guide */}
+          {/* Schnellstart */}
           <div>
-            <h3 className="text-slate-200 text-xs font-black uppercase tracking-widest mb-2">Start-Anleitung</h3>
+            <h3 className="text-slate-200 text-xs font-black uppercase tracking-widest mb-2">Schnellstart</h3>
             <ol className="space-y-1.5 text-sm text-slate-300 list-decimal list-inside">
               <li>Website starten (<span className="font-mono text-xs text-slate-400">npm run dev</span>) — läuft bereits, wenn du das hier siehst.</li>
-              <li>BizHawk öffnen{settings.bizhawkPath && <span className="text-slate-500"> — <span className="font-mono text-[11px]">{settings.bizhawkPath}</span></span>}.</li>
-              <li>ROM laden{settings.romPath && <span className="text-slate-500"> — <span className="font-mono text-[11px]">{settings.romPath}</span></span>}.</li>
-              <li>Lua Console öffnen (Tools → Lua Console).</li>
-              <li>Script laden{settings.luaPath && <span className="text-slate-500"> — <span className="font-mono text-[11px]">{settings.luaPath}</span></span>}.</li>
+              <li><span className="font-semibold text-slate-100">start-soullink.bat</span> doppelklicken — startet BizHawk mit deiner ROM und lädt das Lua-Script.</li>
+              <li>Diesen Run öffnen.</li>
+              <li>Live-Sync prüfen: im Panel steht „Verbunden mit …", dein Team erscheint automatisch.</li>
             </ol>
             <p className="text-slate-500 text-[11px] mt-2">
-              Eine Browser-App darf keine lokalen Programme starten. Die folgende <span className="text-slate-300 font-semibold">.bat</span> erledigt Schritt 2–5 für dich (Speichern &amp; Doppelklick).
+              Eine Browser-App darf keine lokalen Programme starten — deshalb übernimmt das die <span className="text-slate-300 font-semibold">.bat</span> (Schritt&nbsp;2). Die Datei nutzt genau deine oben gespeicherten Pfade.
+            </p>
+            <p className="text-slate-500 text-[11px] mt-1">
+              Lua manuell laden (falls die Auto-Ladung nicht greift): <span className="text-slate-400">Tools → Lua Console → Open Script → soullink_sync.lua</span>
             </p>
           </div>
 
@@ -148,11 +150,11 @@ export default function EmulatorSettingsModal({ onClose }: { onClose: () => void
               <div className="flex gap-2">
                 <button onClick={copyBat} className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
                   style={{ color: '#94a3b8', background: '#16161f', borderColor: '#2e2e42' }}>
-                  {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />} {copied ? 'Kopiert' : 'Kopieren'}
+                  {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />} {copied ? 'Kopiert' : 'Startdatei kopieren'}
                 </button>
                 <button onClick={downloadBat} className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
                   style={{ color: '#CC0000', background: 'rgba(204,0,0,0.1)', borderColor: 'rgba(204,0,0,0.3)' }}>
-                  <Download className="w-3 h-3" /> .bat herunterladen
+                  <Download className="w-3 h-3" /> Startdatei herunterladen
                 </button>
               </div>
             </div>
