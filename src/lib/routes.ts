@@ -114,6 +114,33 @@ export function getRoutesForGame(game: string): string[] {
   return [...new Set(routes), 'Eigene Route...']
 }
 
+// Emulator game codes (Lua CONFIG.game, lowercase English) → run edition label (German).
+const EMU_GAME_TO_LABEL: Record<string, string> = {
+  red: 'Rot', blue: 'Blau', yellow: 'Gelb',
+  gold: 'Gold', silver: 'Silber', crystal: 'Kristall',
+  ruby: 'Rubin', sapphire: 'Saphir', emerald: 'Smaragd',
+  firered: 'Feuerrot', leafgreen: 'Blattgrün',
+  diamond: 'Diamant', pearl: 'Perl', platinum: 'Platin',
+  heartgold: 'HeartGold', soulsilver: 'SoulSilver',
+  black: 'Schwarz', white: 'Weiß', black2: 'Schwarz 2', white2: 'Weiß 2',
+}
+
+/** Map an emulator game code (e.g. "platinum") to the run-edition label (e.g. "Platin"). */
+export function emulatorGameLabel(emuGame: string | null | undefined): string | null {
+  if (!emuGame) return null
+  return EMU_GAME_TO_LABEL[emuGame.toLowerCase()] ?? null
+}
+
+/** True only when we are SURE the emulator game does not match the run edition.
+ *  Unknown emulator codes or PokéMMO (multi-region) never count as a mismatch. */
+export function isGameMismatch(runGame: string | null | undefined, emuGame: string | null | undefined): boolean {
+  if (!runGame || !emuGame) return false
+  if (runGame === 'PokéMMO') return false
+  const label = EMU_GAME_TO_LABEL[emuGame.toLowerCase()]
+  if (!label) return false
+  return label !== runGame
+}
+
 // Normalize a location label for tolerant comparison (case/spaces/diacritics/punct).
 function normalizeLoc(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')

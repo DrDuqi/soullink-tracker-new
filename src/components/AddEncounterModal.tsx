@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, MapPin, PenLine, AlertTriangle } from 'lucide-react'
+import { X, MapPin, PenLine, AlertTriangle, Lock } from 'lucide-react'
 import PokemonSearch from './PokemonSearch'
 import { useAddEncounter } from '../hooks/useEncounters'
 import { getRoutesForGame } from '../lib/routes'
@@ -18,6 +18,11 @@ export interface EncounterPrefill {
   note?: string               // seeded into the notes field (e.g. level, since encounters have no level column)
   emuPid?: string | null      // stable emulator identity → stored on the encounter (evolution-proof)
   emuLocationId?: number | null  // current emulator location id → auto-learn id→route on save
+  // Read-only live data shown in the import modal (comes from Lua, not editable):
+  level?: number | null
+  hp?: number | null
+  maxHp?: number | null
+  item?: string | null
 }
 
 interface Props {
@@ -57,6 +62,9 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
   // Auto-Learning-Hinweis: aktuelle Emulator-Orts-ID und ihr (evtl. schon gelerntes) Mapping.
   const emuLocId = prefill?.emuLocationId ?? null
   const emuLocMapped = emuLocId != null ? getLearnedRoute(game, emuLocId) : null
+  // Read-only Live-Daten (aus Lua) für den Import.
+  const STATUS_DE: Record<string, string> = { alive: 'Am Leben', dead: 'Besiegt', boxed: 'In Box', missing: 'Vermisst' }
+  const liveMoves = (prefill?.moves ?? []).filter(Boolean) as string[]
 
   // PID = eindeutige Identität: existiert bereits ein Encounter mit derselben
   // Emulator-PID, wird NIE ein zweiter angelegt — stattdessen der vorhandene geöffnet.
@@ -175,21 +183,64 @@ export default function AddEncounterModal({ runId, player, game, onClose, defaul
 
           {/* Pokémon */}
           <div>
-            <label className="text-slate-300 text-sm font-semibold mb-2 block">Pokémon <span className="text-slate-500 font-normal">(Gen I–V)</span></label>
-            <PokemonSearch onSelect={setSelectedPokemon} />
-            {selectedPokemon && (
-              <div className="mt-3 flex items-center gap-4 bg-[#16161f] rounded-2xl px-4 py-3 border border-[#2e2e42] anim-slide-d">
-                <img src={selectedPokemon.sprite} alt={selectedPokemon.name} className="w-16 h-16 object-contain drop-shadow-md" />
-                <div>
-                  <div className="text-white capitalize font-bold text-lg">{selectedPokemon.name}</div>
-                  <div className="text-slate-500 text-xs mb-2">#{String(selectedPokemon.id).padStart(3, '0')}</div>
-                  <div className="flex gap-1.5">
-                    {selectedPokemon.types.map((t) => (
-                      <span key={t} className="type-badge" style={{ background: getTypeColor(t) }}>{t}</span>
-                    ))}
+            <label className="text-slate-300 text-sm font-semibold mb-2 block">
+              Pokémon {!isImport && <span className="text-slate-500 font-normal">(Gen I–V)</span>}
+            </label>
+
+            {isImport && selectedPokemon ? (
+              // Emulator-Import: Live-Daten read-only (kommen aus Lua, nicht editierbar).
+              <div className="rounded-2xl border border-[#2e2e42] bg-[#16161f] p-4 space-y-3">
+                <div className="flex items-center gap-4">
+                  <img src={selectedPokemon.sprite} alt="" className="w-16 h-16 object-contain drop-shadow-md" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-white capitalize font-bold text-lg truncate">{selectedPokemon.name}</div>
+                    <div className="text-slate-500 text-xs mb-2">
+                      #{String(selectedPokemon.id).padStart(3, '0')}{prefill?.level != null && ` · Lv ${prefill.level}`}
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {selectedPokemon.types.map((t) => (
+                        <span key={t} className="type-badge" style={{ background: getTypeColor(t) }}>{t}</span>
+                      ))}
+                    </div>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                  {prefill?.level != null && <span>Level: <span className="text-slate-200">{prefill.level}</span></span>}
+                  {prefill?.maxHp != null && <span>KP: <span className="text-slate-200">{prefill.hp ?? 0}/{prefill.maxHp}</span></span>}
+                  <span>Status: <span className="text-slate-200">{STATUS_DE[prefill?.status ?? 'alive']}</span></span>
+                  {prefill?.item && <span>Item: <span className="text-slate-200">{prefill.item}</span></span>}
+                  {prefill?.emuPid && <span className="col-span-2 truncate">PID: <span className="text-slate-300 font-mono">{prefill.emuPid}</span></span>}
+                </div>
+                {liveMoves.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {liveMoves.map((m) => (
+                      <span key={m} className="px-1.5 py-0.5 rounded bg-[#1c1c26] border border-[#2e2e42] text-slate-300 text-[10px]">{m}</span>
+                    ))}
+                  </div>
+                )}
+                <p className="flex items-start gap-1.5 text-[11px] text-slate-500 pt-0.5">
+                  <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  Diese Daten kommen aus dem Emulator und werden automatisch synchronisiert. Editierbar bleiben Route, Spitzname und Notizen.
+                </p>
               </div>
+            ) : (
+              <>
+                <PokemonSearch onSelect={setSelectedPokemon} />
+                {selectedPokemon && (
+                  <div className="mt-3 flex items-center gap-4 bg-[#16161f] rounded-2xl px-4 py-3 border border-[#2e2e42] anim-slide-d">
+                    <img src={selectedPokemon.sprite} alt={selectedPokemon.name} className="w-16 h-16 object-contain drop-shadow-md" />
+                    <div>
+                      <div className="text-white capitalize font-bold text-lg">{selectedPokemon.name}</div>
+                      <div className="text-slate-500 text-xs mb-2">#{String(selectedPokemon.id).padStart(3, '0')}</div>
+                      <div className="flex gap-1.5">
+                        {selectedPokemon.types.map((t) => (
+                          <span key={t} className="type-badge" style={{ background: getTypeColor(t) }}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

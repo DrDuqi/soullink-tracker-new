@@ -1,26 +1,28 @@
 import { useEffect, useState } from 'react'
-import { Wifi, WifiOff, Loader2, Gamepad2, Heart, Skull, Play, Pause, Plus, Check, MapPin } from 'lucide-react'
+import { Wifi, WifiOff, Loader2, Gamepad2, Heart, Skull, Play, Pause, Plus, Check, MapPin, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 import { getSpriteUrl, getTypeColor, fetchPokemon, fetchMoveById, fetchItemName, fetchAbilityName } from '../lib/pokemon-api'
 import { STATUS_LABEL_DE, natureName } from '../lib/emulatorSync'
 import type { EmulatorMon } from '../lib/emulatorSync'
 import type { EncounterPrefill } from './AddEncounterModal'
-import { matchRoute } from '../lib/routes'
+import { matchRoute, isGameMismatch, emulatorGameLabel } from '../lib/routes'
 import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
 import LocationMapManager from './LocationMapManager'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
 
 const ENABLED_KEY = 'soullink-emusync-enabled'
+const COLLAPSED_KEY = 'soullink-emusync-collapsed'
 const GAME_LABEL: Record<string, string> = { platinum: 'Platinum', heartgold: 'HeartGold', firered: 'FireRed', emerald: 'Emerald', black: 'Black' }
 
 // Resolves ability / item / move names (by id, cached) for one Pokémon and
 // renders the enriched detail. Keyed on the ids so the 1s status ticker doesn't
 // cause refetches; cache makes repeats free.
-function MonRich({ mon, imported, game, currentLocationName, currentLocationId, onImport }: {
+function MonRich({ mon, imported, game, currentLocationName, currentLocationId, suppressLocation, onImport }: {
   mon: EmulatorMon
   imported: boolean
   game?: string
   currentLocationName?: string | null
   currentLocationId?: number | null
+  suppressLocation?: boolean   // emulator game ≠ run edition → no route/learn
   onImport?: (p: EncounterPrefill, suggestedRoute?: string) => void
 }) {
   const [moves, setMoves] = useState<({ name: string; type: string } | null)[]>([])
@@ -49,12 +51,14 @@ function MonRich({ mon, imported, game, currentLocationName, currentLocationId, 
       if (!poke) return
       const ids = (mon.moveIds ?? []).filter((x) => x > 0)
       const mv = await Promise.all(ids.map((id) => fetchMoveById(id)))
+      const itemName = mon.heldItemId ? await fetchItemName(mon.heldItemId) : null
       // Route-Quelle: gelernte Orts-ID zuerst (vom Nutzer bestätigt), dann Fangort,
-      // dann aktueller Ort via matchRoute. Kein sicherer Treffer → manuell.
-      const route =
-        getLearnedRoute(game ?? '', currentLocationId) ??
-        matchRoute(mon.metLocationName ?? currentLocationName ?? null, game ?? '') ??
-        undefined
+      // dann aktueller Ort via matchRoute. Bei Spiel-Mismatch GAR keine Vorauswahl.
+      const route = suppressLocation
+        ? undefined
+        : getLearnedRoute(game ?? '', currentLocationId) ??
+          matchRoute(mon.metLocationName ?? currentLocationName ?? null, game ?? '') ??
+          undefined
       onImport({
         pokemon: poke,
         nickname: mon.nickname ?? null,
@@ -62,7 +66,11 @@ function MonRich({ mon, imported, game, currentLocationName, currentLocationId, 
         moves: mv.map((m) => m?.name ?? null),
         note: `Aus Emulator · Lv ${mon.level}`,
         emuPid: mon.pid != null ? String(mon.pid) : null,
-        emuLocationId: currentLocationId ?? null,
+        emuLocationId: suppressLocation ? null : currentLocationId ?? null,
+        level: mon.level,
+        hp: mon.hp,
+        maxHp: mon.maxHp,
+        item: itemName,
       }, route)
     } finally {
       setImporting(false)
@@ -157,12 +165,18 @@ export default function EmulatorLivePanel({
   const [enabled, setEnabled] = useState(() => {
     try { return localStorage.getItem(ENABLED_KEY) !== '0' } catch { return true }
   })
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(COLLAPSED_KEY) === '1' } catch { return false }
+  })
   const { phase, team, game: liveGame, currentLocationName, currentLocationId, ageSec } = useEmulatorSync(enabled)
-  const gameKey = liveGame ?? game ?? ''
-  useLocationMap(gameKey)   // reaktiv: Ort-Anzeige aktualisiert sich nach dem Lernen
-  // Aktueller Ort: gelernte Zuordnung zuerst, sonst (sicherer) Lua-Name, sonst ID.
-  const learnedLoc = currentLocationId != null ? getLearnedRoute(gameKey, currentLocationId) : null
-  const matchedRoute = learnedLoc ?? (currentLocationName ? matchRoute(currentLocationName, gameKey) : null)
+
+  // The RUN edition decides the available routes; the emulator must match it.
+  const runGame = game ?? ''
+  const mismatch = isGameMismatch(runGame, liveGame)
+  useLocationMap(runGame)   // reaktiv: Ort-Anzeige aktualisiert sich nach dem Lernen
+  // Aktueller Ort: bei Spiel-Mismatch KEINE Zuordnung (kein falsches Auto-Matching).
+  const learnedLoc = !mismatch && currentLocationId != null ? getLearnedRoute(runGame, currentLocationId) : null
+  const matchedRoute = mismatch ? null : (learnedLoc ?? (currentLocationName ? matchRoute(currentLocationName, runGame) : null))
   const locText = learnedLoc
     ?? currentLocationName
     ?? (currentLocationId != null ? `Unbekannter Ort (ID ${currentLocationId})` : 'unbekannt')
@@ -171,6 +185,11 @@ export default function EmulatorLivePanel({
     const v = !enabled
     setEnabled(v)
     try { localStorage.setItem(ENABLED_KEY, v ? '1' : '0') } catch { /* ignore */ }
+  }
+  function toggleCollapse() {
+    const v = !collapsed
+    setCollapsed(v)
+    try { localStorage.setItem(COLLAPSED_KEY, v ? '1' : '0') } catch { /* ignore */ }
   }
 
   const gameName = GAME_LABEL[(liveGame ?? game ?? '').toLowerCase()] ?? (liveGame ?? game ?? 'Spiel')
@@ -186,15 +205,17 @@ export default function EmulatorLivePanel({
   else { icon = <Wifi className="w-4 h-4" />; title = `Verbunden mit ${gameName}`; color = '#4ade80' }
 
   const showAge = enabled && ageSec != null && (phase === 'connected' || phase === 'waiting')
+  const monCount = enabled && phase === 'connected' ? team.length : null
 
   return (
-    <div className="rounded-2xl border overflow-hidden" style={{ borderColor: `${color}40` }}>
+    <div className="rounded-2xl border overflow-hidden" style={{ borderColor: mismatch ? 'rgba(248,113,113,0.55)' : `${color}40` }}>
       <div className="flex items-center gap-2 px-4 py-3" style={{ background: '#1c1c26' }}>
         <span style={{ color }}>{icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="text-slate-200 text-xs font-black uppercase tracking-widest">Emulator Live-Team</div>
-          <div className="text-[11px] font-bold" style={{ color }}>
+          <div className="text-slate-200 text-xs font-black uppercase tracking-widest">Emulator Live-Sync</div>
+          <div className="text-[11px] font-bold truncate" style={{ color }}>
             {title}
+            {monCount != null && <span className="text-slate-400 font-medium"> · {monCount} Pokémon</span>}
             {showAge && <span className="text-slate-500 font-medium"> · vor {ageSec}s</span>}
           </div>
         </div>
@@ -207,9 +228,27 @@ export default function EmulatorLivePanel({
         >
           {enabled ? <><Pause className="w-3 h-3" /> Sync stoppen</> : <><Play className="w-3 h-3" /> Sync starten</>}
         </button>
+        <button
+          onClick={toggleCollapse}
+          className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+          title={collapsed ? 'Ausklappen' : 'Einklappen'}
+        >
+          {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+        </button>
       </div>
 
-      {enabled && phase === 'connected' && (
+      {/* Spiel-Mismatch — auch im eingeklappten Zustand sichtbar */}
+      {enabled && mismatch && (
+        <div className="flex items-start gap-1.5 px-4 py-2 text-[11px] border-t" style={{ background: 'rgba(248,113,113,0.1)', borderColor: 'rgba(248,113,113,0.3)' }}>
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-400" />
+          <span className="text-red-300 font-medium">
+            Emulator-Spiel passt nicht zum Run: Run = {runGame || '—'}, Emulator = {emulatorGameLabel(liveGame) ?? gameName}.
+            Routen-Vorschläge sind deaktiviert; Import bleibt manuell möglich.
+          </span>
+        </div>
+      )}
+
+      {!collapsed && enabled && phase === 'connected' && !mismatch && (
         <div className="flex items-center gap-1.5 px-4 py-2 text-[11px] border-t" style={{ background: '#16161f', borderColor: '#2e2e42' }}>
           <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: matchedRoute ? '#4ade80' : '#64748b' }} />
           <span className="text-slate-400 font-medium">Aktueller Ort:</span>
@@ -220,7 +259,7 @@ export default function EmulatorLivePanel({
         </div>
       )}
 
-      {enabled && team.length > 0 && (
+      {!collapsed && enabled && team.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3" style={{ background: '#161620' }}>
           {team.map((m) => (
             <MonRich
@@ -230,15 +269,16 @@ export default function EmulatorLivePanel({
               game={game}
               currentLocationName={currentLocationName}
               currentLocationId={currentLocationId}
+              suppressLocation={mismatch}
               onImport={onImport}
             />
           ))}
         </div>
       )}
 
-      {enabled && <LocationMapManager game={gameKey} />}
+      {!collapsed && enabled && !mismatch && <LocationMapManager game={runGame} />}
 
-      {enabled && team.length === 0 && phase !== 'init' && (
+      {!collapsed && enabled && team.length === 0 && phase !== 'init' && (
         <div className="px-4 py-3 text-slate-600 text-[11px]" style={{ background: '#161620' }}>
           {phase === 'connected' || phase === 'waiting'
             ? 'Noch keine Pokémon im Team erkannt.'

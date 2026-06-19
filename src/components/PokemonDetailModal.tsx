@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, ChevronLeft, ChevronRight, Skull, Heart, Box, HelpCircle, Zap, Shield, Swords } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Skull, Heart, Box, HelpCircle, Zap, Shield, Swords, Wifi } from 'lucide-react'
 import {
   getOfficialArtUrl,
   getSpriteUrl,
@@ -142,6 +142,11 @@ export default function PokemonDetailModal({ encounter, linkedEncounter, linkedP
 
   const types = details?.types ?? encounter.types ?? []
   const statusInfo = STATUS_ICONS[encounter.status] ?? STATUS_ICONS.alive
+  // Mit dem Emulator verbunden → Art/Level/Attacken/Status/Entwicklung kommen aus
+  // Lua und werden automatisch synchronisiert; hier nicht manuell editierbar.
+  const isLiveSynced = !!encounter.emu_pid
+  const canEditMoves = myEncounter && !isLiveSynced
+  const canEvolveManually = myEncounter && !isLiveSynced
 
   async function handleDevolve() {
     if (!prevEvolution || !myEncounter) return
@@ -260,6 +265,16 @@ export default function PokemonDetailModal({ encounter, linkedEncounter, linkedP
         </div>
 
         <div className="px-6 pb-6 space-y-5">
+          {/* Emulator-Sync-Hinweis */}
+          {isLiveSynced && (
+            <div className="rounded-2xl border border-emerald-700/40 bg-emerald-950/20 px-4 py-3 flex items-start gap-2">
+              <Wifi className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+              <p className="text-emerald-300/90 text-xs">
+                Dieses Pokémon ist mit dem Emulator synchronisiert. Art, Level, Attacken, HP, Status, Item und Entwicklung kommen aus Lua und werden automatisch aktualisiert. Manuell änderbar bleiben Route, Spitzname und Notizen.
+              </p>
+            </div>
+          )}
+
           {/* Soul Link partner */}
           {linkedEncounter && (
             <div className="rounded-2xl border border-pk-red/25 p-4" style={{ background: 'rgba(204,0,0,0.06)' }}>
@@ -347,7 +362,7 @@ export default function PokemonDetailModal({ encounter, linkedEncounter, linkedP
                 return (
                   <div key={idx}>
                     <div className="text-slate-600 text-[10px] font-bold mb-1">Attacke {idx + 1}</div>
-                    {myEncounter ? (
+                    {canEditMoves ? (
                       <input
                         list={`moves-${encounter.id}`}
                         value={moves[idx]}
@@ -418,7 +433,7 @@ export default function PokemonDetailModal({ encounter, linkedEncounter, linkedP
           {/* Buttons */}
           <div className="flex gap-2 pt-1 flex-wrap">
             <button onClick={onClose} className="btn-ghost flex-1 py-3 min-w-24">Schließen</button>
-            {prevEvolution && myEncounter && encounter.status !== 'dead' && (
+            {prevEvolution && canEvolveManually && encounter.status !== 'dead' && (
               <button
                 onClick={handleDevolve}
                 disabled={evolving}
@@ -429,7 +444,7 @@ export default function PokemonDetailModal({ encounter, linkedEncounter, linkedP
                 {evolving ? 'Lädt…' : `← ${prevEvolution.name}`}
               </button>
             )}
-            {nextEvolution && myEncounter && encounter.status !== 'dead' && (
+            {nextEvolution && canEvolveManually && encounter.status !== 'dead' && (
               <button
                 onClick={handleEvolve}
                 disabled={evolving}
