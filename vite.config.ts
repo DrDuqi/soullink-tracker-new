@@ -4,6 +4,18 @@ import tailwindcss from '@tailwindcss/vite'
 import { readFileSync, statSync, existsSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
+import { spawn, exec } from 'node:child_process'
+
+// Is an EmuHawk.exe process already running? (Windows; resolves false elsewhere.)
+function isBizhawkRunning(): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      exec('tasklist /FI "IMAGENAME eq EmuHawk.exe" /NH', { windowsHide: true }, (err, stdout) => {
+        resolve(!err && /EmuHawk\.exe/i.test(stdout || ''))
+      })
+    } catch { resolve(false) }
+  })
+}
 
 // Dev-only filesystem detection so the setup wizard can auto-fill paths the user
 // would otherwise have to type (a browser file picker never reveals absolute paths).
@@ -122,6 +134,37 @@ function emulatorSyncPlugin(): Plugin {
         } catch {
           res.statusCode = 500; res.end(JSON.stringify({ ok: false }))
         }
+      })
+
+      // One-click launch: start BizHawk with the saved ROM + Lua (dev-only).
+      // POST { bizhawk, rom, lua } → { ok, launched|already, lua } or { ok:false, error }
+      server.middlewares.use('/api/emulator-launch', (req, res) => {
+        res.setHeader('content-type', 'application/json')
+        if (req.method !== 'POST') { res.statusCode = 405; res.end('{"ok":false}'); return }
+        let body = ''
+        req.on('data', (c) => { body += c; if (body.length > 100_000) req.destroy() })
+        req.on('end', async () => {
+          let cfg: { bizhawk?: string; rom?: string; lua?: string } = {}
+          try { cfg = JSON.parse(body || '{}') } catch { /* invalid */ }
+          const bizhawk = String(cfg.bizhawk || '').trim()
+          const rom = String(cfg.rom || '').trim()
+          const lua = String(cfg.lua || '').trim()
+
+          if (!bizhawk || !existsSync(bizhawk)) { res.end(JSON.stringify({ ok: false, error: 'bizhawk_not_found' })); return }
+          if (!rom || !existsSync(rom)) { res.end(JSON.stringify({ ok: false, error: 'rom_not_found' })); return }
+          const luaOk = !!lua && existsSync(lua)
+          if (!luaOk) { res.end(JSON.stringify({ ok: false, error: 'lua_not_found' })); return }
+
+          if (await isBizhawkRunning()) { res.end(JSON.stringify({ ok: true, already: true, lua: true })); return }
+          try {
+            const child = spawn(bizhawk, [rom, '--lua=' + lua], { detached: true, stdio: 'ignore' })
+            child.on('error', () => { /* surfaced below if it never spawns */ })
+            child.unref()
+            res.end(JSON.stringify({ ok: true, launched: true, lua: true }))
+          } catch {
+            res.end(JSON.stringify({ ok: false, error: 'launch_failed' }))
+          }
+        })
       })
 
       server.middlewares.use('/api/emulator-sync', (req, res) => {

@@ -7,7 +7,7 @@ import { buildLivePrefill, type EncounterPrefill } from '../lib/liveSync'
 import { matchRoute, isGameMismatch, emulatorGameLabel } from '../lib/routes'
 import EmulatorSettingsModal from './EmulatorSettingsModal'
 import EmulatorSetupWizard from './EmulatorSetupWizard'
-import { useEmulatorSettings, useEmulatorSettingsStore, isConfigured } from '../lib/emulatorSettings'
+import { useEmulatorSettings, useEmulatorSettingsStore, isConfigured, launchEmulator, detectEmulator, findFile } from '../lib/emulatorSettings'
 import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
 import LocationMapManager from './LocationMapManager'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
@@ -165,6 +165,62 @@ export default function EmulatorLivePanel({
   }, [settingsHydrated, configured])
   const { phase, team, game: liveGame, currentLocationName, currentLocationId, ageSec } = useEmulatorSync(enabled)
 
+  // ── One-click launch (▶ Live-Sync starten) ───────────────────────────────
+  const updateSettings = useEmulatorSettingsStore((s) => s.update)
+  const [launching, setLaunching] = useState(false)
+  const [launchMsg, setLaunchMsg] = useState<string | null>(null)
+  const [launchErr, setLaunchErr] = useState<{ msg: string; actionLabel: string; action: () => void } | null>(null)
+  const launchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const romPick = useRef<HTMLInputElement>(null)
+
+  // Connection established while launching → success, clear the waiting state.
+  useEffect(() => {
+    if (launching && phase === 'connected') {
+      setLaunching(false); setLaunchMsg(null); setLaunchErr(null)
+      if (launchTimer.current) { clearTimeout(launchTimer.current); launchTimer.current = null }
+    }
+  }, [launching, phase])
+  useEffect(() => () => { if (launchTimer.current) clearTimeout(launchTimer.current) }, [])
+
+  async function launchSync() {
+    if (!configured) { setShowWizard(true); return }
+    if (phase === 'connected') return                          // already connected
+    if (!enabled) { setEnabled(true); try { localStorage.setItem(ENABLED_KEY, '1') } catch { /* ignore */ } }
+    setLaunchErr(null); setLaunching(true); setLaunchMsg('BizHawk wird gestartet …')
+
+    const res = await launchEmulator(emuSettings)
+    if (!res.ok) {
+      if (res.error === 'rom_not_found') {
+        setLaunching(false)
+        setLaunchErr({ msg: 'ROM wurde verschoben.', actionLabel: 'Neue ROM auswählen', action: () => romPick.current?.click() })
+      } else if (res.error === 'lua_not_found') {
+        // Lua fehlt → automatisch erneut suchen, sonst Wizard-Schritt für Lua/Sync.
+        const d = await detectEmulator()
+        if (d?.lua) { updateSettings({ luaPath: d.lua, syncFolder: d.syncFolder }); launchSync() }
+        else { setLaunching(false); setLaunchErr({ msg: 'Sync-Script nicht gefunden.', actionLabel: 'Einrichtung öffnen', action: () => setShowWizard(true) }) }
+      } else {
+        setLaunching(false)
+        setLaunchErr({ msg: 'BizHawk konnte nicht gestartet werden.', actionLabel: 'Einstellungen öffnen', action: () => setShowSettings(true) })
+      }
+      return
+    }
+
+    // Launched (or already running) → wait for the live sync to connect.
+    setLaunchMsg(res.already ? 'BizHawk läuft – warte auf Verbindung …' : 'Warte auf Verbindung …')
+    if (launchTimer.current) clearTimeout(launchTimer.current)
+    launchTimer.current = setTimeout(() => {
+      setLaunching(false)
+      setLaunchErr({ msg: 'Keine Verbindung. Läuft BizHawk? Notfalls Lua über Tools → Lua Console laden.', actionLabel: 'Erneut versuchen', action: () => launchSync() })
+    }, 45000)
+  }
+
+  async function reselectRom(file: File | undefined) {
+    if (!file) return
+    const path = await findFile(file.name)
+    if (path) { updateSettings({ romPath: path }); setLaunchErr(null); launchSync() }
+    else setLaunchErr({ msg: 'ROM nicht gefunden. Bitte in den Einstellungen festlegen.', actionLabel: 'Einstellungen öffnen', action: () => setShowSettings(true) })
+  }
+
   // The RUN edition decides the available routes; the emulator must match it.
   const runGame = game ?? ''
   const mismatch = isGameMismatch(runGame, liveGame)
@@ -241,6 +297,7 @@ export default function EmulatorLivePanel({
 
       {showWizard && <EmulatorSetupWizard onClose={() => setShowWizard(false)} />}
       {showSettings && <EmulatorSettingsModal onClose={() => setShowSettings(false)} />}
+      <input ref={romPick} type="file" accept=".nds,.gba,.gbc,.gb" className="hidden" onChange={(e) => reselectRom(e.target.files?.[0])} />
 
       {/* Spiel-Mismatch — auch im eingeklappten Zustand sichtbar */}
       {enabled && mismatch && (
@@ -250,6 +307,32 @@ export default function EmulatorLivePanel({
             Emulator-Spiel passt nicht zum Run: Run = {runGame || '—'}, Emulator = {emulatorGameLabel(liveGame) ?? gameName}.
             Routen-Vorschläge sind deaktiviert; Import bleibt manuell möglich.
           </span>
+        </div>
+      )}
+
+      {/* ▶ Live-Sync starten — startet BizHawk + ROM + Lua mit einem Klick */}
+      {!collapsed && enabled && phase !== 'connected' && (
+        <div className="p-3 border-t" style={{ background: '#16161f', borderColor: '#2e2e42' }}>
+          {launchErr ? (
+            <div className="rounded-xl border border-red-800/50 bg-red-950/25 p-3">
+              <p className="text-red-300 text-sm font-semibold mb-2">{launchErr.msg}</p>
+              <button onClick={launchErr.action} className="btn-primary text-xs py-2 px-3">{launchErr.actionLabel}</button>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={launchSync}
+                disabled={launching}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-70"
+                style={{ background: '#CC0000', color: '#fff' }}
+              >
+                {launching
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> {launchMsg ?? 'Starte …'}</>
+                  : <><Play className="w-4 h-4" /> Live-Sync starten</>}
+              </button>
+              <p className="text-slate-500 text-[11px] mt-2 text-center">Startet BizHawk mit ROM &amp; Sync-Script automatisch.</p>
+            </>
+          )}
         </div>
       )}
 

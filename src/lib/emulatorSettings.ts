@@ -113,6 +113,27 @@ export async function findFile(name: string): Promise<string | null> {
   } catch { return null }
 }
 
+export interface LaunchResult {
+  ok: boolean
+  launched?: boolean   // a new BizHawk was started
+  already?: boolean    // BizHawk was already running → not restarted
+  error?: 'bizhawk_not_found' | 'rom_not_found' | 'lua_not_found' | 'launch_failed' | 'unreachable'
+}
+
+/** Ask the dev server to start BizHawk with the saved ROM + Lua (dev-only). */
+export async function launchEmulator(s: EmulatorSettings): Promise<LaunchResult> {
+  try {
+    const r = await fetch('/api/emulator-launch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ bizhawk: s.bizhawkPath, rom: s.romPath, lua: s.luaPath }),
+    })
+    return (await r.json()) as LaunchResult
+  } catch {
+    return { ok: false, error: 'unreachable' }
+  }
+}
+
 /** Windows .bat that launches BizHawk with the ROM and the Lua script preloaded.
  *  A browser can't start local programs, but this file can — save & double-click.
  *  Robust: validates the saved paths, prints a clear error and PAUSES so the
