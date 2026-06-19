@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { readFileSync, statSync, existsSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
+import { homedir } from 'node:os'
 
 // Dev-only filesystem detection so the setup wizard can auto-fill paths the user
 // would otherwise have to type (a browser file picker never reveals absolute paths).
@@ -48,18 +49,26 @@ function detectEmulatorPaths(root: string) {
 // user picked in the browser dialog can be resolved to an absolute path.
 function findFileByName(root: string, name: string): string | null {
   if (!name || /[\\/]/.test(name)) return null
-  const skip = new Set(['node_modules', '.git', 'dist', '.vite', 'coverage'])
-  const queue: { dir: string; depth: number }[] = [root, dirname(root)].map((d) => ({ dir: d, depth: 0 }))
+  const skip = new Set(['node_modules', '.git', 'dist', '.vite', 'coverage', 'AppData', '.cache'])
+  const roots = [root, dirname(root)]
+  try {
+    const home = homedir()
+    // Common spots where BizHawk / ROMs get extracted.
+    roots.push(join(home, 'Downloads'), join(home, 'Desktop'), join(home, 'Documents'), join(home, 'Tools'))
+  } catch { /* no home → project/parent only */ }
+  const seenRoot = new Set<string>()
+  const queue: { dir: string; depth: number }[] = []
+  for (const r of roots) { if (!seenRoot.has(r)) { seenRoot.add(r); queue.push({ dir: r, depth: 0 }) } }
   let scanned = 0
   const target = name.toLowerCase()
-  while (queue.length && scanned < 6000) {
+  while (queue.length && scanned < 12000) {
     const { dir, depth } = queue.shift()!
     let entries
     try { entries = readdirSync(dir, { withFileTypes: true }) } catch { continue }
     for (const ent of entries) {
       scanned++
       if (ent.isFile() && ent.name.toLowerCase() === target) return join(dir, ent.name)
-      if (ent.isDirectory() && depth < 2 && !skip.has(ent.name) && !ent.name.startsWith('.')) {
+      if (ent.isDirectory() && depth < 3 && !skip.has(ent.name) && !ent.name.startsWith('.')) {
         queue.push({ dir: join(dir, ent.name), depth: depth + 1 })
       }
     }

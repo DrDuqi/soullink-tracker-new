@@ -110,7 +110,20 @@ export default function EmulatorSetupWizard({ onClose }: { onClose: () => void }
                   {resolving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderSearch className="w-3.5 h-3.5" />} EmuHawk.exe auswählen
                 </button>
               </div>
-              {bizErr && <p className="text-yellow-400/90 text-xs mt-3">{bizErr}</p>}
+              {bizErr && !bizOk && (
+                <div className="mt-3">
+                  <p className="text-yellow-400/90 text-xs mb-1.5">{bizErr}</p>
+                  <input
+                    value={settings.bizhawkPath}
+                    onChange={(e) => update({ bizhawkPath: e.target.value })}
+                    placeholder="C:\Tools\BizHawk\EmuHawk.exe"
+                    spellCheck={false}
+                    autoFocus
+                    className="pk-input font-mono text-xs"
+                  />
+                  <p className="text-slate-600 text-[11px] mt-1">Tipp: im Explorer Shift+Rechtsklick auf EmuHawk.exe → „Als Pfad kopieren", dann hier einfügen.</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -144,7 +157,20 @@ export default function EmulatorSetupWizard({ onClose }: { onClose: () => void }
               </button>
 
               {romOk && <p className="mt-3"><Ok>ROM eingerichtet · <span className="text-slate-300 font-normal">{fileName(settings.romPath)}</span></Ok></p>}
-              {romErr && <p className="text-yellow-400/90 text-xs mt-3">{romErr}</p>}
+              {romErr && !romOk && (
+                <div className="mt-3">
+                  <p className="text-yellow-400/90 text-xs mb-1.5">{romErr}</p>
+                  <input
+                    value={settings.romPath}
+                    onChange={(e) => update({ romPath: e.target.value })}
+                    placeholder="C:\ROMs\Pokemon Platin Randomizer.nds"
+                    spellCheck={false}
+                    autoFocus
+                    className="pk-input font-mono text-xs"
+                  />
+                  <p className="text-slate-600 text-[11px] mt-1">Tipp: im Explorer Shift+Rechtsklick auf die ROM → „Als Pfad kopieren", dann hier einfügen.</p>
+                </div>
+              )}
             </div>
           )}
 
