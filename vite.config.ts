@@ -31,15 +31,18 @@ const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 // exception (0xE0434352) because it can't find its runtime files.
 function bizhawkFolderInfo(exeDir: string) {
   let dllCount = 0, hasDllDir = false, hasGamedb = false
+  const sample: string[] = []
+  let readError: string | null = null
   try {
     for (const ent of readdirSync(exeDir, { withFileTypes: true })) {
       const n = ent.name.toLowerCase()
+      if (sample.length < 20) sample.push(ent.isDirectory() ? ent.name + '/' : ent.name)
       if (ent.isFile() && n.endsWith('.dll')) dllCount++
       if (ent.isDirectory() && n === 'dll') hasDllDir = true
       if (ent.isDirectory() && n === 'gamedb') hasGamedb = true
     }
-  } catch { /* unreadable */ }
-  return { complete: dllCount > 0 || hasDllDir || hasGamedb, dllCount, hasDllDir, hasGamedb }
+  } catch (e) { readError = String((e as Error)?.message || e) }
+  return { complete: dllCount > 0 || hasDllDir || hasGamedb, dllCount, hasDllDir, hasGamedb, sample, readError }
 }
 
 interface LaunchAttempt { alive: boolean; code: number | null; signal: string | null; stdout: string; stderr: string; errEvent: string | null; pid?: number; spawnThrew?: string }
@@ -117,19 +120,34 @@ function findFileByName(root: string, name: string): string | null {
   for (const r of roots) { if (!seenRoot.has(r)) { seenRoot.add(r); queue.push({ dir: r, depth: 0 }) } }
   let scanned = 0
   const target = name.toLowerCase()
+  const matches: string[] = []
   while (queue.length && scanned < 12000) {
     const { dir, depth } = queue.shift()!
     let entries
     try { entries = readdirSync(dir, { withFileTypes: true }) } catch { continue }
     for (const ent of entries) {
       scanned++
-      if (ent.isFile() && ent.name.toLowerCase() === target) return join(dir, ent.name)
+      if (ent.isFile() && ent.name.toLowerCase() === target) {
+        matches.push(join(dir, ent.name))
+        if (matches.length >= 30) { queue.length = 0; break }
+      }
       if (ent.isDirectory() && depth < 3 && !skip.has(ent.name) && !ent.name.startsWith('.')) {
         queue.push({ dir: join(dir, ent.name), depth: depth + 1 })
       }
     }
   }
-  return null
+  if (matches.length === 0) return null
+  // EmuHawk.exe: a loose copy (no DLLs) would crash at startup → prefer a match that
+  // sits in a COMPLETE BizHawk folder (has dll/ / gamedb / DLLs).
+  if (target === 'emuhawk.exe' && matches.length > 1) {
+    const complete = matches.find((m) => bizhawkFolderInfo(dirname(m)).complete)
+    if (complete) {
+      console.log('[detect] EmuHawk.exe: vollständiger BizHawk-Ordner bevorzugt →', complete)
+      console.log('[detect] (Kandidaten:', matches.join(' | '), ')')
+      return complete
+    }
+  }
+  return matches[0]
 }
 
 // Dev-only local endpoint for the emulator live-sync prototype.
@@ -189,22 +207,23 @@ function emulatorSyncPlugin(): Plugin {
         req.on('data', (c) => { body += c; if (body.length > 100_000) req.destroy() })
         req.on('end', async () => {
           const send = (obj: unknown) => { try { res.end(JSON.stringify(obj)) } catch { /* already sent */ } }
+          const clean = (p: unknown) => String(p ?? '').trim().replace(/^"+|"+$/g, '').trim()  // entfernt evtl. „Als Pfad kopieren"-Anführungszeichen
           let cfg: { bizhawk?: string; rom?: string; lua?: string; restart?: boolean } = {}
           try { cfg = JSON.parse(body || '{}') } catch { /* invalid */ }
-          const bizhawk = String(cfg.bizhawk || '').trim()
-          const rom = String(cfg.rom || '').trim()
-          const lua = String(cfg.lua || '').trim()
+          const bizhawk = clean(cfg.bizhawk)
+          const rom = clean(cfg.rom)
+          const lua = clean(cfg.lua)
           const restart = !!cfg.restart
 
           console.log('\n[launch] ── Request erhalten ───────────────────────────')
-          console.log('[launch] restart :', restart)
-          console.log('[launch] bizhawk :', bizhawk || '(leer)')
-          console.log('[launch] rom     :', rom || '(leer)')
-          console.log('[launch] lua     :', lua || '(leer)')
+          console.log('[launch] restart     :', restart)
+          console.log('[launch] EmuHawk.exe :', bizhawk || '(leer)')
+          console.log('[launch] ROM         :', rom || '(leer)')
+          console.log('[launch] Lua         :', lua || '(leer)')
 
-          if (!bizhawk || !existsSync(bizhawk)) { console.error('[launch] FEHLER: BizHawk-Pfad fehlt/existiert nicht.'); send({ ok: false, error: 'bizhawk_not_found' }); return }
-          if (!rom || !existsSync(rom)) { console.error('[launch] FEHLER: ROM-Pfad fehlt/existiert nicht.'); send({ ok: false, error: 'rom_not_found' }); return }
-          if (!lua || !existsSync(lua)) { console.error('[launch] FEHLER: Lua-Pfad fehlt/existiert nicht.'); send({ ok: false, error: 'lua_not_found' }); return }
+          if (!bizhawk || !existsSync(bizhawk)) { console.error('[launch] FEHLER: BizHawk-Pfad fehlt/existiert nicht:', bizhawk); send({ ok: false, error: 'bizhawk_not_found' }); return }
+          if (!rom || !existsSync(rom)) { console.error('[launch] FEHLER: ROM-Pfad fehlt/existiert nicht:', rom); send({ ok: false, error: 'rom_not_found' }); return }
+          if (!lua || !existsSync(lua)) { console.error('[launch] FEHLER: Lua-Pfad fehlt/existiert nicht:', lua); send({ ok: false, error: 'lua_not_found' }); return }
 
           const running = await isBizhawkRunning()
           console.log('[launch] EmuHawk laeuft bereits:', running)
@@ -214,9 +233,16 @@ function emulatorSyncPlugin(): Plugin {
           if (running && restart) { console.log('[launch] → schliesse laufendes EmuHawk …'); await killBizhawk(); await delay(1200) }
 
           const cwd = dirname(bizhawk)   // BizHawk findet seine DLLs/Ressourcen relativ zum eigenen Ordner
+          let cwdExists = false, cwdIsDir = false
+          try { const st = statSync(cwd); cwdExists = true; cwdIsDir = st.isDirectory() } catch { /* nicht lesbar */ }
           const folder = bizhawkFolderInfo(cwd)
-          console.log('[launch] cwd     :', cwd, '· existiert:', existsSync(cwd))
-          console.log('[launch] BizHawk-Ordner:', JSON.stringify(folder), folder.complete ? '(sieht vollständig aus)' : '(UNVOLLSTÄNDIG – evtl. lose EmuHawk.exe ohne DLLs!)')
+          console.log('[launch] dirname (cwd)    :', cwd)
+          console.log('[launch] cwd existiert    :', cwdExists, '· istOrdner:', cwdIsDir)
+          console.log('[launch] DLL-Prüfung in    :', cwd)
+          console.log('[launch] Gefundene Einträge:', folder.sample.length ? folder.sample.join(', ') : '(keine)')
+          if (folder.readError) console.log('[launch] Lesefehler beim Ordner:', folder.readError)
+          console.log('[launch] dllCount =', folder.dllCount, '· dll/ =', folder.hasDllDir, '· gamedb/ =', folder.hasGamedb, '→ complete =', folder.complete)
+          if (!folder.complete) console.log('[launch] ⚠ Ordner wirkt unvollständig — falls dein BizHawk vollständig ist, zeigt dieser Pfad auf eine FALSCHE/LOSE EmuHawk.exe (nicht die, die du meinst).')
 
           // BizHawk akzeptiert beide Reihenfolgen; wir testen sie und nehmen die,
           // die wirklich läuft.

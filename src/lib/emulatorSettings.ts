@@ -125,6 +125,8 @@ export interface LaunchResult {
 /** Ask the dev server to start BizHawk with the saved ROM + Lua (dev-only).
  *  restart=true closes a running EmuHawk first (Lua only loads at startup). */
 export async function launchEmulator(s: EmulatorSettings, restart = false): Promise<LaunchResult> {
+  // Verifizierbar: exakt der gespeicherte Pfad wird gesendet (kein zweiter/alter Pfad).
+  console.info('[launch] sende an Server:', { bizhawk: s.bizhawkPath, rom: s.romPath, lua: s.luaPath, restart })
   try {
     const r = await fetch('/api/emulator-launch', {
       method: 'POST',

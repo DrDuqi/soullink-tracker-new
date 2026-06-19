@@ -7,7 +7,7 @@ import { buildLivePrefill, type EncounterPrefill } from '../lib/liveSync'
 import { matchRoute, isGameMismatch, emulatorGameLabel } from '../lib/routes'
 import EmulatorSettingsModal from './EmulatorSettingsModal'
 import EmulatorSetupWizard from './EmulatorSetupWizard'
-import { useEmulatorSettings, useEmulatorSettingsStore, isConfigured, launchEmulator, detectEmulator, findFile } from '../lib/emulatorSettings'
+import { useEmulatorSettings, useEmulatorSettingsStore, isConfigured, launchEmulator, detectEmulator, findFile, fileName, type EmulatorSettings } from '../lib/emulatorSettings'
 import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
 import LocationMapManager from './LocationMapManager'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
@@ -183,14 +183,15 @@ export default function EmulatorLivePanel({
   }, [launching, phase])
   useEffect(() => () => { if (launchTimer.current) clearTimeout(launchTimer.current) }, [])
 
-  async function launchSync(restart = false) {
+  async function launchSync(restart = false, override?: Partial<EmulatorSettings>) {
     if (!configured) { setShowWizard(true); return }
     if (phase === 'connected') return                          // already connected
     if (!enabled) { setEnabled(true); try { localStorage.setItem(ENABLED_KEY, '1') } catch { /* ignore */ } }
     setLaunchErr(null); setLaunching(true)
     setLaunchMsg(restart ? 'BizHawk wird neu gestartet …' : 'Verbinde …')
 
-    const res = await launchEmulator(emuSettings, restart)
+    const eff = { ...emuSettings, ...override }   // override = frischer Pfad bei einem internen Retry
+    const res = await launchEmulator(eff, restart)
     if (!res.ok) {
       if (res.error === 'rom_not_found') {
         setLaunching(false)
@@ -198,9 +199,19 @@ export default function EmulatorLivePanel({
       } else if (res.error === 'lua_not_found') {
         // Lua fehlt → automatisch erneut suchen, sonst Wizard-Schritt für Lua/Sync.
         const d = await detectEmulator()
-        if (d?.lua) { updateSettings({ luaPath: d.lua, syncFolder: d.syncFolder }); launchSync(restart) }
+        if (d?.lua) { updateSettings({ luaPath: d.lua, syncFolder: d.syncFolder }); launchSync(restart, { luaPath: d.lua }) }
         else { setLaunching(false); setLaunchErr({ msg: 'Sync-Script nicht gefunden.', actionLabel: 'Einrichtung öffnen', action: () => setShowWizard(true) }) }
       } else {
+        // BizHawk-Start fehlgeschlagen → der gespeicherte Pfad zeigt evtl. auf eine
+        // LOSE EmuHawk.exe. Einmal eine VOLLSTÄNDIGE Installation auto-suchen & neu versuchen.
+        if (!override) {
+          const better = await findFile(fileName(eff.bizhawkPath) || 'EmuHawk.exe')
+          if (better && better !== eff.bizhawkPath) {
+            updateSettings({ bizhawkPath: better })
+            launchSync(restart, { bizhawkPath: better })
+            return
+          }
+        }
         setLaunching(false)
         const detail = res.detail ? ` ${res.detail}` : ''
         setLaunchErr({ msg: 'BizHawk konnte nicht gestartet werden.' + detail, actionLabel: 'Andere EmuHawk.exe wählen', action: () => bizPick.current?.click() })
