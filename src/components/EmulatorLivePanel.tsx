@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Wifi, WifiOff, Loader2, Gamepad2, Heart, Skull, Play, Pause, Plus, Check, MapPin, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
+import { Wifi, WifiOff, Loader2, Gamepad2, Heart, Skull, Play, Pause, Plus, Check, MapPin, ChevronDown, ChevronUp, AlertTriangle, Settings } from 'lucide-react'
 import { getSpriteUrl, getTypeColor, fetchMoveById, fetchItemName, fetchAbilityName } from '../lib/pokemon-api'
 import { STATUS_LABEL_DE, natureName } from '../lib/emulatorSync'
 import type { EmulatorMon } from '../lib/emulatorSync'
 import { buildLivePrefill, type EncounterPrefill } from '../lib/liveSync'
 import { matchRoute, isGameMismatch, emulatorGameLabel } from '../lib/routes'
+import EmulatorSettingsModal from './EmulatorSettingsModal'
 import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
 import LocationMapManager from './LocationMapManager'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
@@ -150,6 +151,7 @@ export default function EmulatorLivePanel({
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(COLLAPSED_KEY) === '1' } catch { return false }
   })
+  const [showSettings, setShowSettings] = useState(false)
   const { phase, team, game: liveGame, currentLocationName, currentLocationId, ageSec } = useEmulatorSync(enabled)
 
   // The RUN edition decides the available routes; the emulator must match it.
@@ -211,6 +213,13 @@ export default function EmulatorLivePanel({
           {enabled ? <><Pause className="w-3 h-3" /> Sync stoppen</> : <><Play className="w-3 h-3" /> Sync starten</>}
         </button>
         <button
+          onClick={() => setShowSettings(true)}
+          className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+          title="Emulator-Einstellungen"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
+        <button
           onClick={toggleCollapse}
           className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
           title={collapsed ? 'Ausklappen' : 'Einklappen'}
@@ -218,6 +227,8 @@ export default function EmulatorLivePanel({
           {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
         </button>
       </div>
+
+      {showSettings && <EmulatorSettingsModal onClose={() => setShowSettings(false)} />}
 
       {/* Spiel-Mismatch — auch im eingeklappten Zustand sichtbar */}
       {enabled && mismatch && (
