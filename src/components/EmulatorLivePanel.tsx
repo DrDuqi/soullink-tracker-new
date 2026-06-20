@@ -11,6 +11,8 @@ import { useEmulatorSettings, useEmulatorSettingsStore, isConfigured, launchEmul
 import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
 import LocationMapManager from './LocationMapManager'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
+import { useCompanion } from '../hooks/useCompanion'
+import { COMPANION_PORT } from '../lib/companion'
 
 const ENABLED_KEY = 'soullink-emusync-enabled'
 const COLLAPSED_KEY = 'soullink-emusync-collapsed'
@@ -137,6 +139,39 @@ function MonRich({ mon, imported, game, currentLocationName, currentLocationId, 
   )
 }
 
+/** Online only: explains that a local Companion must run so the website (which
+ *  can't start BizHawk itself) can launch the emulator + read the live team. */
+function CompanionBanner({ status, onRecheck }: { status: 'checking' | 'absent'; onRecheck: () => void }) {
+  if (status === 'checking') {
+    return (
+      <div className="flex items-center gap-2 text-[12px] text-slate-400">
+        <Loader2 className="w-4 h-4 animate-spin" /> Companion wird gesucht …
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-xl border border-amber-700/50 bg-amber-950/20 p-3">
+      <div className="flex items-center gap-1.5 text-amber-300 text-sm font-bold mb-1.5">
+        <WifiOff className="w-4 h-4" /> Companion nicht gestartet
+      </div>
+      <p className="text-slate-300 text-[12px] leading-relaxed mb-2">
+        Die Website darf BizHawk/ROM/Lua aus Sicherheitsgründen nicht selbst starten.
+        Dafür läuft ein kleiner lokaler Helfer auf deinem PC. So startest du ihn:
+      </p>
+      <ol className="text-slate-300 text-[12px] leading-relaxed list-decimal pl-5 space-y-0.5 mb-2.5">
+        <li>Repo lokal öffnen, dann <code className="text-amber-200 bg-black/30 px-1 rounded">npm run companion</code><br />
+          <span className="text-slate-500">(oder Doppelklick auf <code className="text-amber-200 bg-black/30 px-1 rounded">emulator/companion/start-companion.bat</code>)</span></li>
+        <li>Das Companion-Fenster <span className="font-semibold">offen lassen</span>.</li>
+        <li>Hier auf <span className="font-semibold">„Erneut prüfen"</span> klicken.</li>
+      </ol>
+      <div className="flex items-center gap-2">
+        <button onClick={onRecheck} className="btn-primary text-xs py-2 px-3">Erneut prüfen</button>
+        <span className="text-slate-500 text-[11px]">Port {COMPANION_PORT} · am besten Chrome/Edge</span>
+      </div>
+    </div>
+  )
+}
+
 /** Live in-game party from the local emulator sync. Additive & non-destructive:
  *  it does NOT touch tracked encounters / soul links / the team system. */
 export default function EmulatorLivePanel({
@@ -163,7 +198,12 @@ export default function EmulatorLivePanel({
   useEffect(() => {
     if (settingsHydrated && !configured && !autoOpened.current) { autoOpened.current = true; setShowWizard(true) }
   }, [settingsHydrated, configured])
-  const { phase, team, game: liveGame, currentLocationName, currentLocationId, ageSec } = useEmulatorSync(enabled)
+  // Online (Vercel) the emulator endpoints come from a local Companion. Probe it
+  // so we can guide the user, and only poll the sync once it's actually reachable
+  // (avoids failing localhost requests when no Companion is running).
+  const companion = useCompanion(enabled)
+  const companionReady = companion.status === 'connected'
+  const { phase, team, game: liveGame, currentLocationName, currentLocationId, ageSec } = useEmulatorSync(enabled && companionReady)
 
   // ── One-click launch (▶ Live-Sync starten) ───────────────────────────────
   const updateSettings = useEmulatorSettingsStore((s) => s.update)
@@ -287,8 +327,10 @@ export default function EmulatorLivePanel({
   let title = ''
   let color = '#64748b'
   if (!enabled) { icon = <WifiOff className="w-4 h-4" />; title = 'Live-Sync deaktiviert'; color = '#64748b' }
+  else if (companion.usesCompanion && companion.status === 'absent') { icon = <WifiOff className="w-4 h-4" />; title = 'Companion nicht gestartet'; color = '#fbbf24' }
+  else if (companion.usesCompanion && companion.status === 'checking') { icon = <Loader2 className="w-4 h-4 animate-spin" />; title = 'Companion wird gesucht…'; color = '#64748b' }
   else if (phase === 'init') { icon = <Loader2 className="w-4 h-4 animate-spin" />; title = 'Suche Emulator…'; color = '#64748b' }
-  else if (phase === 'error') { icon = <WifiOff className="w-4 h-4" />; title = 'Emulator-Sync nicht erreichbar – läuft „npm run dev"?'; color = '#f87171' }
+  else if (phase === 'error') { icon = <WifiOff className="w-4 h-4" />; title = companion.usesCompanion ? 'Companion erreichbar, aber kein Sync' : 'Emulator-Sync nicht erreichbar – läuft „npm run dev"?'; color = '#f87171' }
   else if (phase === 'offline') { icon = <WifiOff className="w-4 h-4" />; title = 'Emulator nicht gefunden'; color = '#94a3b8' }
   else if (phase === 'waiting') { icon = <Loader2 className="w-4 h-4 animate-spin" />; title = 'Datei gefunden – warte auf Pokémon'; color = '#fbbf24' }
   else { icon = <Wifi className="w-4 h-4" />; title = `Verbunden mit ${gameName}`; color = '#4ade80' }
@@ -352,7 +394,9 @@ export default function EmulatorLivePanel({
       {/* ▶ Live-Sync starten — startet BizHawk + ROM + Lua mit einem Klick */}
       {!collapsed && enabled && phase !== 'connected' && (
         <div className="p-3 border-t" style={{ background: '#16161f', borderColor: '#2e2e42' }}>
-          {launchErr ? (
+          {companion.usesCompanion && !companionReady ? (
+            <CompanionBanner status={companion.status === 'checking' ? 'checking' : 'absent'} onRecheck={companion.recheck} />
+          ) : launchErr ? (
             <div className="rounded-xl border border-red-800/50 bg-red-950/25 p-3">
               <p className="text-red-300 text-sm font-semibold mb-2">{launchErr.msg}</p>
               <button onClick={launchErr.action} className="btn-primary text-xs py-2 px-3">{launchErr.actionLabel}</button>

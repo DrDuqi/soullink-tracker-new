@@ -3,6 +3,8 @@
 // (Vite middleware) stores the latest one; the test page polls it.
 // NOTE: prototype only — no Supabase writes happen from this module.
 
+import { EMU_BASE } from './companion'
+
 export type MonStatus = 'ok' | 'slp' | 'psn' | 'tox' | 'brn' | 'frz' | 'par'
 
 export interface EmulatorMon {
@@ -40,7 +42,7 @@ export interface SyncEnvelope {
   last: { data: EmulatorPayload; at: number } | null  // at = epoch ms the endpoint received it
 }
 
-export const SYNC_ENDPOINT = '/api/emulator-sync'
+export const SYNC_ENDPOINT = `${EMU_BASE}/api/emulator-sync`
 
 export const STATUS_LABEL_DE: Record<MonStatus, string> = {
   ok: 'OK', slp: 'Schlaf', psn: 'Gift', tox: 'Schwer vergiftet',

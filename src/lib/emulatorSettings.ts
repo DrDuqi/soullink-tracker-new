@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
+import { EMU_BASE } from './companion'
 
 // Local emulator settings — paths to BizHawk, the ROM, the Lua script and the
 // sync folder. Stored ONLY in localStorage (no account, no Supabase): paths are
@@ -91,7 +92,7 @@ export interface DetectResult {
 /** Asks the dev server to auto-detect Lua / sync folder / BizHawk / ROMs (dev-only). */
 export async function detectEmulator(): Promise<DetectResult | null> {
   try {
-    const r = await fetch('/api/emulator-detect', { cache: 'no-store' })
+    const r = await fetch(`${EMU_BASE}/api/emulator-detect`, { cache: 'no-store' })
     if (!r.ok) return null
     const j = await r.json()
     if (!j?.ok) return null
@@ -107,7 +108,7 @@ export async function detectEmulator(): Promise<DetectResult | null> {
 /** Resolve a file the user picked in the browser dialog to an absolute path. */
 export async function findFile(name: string): Promise<string | null> {
   try {
-    const r = await fetch('/api/emulator-detect?find=' + encodeURIComponent(name), { cache: 'no-store' })
+    const r = await fetch(`${EMU_BASE}/api/emulator-detect?find=` + encodeURIComponent(name), { cache: 'no-store' })
     const j = await r.json()
     return j?.path ?? null
   } catch { return null }
@@ -128,7 +129,7 @@ export async function launchEmulator(s: EmulatorSettings, restart = false): Prom
   // Verifizierbar: exakt der gespeicherte Pfad wird gesendet (kein zweiter/alter Pfad).
   console.info('[launch] sende an Server:', { bizhawk: s.bizhawkPath, rom: s.romPath, lua: s.luaPath, restart })
   try {
-    const r = await fetch('/api/emulator-launch', {
+    const r = await fetch(`${EMU_BASE}/api/emulator-launch`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ bizhawk: s.bizhawkPath, rom: s.romPath, lua: s.luaPath, restart }),

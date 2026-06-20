@@ -39,6 +39,7 @@ import PlayersPanel from '../components/PlayersPanel'
 import { useRunMode, setRunMode, type RunMode } from '../lib/runMode'
 import { useEmuTeamStore } from '../store/emuTeamStore'
 import { usePresence } from '../hooks/usePresence'
+import { useCompanion } from '../hooks/useCompanion'
 import { useAuth } from '../contexts/AuthContext'
 import type { Encounter, Run, Player, SoulLinkPair, LinkRequest, ActivityLogEntry } from '../types/database'
 
@@ -194,6 +195,10 @@ export default function RunPage() {
   const [savingName, setSavingName] = useState(false)
   const runMode = useRunMode(runId ?? '')        // 'manual' | 'live_sync' (per run, local)
   const liveSyncMode = runMode === 'live_sync'
+  // Online the live-sync runs through a local Companion; in dev this is always
+  // 'connected' (Vite plugin). Gates the invisible reconciler so it only polls
+  // when a backend is actually reachable.
+  const companion = useCompanion(liveSyncMode)
 
   // Run-Namen ändern (nur Owner). Verändert NICHTS an Encountern/SoulLinks.
   async function saveRunName() {
@@ -907,8 +912,8 @@ export default function RunPage() {
                 </div>
               )}
 
-              {/* Emulator live-team — only in Live-Sync mode (local dev sync; additive) */}
-              {isMyFocus && import.meta.env.DEV && liveSyncMode && (
+              {/* Emulator live-team — only in Live-Sync mode (dev plugin or online Companion; additive) */}
+              {isMyFocus && liveSyncMode && (
                 <EmulatorLivePanel
                   game={currentRun.game}
                   importedSpeciesIds={myEncounterSpeciesIds}
@@ -1169,8 +1174,9 @@ export default function RunPage() {
         </div>
       </div>
 
-      {/* Invisible: keeps emulator-imported encounters in sync by stable PID (evolution etc.) */}
-      {import.meta.env.DEV && myPlayerId && liveSyncMode && (
+      {/* Invisible: keeps emulator-imported encounters in sync by stable PID (evolution etc.).
+          Mounts only when a sync backend is reachable (dev plugin, or online Companion). */}
+      {myPlayerId && liveSyncMode && companion.status === 'connected' && (
         <EmulatorReconciler encounters={myEncounters} runId={currentRun.id} />
       )}
 
