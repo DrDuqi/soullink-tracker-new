@@ -19,6 +19,7 @@ export interface Run {
   created_at: string
   share_code: string
   owner_user_id?: string | null
+  max_players?: number | null   // 2 or 3 (default 2; column added in migration v13)
 }
 
 export interface Player {

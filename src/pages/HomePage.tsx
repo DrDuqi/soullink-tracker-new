@@ -229,6 +229,7 @@ function Dashboard() {
   const toast = useToastStore()
   const [game, setGame] = useState(GAME_LIST[0])
   const [mode, setMode] = useState<RunMode>('manual')
+  const [playerCount, setPlayerCount] = useState(2)
   const [customCode, setCustomCode] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [busy, setBusy] = useState(false)
@@ -280,8 +281,12 @@ function Dashboard() {
         .insert({ run_id: run.id, name: profile.username, player_number: 1, auth_user_id: user.id })
         .select().single()
       if (pErr) throw pErr
+      // Spieleranzahl best-effort persistieren (Spalte existiert erst ab Migration v13).
+      if (playerCount === 3) {
+        try { await supabase.from('runs').update({ max_players: 3 }).eq('id', run.id) } catch { /* Spalte fehlt → bleibt 2 */ }
+      }
       setRunMode(run.id, mode)   // gewählten Spielmodus lokal für diesen Run speichern
-      setCurrentRun(run as Run, [player as Player], (player as Player).id)
+      setCurrentRun({ ...(run as Run), max_players: playerCount }, [player as Player], (player as Player).id)
       navigate(`/run/${run.id}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Fehler beim Erstellen')
@@ -362,6 +367,18 @@ function Dashboard() {
             <div className="flex gap-2">
               <input value={customCode} onChange={(e) => setCustomCode(e.target.value)} placeholder="Automatisch generieren" className="pk-input font-mono" maxLength={12} />
               <button type="button" onClick={() => setCustomCode('')} title="Zufällig" className="shrink-0 w-12 flex items-center justify-center rounded-xl border border-[#2e2e42] text-slate-400 hover:text-white hover:border-slate-500 transition-colors" style={{ background: '#16161f' }}><Shuffle className="w-4 h-4" /></button>
+            </div>
+          </div>
+          <div>
+            <label className="text-slate-300 text-sm font-bold mb-2 block">Spieleranzahl</label>
+            <div className="flex rounded-xl p-1 gap-1" style={{ background: '#16161f', border: '1px solid #2e2e42' }}>
+              {[2, 3].map((n) => (
+                <button key={n} type="button" onClick={() => setPlayerCount(n)}
+                  className="flex-1 py-2 rounded-lg text-xs font-bold transition-all"
+                  style={playerCount === n ? { background: '#CC0000', color: 'white' } : { color: '#64748b' }}>
+                  {n} Spieler
+                </button>
+              ))}
             </div>
           </div>
           <div>

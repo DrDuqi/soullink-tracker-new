@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Plus, Link2, Copy, Check, ArrowLeft, Heart, Skull,
-  LayoutGrid, List, Zap, Eye, Lock, Pencil, Gamepad2,
+  LayoutGrid, List, Zap, Eye, Lock, Pencil, Gamepad2, X,
 } from 'lucide-react'
 import { useRunStore } from '../store/runStore'
 import { useEncounters, useReorderEncounters } from '../hooks/useEncounters'
@@ -31,8 +31,10 @@ import EmulatorReconciler from '../components/EmulatorReconciler'
 import TeamOverview from '../components/TeamOverview'
 import ChangeEditionModal from '../components/ChangeEditionModal'
 import ChangeModeModal from '../components/ChangeModeModal'
+import PlayersPanel from '../components/PlayersPanel'
 import { useRunMode, setRunMode, type RunMode } from '../lib/runMode'
 import { useEmuTeamStore } from '../store/emuTeamStore'
+import { usePresence } from '../hooks/usePresence'
 import { useAuth } from '../contexts/AuthContext'
 import type { Encounter, Run, Player, SoulLinkPair, LinkRequest, ActivityLogEntry } from '../types/database'
 
@@ -183,8 +185,23 @@ export default function RunPage() {
   const [showEditEdition, setShowEditEdition] = useState(false)
   const [savingEdition, setSavingEdition] = useState(false)
   const [showModeModal, setShowModeModal] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [savingName, setSavingName] = useState(false)
   const runMode = useRunMode(runId ?? '')        // 'manual' | 'live_sync' (per run, local)
   const liveSyncMode = runMode === 'live_sync'
+
+  // Run-Namen ändern (nur Owner). Verändert NICHTS an Encountern/SoulLinks.
+  async function saveRunName() {
+    const next = nameDraft.trim()
+    if (!currentRun || !next || next === currentRun.name) { setEditingName(false); return }
+    setSavingName(true)
+    const { error } = await supabase.from('runs').update({ name: next }).eq('id', currentRun.id)
+    setSavingName(false)
+    if (error) { toast.show('Name konnte nicht geändert werden: ' + error.message, 'error'); return }
+    setCurrentRun({ ...currentRun, name: next }, players, myPlayerId ?? '')
+    setEditingName(false)
+  }
 
   // Spielmodus wechseln. Manuell → Emulator-UI verschwindet + Live-Team verwerfen
   // (der Reconciler/Panel werden ausgehängt → Sync stoppt). Live-Sync → Panel kommt
@@ -225,6 +242,10 @@ export default function RunPage() {
 
   const myPlayer = players.find((p) => p.id === myPlayerId)
   const partnerPlayer = players.find((p) => p.id !== myPlayerId)
+
+  // Online-Status der Mitspieler (Supabase Realtime Presence) + Spieleranzahl des Runs.
+  const onlinePlayers = usePresence(runId ?? null, myPlayer ? { playerId: myPlayer.id, name: myPlayer.name } : null)
+  const maxPlayers = currentRun?.max_players ?? 2
 
   // Default focused player = me
   useEffect(() => {
@@ -649,7 +670,29 @@ export default function RunPage() {
                 </button>
                 <PokeBall className="w-7 h-7 text-pk-red hidden sm:block" />
                 <div>
-                  <h1 className="text-white font-black text-lg leading-tight">{currentRun.name}</h1>
+                  {editingName ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        value={nameDraft}
+                        onChange={(e) => setNameDraft(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveRunName(); if (e.key === 'Escape') setEditingName(false) }}
+                        autoFocus
+                        maxLength={60}
+                        className="bg-[#16161f] border border-[#2e2e42] rounded-lg px-2 py-1 text-white font-bold text-base outline-none focus:border-pk-red"
+                      />
+                      <button onClick={saveRunName} disabled={savingName} className="text-xs font-bold px-2 py-1.5 rounded-lg" style={{ background: '#CC0000', color: '#fff' }}>{savingName ? '…' : 'Speichern'}</button>
+                      <button onClick={() => setEditingName(false)} className="text-slate-500 hover:text-white p-1.5"><X className="w-4 h-4" /></button>
+                    </div>
+                  ) : (
+                    <h1 className="text-white font-black text-lg leading-tight flex items-center gap-1.5">
+                      {currentRun.name}
+                      {isOwner && (
+                        <button onClick={() => { setNameDraft(currentRun.name); setEditingName(true) }} className="text-slate-600 hover:text-slate-300 transition-colors" title="Run-Namen ändern">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </h1>
+                  )}
                   <div className="flex items-center gap-2">
                     {isOwner ? (
                       <button
@@ -946,8 +989,17 @@ export default function RunPage() {
               </div>
             </main>
 
-            {/* ░░ RIGHT SIDEBAR — Checkliste · Typen · Statistik ░░ */}
+            {/* ░░ RIGHT SIDEBAR — Spieler · Checkliste · Typen · Statistik ░░ */}
             <aside className="order-3 min-w-0 xl:sticky xl:top-20 xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-4">
+
+              {/* Run roster + online status */}
+              <PlayersPanel
+                players={players}
+                maxPlayers={maxPlayers}
+                myPlayerId={myPlayerId ?? ''}
+                ownerUserId={currentRun.owner_user_id}
+                online={onlinePlayers}
+              />
 
               {/* Encounter checklist */}
               <RouteChecklist
