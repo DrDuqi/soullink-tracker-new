@@ -5,8 +5,8 @@ import {
   LayoutGrid, List, Zap, Eye, Lock, Pencil, Gamepad2, X,
 } from 'lucide-react'
 import { useRunStore } from '../store/runStore'
-import { useEncounters, useReorderEncounters } from '../hooks/useEncounters'
-import { useSoulLinks, useSoulLinkPairs } from '../hooks/useSoulLinks'
+import { useEncounters, useReorderEncounters, useUpdateEncounterStatus } from '../hooks/useEncounters'
+import { useSoulLinks, useSoulLinkPairs, useSoulLinkGroups, useDeleteSoulLink } from '../hooks/useSoulLinks'
 import { useTeamSlots } from '../hooks/useTeamSlots'
 import { useActivityLog } from '../hooks/useActivityLog'
 import { useRealtime } from '../hooks/useRealtime'
@@ -15,8 +15,10 @@ import { useToastStore } from '../store/toastStore'
 import { supabase } from '../lib/supabase'
 import AddEncounterModal, { type EncounterPrefill } from '../components/AddEncounterModal'
 import SoulLinkModal from '../components/SoulLinkModal'
+import SoulLink3Modal from '../components/SoulLink3Modal'
 import EncounterCard from '../components/EncounterCard'
 import SoulLinkPairCard from '../components/SoulLinkPairCard'
+import SoulLinkTripleCard from '../components/SoulLinkTripleCard'
 import RequestsPanel from '../components/RequestsPanel'
 import TeamPanel from '../components/TeamPanel'
 import ActivityFeed from '../components/ActivityFeed'
@@ -236,6 +238,8 @@ export default function RunPage() {
   const { data: teamSlots = [] } = useTeamSlots(runId ?? null)
   const { data: activityLog = [] } = useActivityLog(runId ?? null)
   const pairs = useSoulLinkPairs(runId ?? null, encounters as Encounter[])
+  const updateStatus = useUpdateEncounterStatus()
+  const deleteSoulLink = useDeleteSoulLink()
   const pendingRequests = usePendingRequests(runId ?? null, encounters as Encounter[], players)
 
   const teamEncounterIds = new Set(teamSlots.map((s) => s.encounter_id))
@@ -246,6 +250,9 @@ export default function RunPage() {
   // Online-Status der Mitspieler (Supabase Realtime Presence) + Spieleranzahl des Runs.
   const onlinePlayers = usePresence(runId ?? null, myPlayer ? { playerId: myPlayer.id, name: myPlayer.name } : null)
   const maxPlayers = currentRun?.max_players ?? 2
+  const is3 = maxPlayers === 3   // 3-Spieler-SoulLink-Logik nur bei max_players = 3
+  // Triple-Gruppen (nur bei 3 Spielern genutzt; bei 2 Spielern bleibt alles wie bisher).
+  const groups = useSoulLinkGroups(runId ?? null, encounters as Encounter[], players, maxPlayers)
 
   // Default focused player = me
   useEffect(() => {
@@ -298,7 +305,9 @@ export default function RunPage() {
   const partnerEncounters = encounters.filter((e) => e.player_id !== myPlayerId) as Encounter[]
   const focusedEncounters = isMyFocus ? myEncounters : partnerEncounters
 
-  const linkedIds = new Set(soulLinks.flatMap((l) => [l.encounter1_id, l.encounter2_id]))
+  const linkedIds = new Set(
+    soulLinks.flatMap((l) => [l.encounter1_id, l.encounter2_id, l.encounter3_id]).filter(Boolean) as string[]
+  )
   const pendingDeathLinkIds = new Set(
     pendingRequests.filter((r) => r.request_type === 'death' && r.soul_link_id).map((r) => r.soul_link_id as string)
   )
@@ -391,12 +400,37 @@ export default function RunPage() {
   }, [runId, currentRun?.id, setCurrentRun, user?.id, navigate])
 
   // ─ Helper functions ───────────────────────────────────────────────────────
+  const groupOf = (encId: string) => groups.find((g) => g.members.some((m) => m.encounter.id === encId))
+
   function getLinkedEncounter(enc: Encounter): { enc: Encounter; playerName: string } | null {
+    if (is3) {
+      const g = groupOf(enc.id)
+      const other = g?.members.find((m) => m.encounter.id !== enc.id)
+      return other ? { enc: other.encounter, playerName: other.player?.name ?? '' } : null
+    }
     for (const pair of pairs) {
       if (pair.encounter1.id === enc.id) return { enc: pair.encounter2, playerName: players.find((p) => p.id === pair.encounter2.player_id)?.name ?? '' }
       if (pair.encounter2.id === enc.id) return { enc: pair.encounter1, playerName: players.find((p) => p.id === pair.encounter1.player_id)?.name ?? '' }
     }
     return null
+  }
+
+  // 3-Spieler: Tod/Wiederbeleben wirkt direkt auf ALLE Mitglieder des Links
+  // (keine Partner-Bestätigung; das 2-Spieler-Anfrage-System bleibt unverändert).
+  async function handleTripleDeath(enc: Encounter) {
+    const g = groupOf(enc.id)
+    if (!g) { await updateStatus.mutateAsync({ id: enc.id, status: 'dead', runId: enc.run_id }); return }
+    for (const m of g.members) {
+      if (m.encounter.status !== 'dead') await updateStatus.mutateAsync({ id: m.encounter.id, status: 'dead', runId: enc.run_id })
+    }
+    toast.show('SoulLink besiegt – alle Pokémon im Link sind betroffen.', 'info')
+  }
+  async function handleTripleRevive(enc: Encounter) {
+    const g = groupOf(enc.id)
+    if (!g) { await updateStatus.mutateAsync({ id: enc.id, status: 'alive', runId: enc.run_id }); return }
+    for (const m of g.members) {
+      if (m.encounter.status === 'dead') await updateStatus.mutateAsync({ id: m.encounter.id, status: 'alive', runId: enc.run_id })
+    }
   }
 
   function getLinkedInfo(enc: Encounter): { name: string; playerName: string } | undefined {
@@ -407,6 +441,13 @@ export default function RunPage() {
   // A Pokémon may only enter the team if it has a confirmed (still-active) soul
   // link AND both partners are alive. Otherwise the team button/DnD is blocked.
   function getTeamEligibility(enc: Encounter): { eligible: boolean; reason?: string } {
+    if (is3) {
+      const g = groupOf(enc.id)
+      if (!g) return { eligible: false, reason: 'Pokémon muss zuerst in einem SoulLink sein.' }
+      if (!g.complete) return { eligible: false, reason: 'SoulLink ist noch unvollständig.' }
+      if (g.members.some((m) => m.encounter.status !== 'alive')) return { eligible: false, reason: 'Alle Pokémon im Link müssen am Leben sein.' }
+      return { eligible: true }
+    }
     const link = getLinkedEncounter(enc)
     if (!link) return { eligible: false, reason: 'Pokémon muss zuerst mit dem Partner verlinkt werden.' }
     if (enc.status !== 'alive' || link.enc.status !== 'alive')
@@ -565,8 +606,8 @@ export default function RunPage() {
           onClick={() => setSelectedEncounter(enc)}
           draggable={false}
           onAddToTeam={isEditable && enc.status !== 'dead' ? () => handleAddToTeam(enc) : undefined}
-          onDeathRequest={isEditable && linkedIds.has(enc.id) ? () => handleDeathRequest(enc) : undefined}
-          onReviveRequest={isEditable && linkedIds.has(enc.id) ? () => handleReviveRequest(enc) : undefined}
+          onDeathRequest={isEditable && linkedIds.has(enc.id) ? () => (is3 ? handleTripleDeath(enc) : handleDeathRequest(enc)) : undefined}
+          onReviveRequest={isEditable && linkedIds.has(enc.id) ? () => (is3 ? handleTripleRevive(enc) : handleReviveRequest(enc)) : undefined}
           onNavigateToPairs={() => setMainView('pairs')}
         />
       </div>
@@ -882,7 +923,7 @@ export default function RunPage() {
                       className="flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1"
                       style={mainView === 'pairs' ? { background: '#CC0000', color: 'white' } : { color: '#64748b' }}
                     >
-                      <Link2 className="w-3 h-3" /> Soul Links ({pairs.length})
+                      <Link2 className="w-3 h-3" /> Soul Links ({is3 ? groups.length : pairs.length})
                     </button>
                   </div>
 
@@ -935,7 +976,26 @@ export default function RunPage() {
                 {/* PAIRS view */}
                 {mainView === 'pairs' && (
                   <div className="space-y-4">
-                    {pairs.length === 0 ? (
+                    {is3 ? (
+                      groups.length === 0 ? (
+                        <EmptyState
+                          icon={<Link2 className="w-12 h-12" />}
+                          title="Noch keine Soul Links"
+                          desc="Verlinke Pokémon aus bis zu 3 Spielern zu einem gemeinsamen 3er-SoulLink."
+                        />
+                      ) : (
+                        groups.map((g) => (
+                          <SoulLinkTripleCard
+                            key={g.id}
+                            group={g}
+                            players={players}
+                            myPlayerId={myPlayerId ?? ''}
+                            onSelectEncounter={(encId) => { const e = (encounters as Encounter[]).find((x) => x.id === encId); if (e) setSelectedEncounter(e) }}
+                            onDelete={isMyFocus ? () => deleteSoulLink.mutate({ id: g.id, runId: currentRun.id, enc1Name: g.members[0]?.encounter.nickname ?? g.members[0]?.encounter.pokemon_name, enc2Name: g.members[1]?.encounter.nickname ?? g.members[1]?.encounter.pokemon_name }) : undefined}
+                          />
+                        ))
+                      )
+                    ) : pairs.length === 0 ? (
                       <EmptyState
                         icon={<Link2 className="w-12 h-12" />}
                         title="Noch keine Soul Links"
@@ -1015,7 +1075,7 @@ export default function RunPage() {
                   flashTo(`enc-${enc.id}`)
                 }}
                 onJumpToPair={(pairId) => { setMainView('pairs'); flashTo(`pair-${pairId}`) }}
-                onRequestSoulLink={handleQuickSoulLink}
+                onRequestSoulLink={is3 ? undefined : handleQuickSoulLink}
                 pendingLinkEncIds={pendingLinkEncIds}
                 readOnly={!isMyFocus}
                 collapsible
@@ -1030,7 +1090,7 @@ export default function RunPage() {
                 myPlayerId={myPlayerId ?? ''}
                 encounters={encounters as Encounter[]}
                 teamSlots={teamSlots}
-                soulLinkPairs={pairs}
+                soulLinkPairs={is3 ? [] : pairs}
                 onSelectEncounter={(enc) => setSelectedEncounter(enc)}
                 useLiveTeam
                 collapsible
@@ -1095,11 +1155,19 @@ export default function RunPage() {
         />
       )}
       {showSoulLink && myPlayerId && (
-        <SoulLinkModal
-          runId={currentRun.id} game={currentRun.game} players={players}
-          myPlayerId={myPlayerId} encounters={encounters as Encounter[]}
-          linkedIds={linkedIds} onClose={() => setShowSoulLink(false)}
-        />
+        is3 ? (
+          <SoulLink3Modal
+            runId={currentRun.id} players={players} maxPlayers={maxPlayers}
+            encounters={encounters as Encounter[]} linkedIds={linkedIds}
+            onClose={() => setShowSoulLink(false)}
+          />
+        ) : (
+          <SoulLinkModal
+            runId={currentRun.id} game={currentRun.game} players={players}
+            myPlayerId={myPlayerId} encounters={encounters as Encounter[]}
+            linkedIds={linkedIds} onClose={() => setShowSoulLink(false)}
+          />
+        )
       )}
       {selectedEncounter && (
         <PokemonDetailModal

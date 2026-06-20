@@ -26,7 +26,7 @@ export interface Player {
   id: string
   run_id: string
   name: string
-  player_number: 1 | 2
+  player_number: number   // 1, 2 or 3 (3-player runs since v13)
   created_at: string
   auth_user_id?: string | null
 }
@@ -54,18 +54,37 @@ export interface Encounter {
 export interface SoulLink {
   id: string
   run_id: string
-  encounter1_id: string
-  encounter2_id: string
+  encounter1_id: string | null   // Spieler 1 (nullable seit v14 für unvollständige 3er-Links)
+  encounter2_id: string | null   // Spieler 2
+  encounter3_id?: string | null  // Spieler 3 (v14)
   route_match_type: RouteMatchType | null
   created_at: string
 }
 
+// 2-Spieler-Paar (unverändert für max_players = 2).
 export interface SoulLinkPair {
   id: string
   run_id: string
   encounter1: Encounter
   encounter2: Encounter
   location: string
+  route_match_type: RouteMatchType | null
+}
+
+// Verallgemeinerter SoulLink für 3-Spieler-Runs (1–3 Mitglieder).
+export interface SoulLinkMember {
+  playerNumber: number
+  player?: Player
+  encounter: Encounter
+}
+export interface SoulLinkGroup {
+  id: string
+  run_id: string
+  members: SoulLinkMember[]          // vorhandene Mitglieder, nach player_number sortiert
+  missingPlayerNumbers: number[]     // erwartete Slots (1..maxPlayers) ohne Pokémon
+  complete: boolean                  // alle erwarteten Slots gefüllt
+  anyDead: boolean                   // mind. ein Mitglied besiegt → ganzer Link betroffen
+  location: string | null
   route_match_type: RouteMatchType | null
 }
 

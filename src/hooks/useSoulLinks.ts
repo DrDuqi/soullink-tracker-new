@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { logActivity } from '../lib/activityLogger'
 import { useRunStore } from '../store/runStore'
-import type { SoulLink, SoulLinkPair, Encounter } from '../types/database'
+import type { SoulLink, SoulLinkPair, SoulLinkGroup, SoulLinkMember, Encounter, Player, RouteMatchType } from '../types/database'
 
 export function useSoulLinks(runId: string | null) {
   return useQuery({
@@ -40,6 +40,68 @@ export function useSoulLinkPairs(runId: string | null, encounters: Encounter[]) 
     .filter(Boolean) as SoulLinkPair[]
 
   return pairs
+}
+
+// 3-Spieler-Runs: jeden Link in eine Gruppe (1–3 Mitglieder, per player_number)
+// auflösen. encounterN_id ↔ Spieler N. Wird NUR bei max_players = 3 genutzt.
+export function useSoulLinkGroups(
+  runId: string | null, encounters: Encounter[], players: Player[], maxPlayers: number,
+): SoulLinkGroup[] {
+  const { data: links = [] } = useSoulLinks(runId)
+  const byId = new Map(encounters.map((e) => [e.id, e]))
+  const playerByNum = new Map(players.map((p) => [p.player_number, p]))
+  const expected = Array.from({ length: Math.max(2, Math.min(3, maxPlayers)) }, (_, i) => i + 1)
+
+  return links
+    .map((link): SoulLinkGroup => {
+      const slots: [number, string | null | undefined][] = [
+        [1, link.encounter1_id], [2, link.encounter2_id], [3, link.encounter3_id],
+      ]
+      const members: SoulLinkMember[] = []
+      for (const [pn, encId] of slots) {
+        if (!encId) continue
+        const enc = byId.get(encId)
+        if (enc) members.push({ playerNumber: pn, player: playerByNum.get(pn), encounter: enc })
+      }
+      members.sort((a, b) => a.playerNumber - b.playerNumber)
+      const present = new Set(members.map((m) => m.playerNumber))
+      const missingPlayerNumbers = expected.filter((n) => !present.has(n))
+      return {
+        id: link.id,
+        run_id: link.run_id,
+        members,
+        missingPlayerNumbers,
+        complete: missingPlayerNumbers.length === 0 && members.length === expected.length,
+        anyDead: members.some((m) => m.encounter.status === 'dead'),
+        location: members[0]?.encounter.location ?? null,
+        route_match_type: link.route_match_type ?? null,
+      }
+    })
+    .filter((g) => g.members.length > 0)
+}
+
+// 3-Spieler: SoulLink DIREKT anlegen (keine Bestätigungs-Anfrage). Bis zu 3 Slots.
+export function useCreateSoulLink3() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ link, names }: {
+      link: { run_id: string; encounter1_id: string | null; encounter2_id: string | null; encounter3_id: string | null; route_match_type: RouteMatchType | null }
+      names: string[]
+    }) => {
+      const { data, error } = await supabase.from('soul_links').insert(link).select().single()
+      if (error) throw error
+      return { data: data as SoulLink, names }
+    },
+    onSuccess: async ({ data, names }) => {
+      queryClient.invalidateQueries({ queryKey: ['soul_links', data.run_id] })
+      const { myPlayerId } = useRunStore.getState()
+      await logActivity({
+        runId: data.run_id, playerId: myPlayerId, eventType: 'soul_link_created',
+        description: `3er-SoulLink erstellt: ${names.join(' ↔ ')}`,
+      })
+      queryClient.invalidateQueries({ queryKey: ['activity_log', data.run_id] })
+    },
+  })
 }
 
 export function useCreateSoulLink() {
