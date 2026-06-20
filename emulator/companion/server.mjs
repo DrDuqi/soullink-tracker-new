@@ -22,7 +22,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 import { createServer } from 'node:http'
-import { readFileSync, statSync, existsSync, readdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, statSync, existsSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -41,6 +41,50 @@ const ROOT = process.env.SOULLINK_ROOT || join(HERE, '..', '..')
 // the user keeps the .lua elsewhere). Env override still wins.
 let currentTeamFile = process.env.SOULLINK_TEAM_FILE
   || join(ROOT, 'emulator', 'bizhawk', 'soullink_team.json')
+
+// ── persistent config (BizHawk/ROM paths the user picked once) ───────────────
+// The Companion — not the browser — is the machine-bound part, so it remembers the
+// paths. This makes setup survive a browser change / cache reset and is the basis
+// for the future standalone app. Per-machine → gitignored.
+const CONFIG_FILE = process.env.SOULLINK_COMPANION_CONFIG || join(HERE, 'companion-config.json')
+function loadConfig() {
+  try { const j = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')); return (j && typeof j === 'object') ? j : {} }
+  catch { return {} }
+}
+function saveConfig(patch) {
+  const next = { ...loadConfig() }
+  for (const [k, v] of Object.entries(patch)) { if (v) next[k] = v }   // never store empty
+  try { writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2)) }
+  catch (e) { console.error('[config] Speichern fehlgeschlagen:', e?.message || e) }
+  return next
+}
+
+// The Lua ships WITH the Companion: prefer a copy next to it (what the future
+// standalone .exe bundles), then the in-repo script. The user never picks it.
+function resolveLua(storedLua) {
+  const candidates = [
+    storedLua,
+    join(HERE, 'soullink_sync.lua'),
+    join(HERE, 'lua', 'soullink_sync.lua'),
+    join(ROOT, 'emulator', 'bizhawk', 'soullink_sync.lua'),
+  ]
+  for (const c of candidates) { try { if (c && existsSync(c)) return c } catch { /* skip */ } }
+  return null
+}
+
+// Effective config = saved paths ∪ auto-detection. `ready` means the website can
+// skip the wizard and go straight to "Lua-Sync verbinden".
+function effectiveConfig() {
+  const stored = loadConfig()
+  const detected = detectEmulatorPaths(ROOT)
+  const lua = resolveLua(stored.lua)
+  const bizhawk = (stored.bizhawk && existsSync(stored.bizhawk)) ? stored.bizhawk : (detected.bizhawk || stored.bizhawk || null)
+  let rom = (stored.rom && existsSync(stored.rom)) ? stored.rom : null
+  if (!rom && detected.roms.length === 1) rom = detected.roms[0].path   // unambiguous → auto-pick
+  const syncFolder = stored.syncFolder || (lua ? dirname(lua) : detected.syncFolder)
+  const ready = !!(bizhawk && existsSync(bizhawk) && rom && existsSync(rom) && lua)
+  return { config: { bizhawk, rom, lua, syncFolder }, detected, ready }
+}
 
 // ── shared helpers (mirrored from vite.config.ts; kept dependency-free) ──────
 const delay = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -218,7 +262,39 @@ const server = createServer((req, res) => {
 
   // ── health: the website pings this to know the companion is running ─────────
   if (path === '/api/companion/health') {
-    sendJson(res, { ok: true, name: 'soullink-companion', version: VERSION, port: PORT })
+    let ready = false
+    try { ready = effectiveConfig().ready } catch { /* detection error → not ready */ }
+    sendJson(res, { ok: true, name: 'soullink-companion', version: VERSION, port: PORT, ready })
+    return
+  }
+
+  // ── config: GET effective (saved ∪ detected) paths; POST saves picked paths ──
+  if (path === '/api/companion/config') {
+    if (req.method === 'GET') {
+      try { sendJson(res, { ok: true, ...effectiveConfig() }) }
+      catch { sendJson(res, { ok: false }, 500) }
+      return
+    }
+    if (req.method === 'POST') {
+      let body = ''
+      req.on('data', (c) => { body += c; if (body.length > 100_000) req.destroy() })
+      req.on('end', () => {
+        const clean = (p) => String(p ?? '').trim().replace(/^"+|"+$/g, '').trim()
+        let cfg = {}
+        try { cfg = JSON.parse(body || '{}') } catch { /* invalid */ }
+        const patch = {}
+        if (cfg.bizhawk != null) patch.bizhawk = clean(cfg.bizhawk)
+        if (cfg.rom != null) patch.rom = clean(cfg.rom)
+        if (cfg.lua != null) patch.lua = clean(cfg.lua)
+        if (cfg.syncFolder != null) patch.syncFolder = clean(cfg.syncFolder)
+        saveConfig(patch)
+        console.log('[config] gespeichert:', Object.keys(patch).filter((k) => patch[k]).join(', ') || '(leer)')
+        try { sendJson(res, { ok: true, ...effectiveConfig() }) }
+        catch { sendJson(res, { ok: true }) }
+      })
+      return
+    }
+    sendJson(res, { ok: false }, 405)
     return
   }
 
@@ -241,9 +317,12 @@ const server = createServer((req, res) => {
       const clean = (p) => String(p ?? '').trim().replace(/^"+|"+$/g, '').trim()
       let cfg = {}
       try { cfg = JSON.parse(body || '{}') } catch { /* invalid */ }
-      const bizhawk = clean(cfg.bizhawk)
-      const rom = clean(cfg.rom)
-      const lua = clean(cfg.lua)
+      // Fall back to the Companion's saved config when the website omits paths, and
+      // always auto-resolve the bundled Lua so the user never has to provide it.
+      const eff = effectiveConfig()
+      const bizhawk = clean(cfg.bizhawk) || eff.config.bizhawk || ''
+      const rom = clean(cfg.rom) || eff.config.rom || ''
+      const lua = clean(cfg.lua) || eff.config.lua || ''
       const restart = !!cfg.restart
 
       console.log('\n[launch] ── Request ─────────────────────────────')
@@ -253,6 +332,9 @@ const server = createServer((req, res) => {
       if (!bizhawk || !existsSync(bizhawk)) { console.error('[launch] BizHawk fehlt:', bizhawk); sendJson(res, { ok: false, error: 'bizhawk_not_found' }); return }
       if (!rom || !existsSync(rom)) { console.error('[launch] ROM fehlt:', rom); sendJson(res, { ok: false, error: 'rom_not_found' }); return }
       if (!lua || !existsSync(lua)) { console.error('[launch] Lua fehlt:', lua); sendJson(res, { ok: false, error: 'lua_not_found' }); return }
+
+      // Paths are valid → remember them for next time (any browser, no wizard).
+      saveConfig({ bizhawk, rom, syncFolder: dirname(lua) })
 
       // Read this Lua's team output from now on (robust if it lives elsewhere).
       currentTeamFile = join(dirname(lua), 'soullink_team.json')
@@ -321,6 +403,11 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`  Health : http://127.0.0.1:${PORT}/api/companion/health`)
   console.log(`  Team   : ${currentTeamFile}`)
   console.log(`  Repo   : ${ROOT}`)
+  try {
+    const eff = effectiveConfig()
+    console.log(`  Lua    : ${eff.config.lua || '(nicht gefunden)'}`)
+    console.log(`  Setup  : ${eff.ready ? 'fertig – Website kann direkt verbinden' : 'erster Start → Website öffnet den Setup-Assistenten'}`)
+  } catch { /* detection error → ignore */ }
   console.log('  → Lass dieses Fenster offen und klicke auf der Website auf')
   console.log('    „Lua-Sync verbinden".  (Beenden: Strg+C)')
 })

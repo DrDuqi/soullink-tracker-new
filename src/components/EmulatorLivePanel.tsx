@@ -12,7 +12,7 @@ import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
 import LocationMapManager from './LocationMapManager'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
 import { useCompanion } from '../hooks/useCompanion'
-import { COMPANION_PORT } from '../lib/companion'
+import { COMPANION_PORT, USES_COMPANION, companionConfig, saveCompanionConfig } from '../lib/companion'
 
 const ENABLED_KEY = 'soullink-emusync-enabled'
 const COLLAPSED_KEY = 'soullink-emusync-collapsed'
@@ -161,12 +161,15 @@ function CompanionBanner({ status, onRecheck }: { status: 'checking' | 'absent';
       <ol className="text-slate-300 text-[12px] leading-relaxed list-decimal pl-5 space-y-0.5 mb-2.5">
         <li>Repo lokal öffnen, dann <code className="text-amber-200 bg-black/30 px-1 rounded">npm run companion</code><br />
           <span className="text-slate-500">(oder Doppelklick auf <code className="text-amber-200 bg-black/30 px-1 rounded">emulator/companion/start-companion.bat</code>)</span></li>
-        <li>Das Companion-Fenster <span className="font-semibold">offen lassen</span>.</li>
-        <li>Hier auf <span className="font-semibold">„Erneut prüfen"</span> klicken.</li>
+        <li>Das Companion-Fenster <span className="font-semibold">offen lassen</span> – das war's.</li>
       </ol>
       <div className="flex items-center gap-2">
-        <button onClick={onRecheck} className="btn-primary text-xs py-2 px-3">Erneut prüfen</button>
-        <span className="text-slate-500 text-[11px]">Port {COMPANION_PORT} · am besten Chrome/Edge</span>
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300/80 shrink-0" />
+        <span className="text-amber-200/90 text-[12px] font-semibold">Sobald der Companion läuft, verbindet sich die Seite automatisch …</span>
+      </div>
+      <div className="flex items-center gap-2 mt-2">
+        <button onClick={onRecheck} className="text-slate-400 hover:text-white text-[11px] underline underline-offset-2">Jetzt sofort prüfen</button>
+        <span className="text-slate-600 text-[11px]">· Port {COMPANION_PORT} · am besten Chrome/Edge</span>
       </div>
     </div>
   )
@@ -193,20 +196,57 @@ export default function EmulatorLivePanel({
   const emuSettings = useEmulatorSettings()
   const settingsHydrated = useEmulatorSettingsStore((s) => s.hydrated)
   const configured = isConfigured(emuSettings)
-  const autoOpened = useRef(false)
-  // First time the live-sync is used without setup → open the wizard automatically.
-  useEffect(() => {
-    if (settingsHydrated && !configured && !autoOpened.current) { autoOpened.current = true; setShowWizard(true) }
-  }, [settingsHydrated, configured])
+  const updateSettings = useEmulatorSettingsStore((s) => s.update)
   // Online (Vercel) the emulator endpoints come from a local Companion. Probe it
   // so we can guide the user, and only poll the sync once it's actually reachable
   // (avoids failing localhost requests when no Companion is running).
   const companion = useCompanion(enabled)
   const companionReady = companion.status === 'connected'
+
+  // Phase 2: the Companion remembers BizHawk/ROM/Lua machine-side. Pull them on
+  // connect so a configured machine skips the wizard (even in a fresh browser),
+  // and push them back when they change so the Companion stays the source of truth.
+  const [companionPulled, setCompanionPulled] = useState(!USES_COMPANION)
+  useEffect(() => {
+    if (!USES_COMPANION || companion.status !== 'connected' || companionPulled) return
+    let cancelled = false
+    companionConfig().then((cfg) => {
+      if (cancelled) return
+      if (cfg && !isConfigured(emuSettings)) {
+        const patch: Partial<EmulatorSettings> = {}
+        if (cfg.config.bizhawk) patch.bizhawkPath = cfg.config.bizhawk
+        if (cfg.config.rom) patch.romPath = cfg.config.rom
+        if (cfg.config.lua) patch.luaPath = cfg.config.lua
+        if (cfg.config.syncFolder) patch.syncFolder = cfg.config.syncFolder
+        if (Object.keys(patch).length) updateSettings(patch)
+      }
+      setCompanionPulled(true)
+    }).catch(() => { if (!cancelled) setCompanionPulled(true) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companion.status, companionPulled])
+  useEffect(() => {
+    if (!USES_COMPANION || companion.status !== 'connected' || !companionPulled || !configured) return
+    const t = setTimeout(() => {
+      saveCompanionConfig({ bizhawk: emuSettings.bizhawkPath, rom: emuSettings.romPath, lua: emuSettings.luaPath })
+    }, 800)
+    return () => clearTimeout(t)
+  }, [emuSettings.bizhawkPath, emuSettings.romPath, emuSettings.luaPath, configured, companion.status, companionPulled])
+
+  // First time without setup → open the wizard. In prod wait until we've checked
+  // the Companion's saved config (a configured Companion skips the wizard entirely;
+  // if the Companion is absent the start-banner guides the user instead).
+  const autoOpened = useRef(false)
+  useEffect(() => {
+    if (!settingsHydrated || configured || autoOpened.current) return
+    if (USES_COMPANION && (companion.status !== 'connected' || !companionPulled)) return
+    autoOpened.current = true
+    setShowWizard(true)
+  }, [settingsHydrated, configured, companion.status, companionPulled])
+
   const { phase, team, game: liveGame, currentLocationName, currentLocationId, ageSec } = useEmulatorSync(enabled && companionReady)
 
   // ── One-click launch (▶ Live-Sync starten) ───────────────────────────────
-  const updateSettings = useEmulatorSettingsStore((s) => s.update)
   const [launching, setLaunching] = useState(false)
   const [launchMsg, setLaunchMsg] = useState<string | null>(null)
   const [launchErr, setLaunchErr] = useState<{ msg: string; actionLabel: string; action: () => void } | null>(null)

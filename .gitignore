@@ -18,6 +18,9 @@ emulator/bizhawk/soullink_party_addr.txt
 soullink_team.json
 soullink_party_addr.txt
 
+# Companion: per-machine saved paths (BizHawk/ROM/Lua) — never commit
+emulator/companion/companion-config.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

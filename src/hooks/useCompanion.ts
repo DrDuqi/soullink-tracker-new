@@ -30,7 +30,9 @@ export function useCompanion(enabled = true): CompanionState {
     }
 
     probe()
-    const id = setInterval(probe, 4000)
+    // Poll briskly so a freshly started Companion is picked up automatically —
+    // the user never has to click "recheck".
+    const id = setInterval(probe, 2000)
     return () => { cancelled = true; ctrl.abort(); clearInterval(id) }
   }, [enabled, nonce])
 

@@ -28,3 +28,39 @@ export async function companionHealth(signal?: AbortSignal): Promise<boolean> {
     return false
   }
 }
+
+// The Companion remembers BizHawk/ROM/Lua paths machine-side (survives a browser
+// change), so the website can pull them instead of re-running the wizard.
+export interface CompanionConfig {
+  config: { bizhawk: string | null; rom: string | null; lua: string | null; syncFolder: string | null }
+  detected: { bizhawk: string | null; roms: { name: string; path: string }[]; lua: string | null; syncFolder: string }
+  ready: boolean   // companion already knows BizHawk + ROM + Lua → wizard can be skipped
+}
+
+/** Fetch the Companion's saved+detected paths. null in dev (no companion). */
+export async function companionConfig(signal?: AbortSignal): Promise<CompanionConfig | null> {
+  if (!USES_COMPANION) return null
+  try {
+    const r = await fetch(`${EMU_BASE}/api/companion/config`, { cache: 'no-store', signal })
+    if (!r.ok) return null
+    const j = await r.json().catch(() => null)
+    return j?.ok ? (j as CompanionConfig) : null
+  } catch {
+    return null
+  }
+}
+
+/** Persist picked paths in the Companion so the next start needs no wizard. */
+export async function saveCompanionConfig(patch: { bizhawk?: string; rom?: string; lua?: string }): Promise<boolean> {
+  if (!USES_COMPANION) return false
+  try {
+    const r = await fetch(`${EMU_BASE}/api/companion/config`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
