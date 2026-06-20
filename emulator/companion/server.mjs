@@ -25,7 +25,7 @@ import { createServer } from 'node:http'
 import { readFileSync, writeFileSync, statSync, existsSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawn, exec } from 'node:child_process'
 
 const VERSION = '1.0.0'
@@ -63,6 +63,7 @@ function saveConfig(patch) {
 // standalone .exe bundles), then the in-repo script. The user never picks it.
 function resolveLua(storedLua) {
   const candidates = [
+    process.env.SOULLINK_LUA,   // packaged app points this at a writable copy
     storedLua,
     join(HERE, 'soullink_sync.lua'),
     join(HERE, 'lua', 'soullink_sync.lua'),
@@ -253,7 +254,7 @@ const sendJson = (res, obj, status = 200) => {
   res.end(JSON.stringify(obj))
 }
 
-const server = createServer((req, res) => {
+function handleRequest(req, res) {
   setCors(req, res)
   if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return }
 
@@ -393,29 +394,47 @@ const server = createServer((req, res) => {
 
   res.statusCode = 404
   res.end()
-})
+}
 
-// Bind to 127.0.0.1 only — never expose the launcher on the network.
-server.listen(PORT, '127.0.0.1', () => {
-  console.log('╔══════════════════════════════════════════════════════════╗')
-  console.log('║  SoulLink Companion läuft                                  ║')
-  console.log('╚══════════════════════════════════════════════════════════╝')
-  console.log(`  Health : http://127.0.0.1:${PORT}/api/companion/health`)
-  console.log(`  Team   : ${currentTeamFile}`)
-  console.log(`  Repo   : ${ROOT}`)
-  try {
-    const eff = effectiveConfig()
-    console.log(`  Lua    : ${eff.config.lua || '(nicht gefunden)'}`)
-    console.log(`  Setup  : ${eff.ready ? 'fertig – Website kann direkt verbinden' : 'erster Start → Website öffnet den Setup-Assistenten'}`)
-  } catch { /* detection error → ignore */ }
-  console.log('  → Lass dieses Fenster offen und klicke auf der Website auf')
-  console.log('    „Lua-Sync verbinden".  (Beenden: Strg+C)')
-})
-server.on('error', (e) => {
-  if (e?.code === 'EADDRINUSE') {
-    console.error(`\n[FEHLER] Port ${PORT} ist belegt. Läuft der Companion schon? Sonst SOULLINK_COMPANION_PORT setzen.`)
-  } else {
-    console.error('[FEHLER]', e?.message || e)
-  }
-  process.exit(1)
-})
+// Start the companion HTTP server. Shared by the CLI (`npm run companion`) and
+// the Electron tray app — one implementation, no drift. Resolves with the server
+// once it is listening; rejects on bind error (e.g. EADDRINUSE) so the caller
+// decides what to do (CLI exits; the tray app shows "läuft bereits").
+export function startCompanion({ port = PORT, quiet = false } = {}) {
+  return new Promise((resolve, reject) => {
+    const server = createServer(handleRequest)
+    server.once('error', reject)
+    // Bind to 127.0.0.1 only — never expose the launcher on the network.
+    server.listen(port, '127.0.0.1', () => {
+      server.off('error', reject)
+      server.on('error', (e) => console.error('[server]', e?.message || e))
+      if (!quiet) {
+        console.log('╔══════════════════════════════════════════════════════════╗')
+        console.log('║  SoulLink Companion läuft                                  ║')
+        console.log('╚══════════════════════════════════════════════════════════╝')
+        console.log(`  Health : http://127.0.0.1:${port}/api/companion/health`)
+        console.log(`  Team   : ${currentTeamFile}`)
+        try {
+          const eff = effectiveConfig()
+          console.log(`  Lua    : ${eff.config.lua || '(nicht gefunden)'}`)
+          console.log(`  Setup  : ${eff.ready ? 'fertig – Website kann direkt verbinden' : 'erster Start → Website öffnet den Setup-Assistenten'}`)
+        } catch { /* detection error → ignore */ }
+        console.log('  → Auf der Website auf „Lua-Sync verbinden" klicken.')
+      }
+      resolve(server)
+    })
+  })
+}
+
+// Run directly (`node server.mjs` / `npm run companion`) → start + handle errors.
+const invokedDirectly = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url
+if (invokedDirectly) {
+  startCompanion().catch((e) => {
+    if (e?.code === 'EADDRINUSE') {
+      console.error(`\n[FEHLER] Port ${PORT} ist belegt. Läuft der Companion schon? Sonst SOULLINK_COMPANION_PORT setzen.`)
+    } else {
+      console.error('[FEHLER]', e?.message || e)
+    }
+    process.exit(1)
+  })
+}

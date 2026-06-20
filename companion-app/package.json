@@ -1,0 +1,48 @@
+{
+  "name": "soullink-companion",
+  "productName": "SoulLink Companion",
+  "version": "1.0.0",
+  "description": "Lokaler Companion für den SoulLink-Tracker Live-Sync — startet BizHawk und überträgt das Team an die Website.",
+  "author": "SoulLink Tracker",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "icon": "node scripts/gen-icon.mjs",
+    "start": "electron .",
+    "pack": "npm run icon && electron-builder --dir",
+    "dist": "npm run icon && electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^33.3.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "build": {
+    "appId": "app.soullink.companion",
+    "productName": "SoulLink Companion",
+    "directories": { "output": "dist" },
+    "files": ["main.cjs", "assets/**"],
+    "extraResources": [
+      { "from": "../emulator/companion/server.mjs", "to": "companion/server.mjs" },
+      { "from": "../emulator/bizhawk/soullink_sync.lua", "to": "companion/soullink_sync.lua" }
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SoulLink Companion"
+    },
+    "publish": [
+      { "provider": "github", "owner": "DrDuqi", "repo": "soullink-tracker-new" }
+    ]
+  }
+}
