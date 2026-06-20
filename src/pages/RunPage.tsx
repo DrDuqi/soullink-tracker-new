@@ -7,7 +7,7 @@ import {
 import { useRunStore } from '../store/runStore'
 import { useEncounters, useReorderEncounters, useUpdateEncounterStatus } from '../hooks/useEncounters'
 import { useSoulLinks, useSoulLinkPairs, useSoulLinkGroups, useDeleteSoulLink } from '../hooks/useSoulLinks'
-import { useTeamSlots } from '../hooks/useTeamSlots'
+import { useTeamSlots, useAddToTeam } from '../hooks/useTeamSlots'
 import { useActivityLog } from '../hooks/useActivityLog'
 import { useRealtime } from '../hooks/useRealtime'
 import { usePendingRequests, useRequests, useCreateRequest } from '../hooks/useRequests'
@@ -21,6 +21,8 @@ import SoulLinkPairCard from '../components/SoulLinkPairCard'
 import SoulLinkTripleCard from '../components/SoulLinkTripleCard'
 import RequestsPanel from '../components/RequestsPanel'
 import TeamPanel from '../components/TeamPanel'
+import TeamPanel3 from '../components/TeamPanel3'
+import RouteChecklist3 from '../components/RouteChecklist3'
 import ActivityFeed from '../components/ActivityFeed'
 import TypeEffectChart from '../components/TypeEffectChart'
 import RouteChecklist from '../components/RouteChecklist'
@@ -240,6 +242,7 @@ export default function RunPage() {
   const pairs = useSoulLinkPairs(runId ?? null, encounters as Encounter[])
   const updateStatus = useUpdateEncounterStatus()
   const deleteSoulLink = useDeleteSoulLink()
+  const addToTeam = useAddToTeam()
   const pendingRequests = usePendingRequests(runId ?? null, encounters as Encounter[], players)
 
   const teamEncounterIds = new Set(teamSlots.map((s) => s.encounter_id))
@@ -459,6 +462,14 @@ export default function RunPage() {
     if (enc.player_id !== myPlayerId || enc.status === 'dead') return
     const elig = getTeamEligibility(enc)
     if (!elig.eligible) { toast.show(elig.reason ?? 'Nicht möglich', 'warning'); return }
+    if (is3) {
+      // 3-Spieler: direkt in den ersten freien Slot (kein Partner-Bestätigungs-Flow).
+      const used = new Set(teamSlots.filter((s) => s.player_id === myPlayerId).map((s) => s.slot_position))
+      const pos = [1, 2, 3, 4, 5, 6].find((p) => !used.has(p))
+      if (!pos) { toast.show('Dein Team ist voll (6).', 'warning'); return }
+      addToTeam.mutate({ runId: enc.run_id, playerId: myPlayerId!, encounterId: enc.id, slotPosition: pos, pokemonName: enc.nickname ?? enc.pokemon_name })
+      return
+    }
     setSlotPickerEncounter(enc)
   }
 
@@ -830,7 +841,7 @@ export default function RunPage() {
               </div>
 
               {/* Hauptteam (shared, always editable for my slots) */}
-              {players.length === 2 && (
+              {!is3 && players.length === 2 && (
                 <div>
                   <SectionLabel label="Hauptteam" sub={`${teamSlots.length} Pokémon`} />
                   <TeamPanel
@@ -841,6 +852,21 @@ export default function RunPage() {
                     soulLinkPairs={pairs}
                     onSelectEncounter={(enc) => setSelectedEncounter(enc)}
                     onNavigateToPairs={() => setMainView('pairs')}
+                  />
+                </div>
+              )}
+              {/* Hauptteam für 3-Spieler-Runs (3 Spalten, direkte Add/Remove) */}
+              {is3 && (
+                <div>
+                  <SectionLabel label="Hauptteam" sub={`${teamSlots.length} Pokémon`} />
+                  <TeamPanel3
+                    runId={currentRun.id}
+                    players={players}
+                    myPlayerId={myPlayerId ?? ''}
+                    maxPlayers={maxPlayers}
+                    encounters={encounters as Encounter[]}
+                    groups={groups}
+                    onSelectEncounter={(enc) => setSelectedEncounter(enc)}
                   />
                 </div>
               )}
@@ -1061,26 +1087,42 @@ export default function RunPage() {
                 online={onlinePlayers}
               />
 
-              {/* Encounter checklist */}
-              <RouteChecklist
-                game={currentRun.game}
-                encounters={encounters as Encounter[]}
-                players={players}
-                myPlayerId={myPlayerId ?? ''}
-                soulLinkPairs={pairs}
-                onOpenAddForRoute={(route) => { setAddEncounterRoute(route); setShowAddEncounter(true) }}
-                onScrollToEncounter={(enc) => {
-                  setFocusedPlayerId(enc.player_id)
-                  setMainView('encounters')
-                  flashTo(`enc-${enc.id}`)
-                }}
-                onJumpToPair={(pairId) => { setMainView('pairs'); flashTo(`pair-${pairId}`) }}
-                onRequestSoulLink={is3 ? undefined : handleQuickSoulLink}
-                pendingLinkEncIds={pendingLinkEncIds}
-                readOnly={!isMyFocus}
-                collapsible
-                defaultOpen
-              />
+              {/* Encounter checklist (3-Spieler: eigene N-Spieler-Variante) */}
+              {is3 ? (
+                <RouteChecklist3
+                  game={currentRun.game}
+                  encounters={encounters as Encounter[]}
+                  players={players}
+                  myPlayerId={myPlayerId ?? ''}
+                  maxPlayers={maxPlayers}
+                  soulLinkGroups={groups}
+                  onOpenAddForRoute={(route) => { setAddEncounterRoute(route); setShowAddEncounter(true) }}
+                  onScrollToEncounter={(enc) => { setFocusedPlayerId(enc.player_id); setMainView('encounters'); flashTo(`enc-${enc.id}`) }}
+                  onJumpToPair={() => setMainView('pairs')}
+                  collapsible
+                  defaultOpen
+                />
+              ) : (
+                <RouteChecklist
+                  game={currentRun.game}
+                  encounters={encounters as Encounter[]}
+                  players={players}
+                  myPlayerId={myPlayerId ?? ''}
+                  soulLinkPairs={pairs}
+                  onOpenAddForRoute={(route) => { setAddEncounterRoute(route); setShowAddEncounter(true) }}
+                  onScrollToEncounter={(enc) => {
+                    setFocusedPlayerId(enc.player_id)
+                    setMainView('encounters')
+                    flashTo(`enc-${enc.id}`)
+                  }}
+                  onJumpToPair={(pairId) => { setMainView('pairs'); flashTo(`pair-${pairId}`) }}
+                  onRequestSoulLink={handleQuickSoulLink}
+                  pendingLinkEncIds={pendingLinkEncIds}
+                  readOnly={!isMyFocus}
+                  collapsible
+                  defaultOpen
+                />
+              )}
 
               {/* Strategy center — team analysis */}
               <TeamAnalysisPanel
