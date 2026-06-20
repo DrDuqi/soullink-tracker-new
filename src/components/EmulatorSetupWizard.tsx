@@ -177,7 +177,7 @@ export default function EmulatorSetupWizard({ onClose }: { onClose: () => void }
           {step === 4 && (
             <div>
               <h2 className="text-white font-black text-xl mb-1.5">Lua &amp; Live-Sync</h2>
-              <p className="text-slate-400 text-sm mb-5">Die App kennt ihr eigenes Projekt – hier musst du nichts auswählen.</p>
+              <p className="text-slate-400 text-sm mb-5">Das Lua-Script ist bereits enthalten – hier musst du nichts auswählen.</p>
               {detecting ? (
                 <div className="flex items-center gap-2 text-slate-500 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Wird eingerichtet…</div>
               ) : (

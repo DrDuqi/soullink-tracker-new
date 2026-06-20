@@ -12,11 +12,17 @@ import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
 import LocationMapManager from './LocationMapManager'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
 import { useCompanion } from '../hooks/useCompanion'
-import { COMPANION_PORT, USES_COMPANION, companionConfig, saveCompanionConfig } from '../lib/companion'
+import { USES_COMPANION, companionConfig, saveCompanionConfig } from '../lib/companion'
 
 const ENABLED_KEY = 'soullink-emusync-enabled'
 const COLLAPSED_KEY = 'soullink-emusync-collapsed'
 const GAME_LABEL: Record<string, string> = { platinum: 'Platinum', heartgold: 'HeartGold', firered: 'FireRed', emerald: 'Emerald', black: 'Black' }
+const COMPANION_DOWNLOAD = 'https://github.com/DrDuqi/soullink-tracker-new/releases'
+// Chromium browsers (Chrome/Edge/Brave/Opera) allow the HTTPS→localhost
+// (Private Network Access) call to the Companion; Firefox/Safari may block it.
+const IS_CHROMIUM = typeof navigator !== 'undefined'
+  && /Chrome|Chromium|Edg\//.test(navigator.userAgent)
+  && !/Firefox|FxiOS/.test(navigator.userAgent)
 
 // Resolves ability / item / move names (by id, cached) for one Pokémon and
 // renders the enriched detail. Keyed on the ids so the 1s status ticker doesn't
@@ -154,23 +160,29 @@ function CompanionBanner({ status, onRecheck }: { status: 'checking' | 'absent';
       <div className="flex items-center gap-1.5 text-amber-300 text-sm font-bold mb-1.5">
         <WifiOff className="w-4 h-4" /> Companion nicht gestartet
       </div>
+      {!IS_CHROMIUM && (
+        <p className="text-amber-200 text-[12px] leading-relaxed mb-2 font-semibold">
+          Bitte öffne diese Seite in <span className="underline">Chrome</span> oder <span className="underline">Edge</span> –
+          in Firefox/Safari blockiert der Browser die Verbindung zum lokalen Companion.
+        </p>
+      )}
       <p className="text-slate-300 text-[12px] leading-relaxed mb-2">
-        Die Website darf BizHawk/ROM/Lua aus Sicherheitsgründen nicht selbst starten.
-        Dafür läuft ein kleiner lokaler Helfer auf deinem PC. So startest du ihn:
+        Der <span className="font-semibold">SoulLink Companion</span> ist eine kleine App auf deinem PC,
+        die BizHawk für dich startet. Einmal einrichten, dann läuft alles automatisch:
       </p>
-      <ol className="text-slate-300 text-[12px] leading-relaxed list-decimal pl-5 space-y-0.5 mb-2.5">
-        <li>Repo lokal öffnen, dann <code className="text-amber-200 bg-black/30 px-1 rounded">npm run companion</code><br />
-          <span className="text-slate-500">(oder Doppelklick auf <code className="text-amber-200 bg-black/30 px-1 rounded">emulator/companion/start-companion.bat</code>)</span></li>
-        <li>Das Companion-Fenster <span className="font-semibold">offen lassen</span> – das war's.</li>
+      <ol className="text-slate-300 text-[12px] leading-relaxed list-decimal pl-5 space-y-1 mb-2.5">
+        <li>
+          <a href={COMPANION_DOWNLOAD} target="_blank" rel="noreferrer" className="text-amber-300 font-semibold underline underline-offset-2">
+            SoulLink Companion herunterladen &amp; installieren
+          </a>
+        </li>
+        <li>Companion starten – er läuft dann unten rechts im <span className="font-semibold">System-Tray</span>.</li>
       </ol>
       <div className="flex items-center gap-2">
         <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300/80 shrink-0" />
-        <span className="text-amber-200/90 text-[12px] font-semibold">Sobald der Companion läuft, verbindet sich die Seite automatisch …</span>
+        <span className="text-amber-200/90 text-[12px] font-semibold">Läuft der Companion, verbindet sich die Seite automatisch …</span>
       </div>
-      <div className="flex items-center gap-2 mt-2">
-        <button onClick={onRecheck} className="text-slate-400 hover:text-white text-[11px] underline underline-offset-2">Jetzt sofort prüfen</button>
-        <span className="text-slate-600 text-[11px]">· Port {COMPANION_PORT} · am besten Chrome/Edge</span>
-      </div>
+      <button onClick={onRecheck} className="mt-2 text-slate-400 hover:text-white text-[11px] underline underline-offset-2">Jetzt sofort prüfen</button>
     </div>
   )
 }
