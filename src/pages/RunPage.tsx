@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Plus, Link2, Copy, Check, ArrowLeft, Heart, Skull,
-  LayoutGrid, List, Zap, Eye, Lock, Pencil,
+  LayoutGrid, List, Zap, Eye, Lock, Pencil, Gamepad2,
 } from 'lucide-react'
 import { useRunStore } from '../store/runStore'
 import { useEncounters, useReorderEncounters } from '../hooks/useEncounters'
@@ -30,6 +30,9 @@ import EmulatorLivePanel from '../components/EmulatorLivePanel'
 import EmulatorReconciler from '../components/EmulatorReconciler'
 import TeamOverview from '../components/TeamOverview'
 import ChangeEditionModal from '../components/ChangeEditionModal'
+import ChangeModeModal from '../components/ChangeModeModal'
+import { useRunMode, setRunMode, type RunMode } from '../lib/runMode'
+import { useEmuTeamStore } from '../store/emuTeamStore'
 import { useAuth } from '../contexts/AuthContext'
 import type { Encounter, Run, Player, SoulLinkPair, LinkRequest, ActivityLogEntry } from '../types/database'
 
@@ -179,6 +182,18 @@ export default function RunPage() {
   const [emuPrefill, setEmuPrefill] = useState<EncounterPrefill | undefined>(undefined)
   const [showEditEdition, setShowEditEdition] = useState(false)
   const [savingEdition, setSavingEdition] = useState(false)
+  const [showModeModal, setShowModeModal] = useState(false)
+  const runMode = useRunMode(runId ?? '')        // 'manual' | 'live_sync' (per run, local)
+  const liveSyncMode = runMode === 'live_sync'
+
+  // Spielmodus wechseln. Manuell → Emulator-UI verschwindet + Live-Team verwerfen
+  // (der Reconciler/Panel werden ausgehängt → Sync stoppt). Live-Sync → Panel kommt
+  // zurück (Setup-Wizard öffnet sich dort automatisch, falls noch nicht eingerichtet).
+  function applyMode(newMode: RunMode) {
+    if (runId) setRunMode(runId, newMode)
+    if (newMode === 'manual') useEmuTeamStore.getState().setTeam([], false)
+    setShowModeModal(false)
+  }
   const [showSoulLink, setShowSoulLink] = useState(false)
   const [copied, setCopied] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -346,10 +361,13 @@ export default function RunPage() {
         const ps = runPlayers as Player[]
         const bound = ps.find((p) => p.auth_user_id === user?.id)
         setCurrentRun(run as Run, ps, bound?.id ?? '')
+      } else if (user) {
+        // Run not found / not accessible → don't get stuck on "loading", go home.
+        navigate('/', { replace: true })
       }
     }
     loadRun()
-  }, [runId, currentRun?.id, setCurrentRun, user?.id])
+  }, [runId, currentRun?.id, setCurrentRun, user?.id, navigate])
 
   // ─ Helper functions ───────────────────────────────────────────────────────
   function getLinkedEncounter(enc: Encounter): { enc: Encounter; playerName: string } | null {
@@ -445,7 +463,9 @@ export default function RunPage() {
     setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
-  if (!currentRun) {
+  // Trust the URL: never render a run whose id ≠ the route param (the persisted
+  // store may still hold the previous run — loadRun replaces it below).
+  if (!currentRun || currentRun.id !== runId) {
     return (
       <div className="min-h-screen pokeball-bg flex items-center justify-center">
         <div className="text-slate-400 text-lg">Run wird geladen…</div>
@@ -630,17 +650,28 @@ export default function RunPage() {
                 <PokeBall className="w-7 h-7 text-pk-red hidden sm:block" />
                 <div>
                   <h1 className="text-white font-black text-lg leading-tight">{currentRun.name}</h1>
-                  {isOwner ? (
-                    <button
-                      onClick={() => setShowEditEdition(true)}
-                      className="text-slate-500 hover:text-slate-200 text-xs font-medium flex items-center gap-1 transition-colors"
-                      title="Run-Edition ändern"
-                    >
-                      {currentRun.game} <Pencil className="w-3 h-3" />
-                    </button>
-                  ) : (
-                    <div className="text-slate-500 text-xs font-medium">{currentRun.game}</div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {isOwner ? (
+                      <button
+                        onClick={() => setShowEditEdition(true)}
+                        className="text-slate-500 hover:text-slate-200 text-xs font-medium flex items-center gap-1 transition-colors"
+                        title="Run-Edition ändern"
+                      >
+                        {currentRun.game} <Pencil className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <div className="text-slate-500 text-xs font-medium">{currentRun.game}</div>
+                    )}
+                    {isMember && (
+                      <button
+                        onClick={() => setShowModeModal(true)}
+                        className="text-slate-500 hover:text-slate-200 text-xs font-medium flex items-center gap-1 transition-colors"
+                        title="Spielmodus ändern"
+                      >
+                        · {liveSyncMode ? <><Zap className="w-3 h-3" /> Live-Sync</> : <><Gamepad2 className="w-3 h-3" /> Manuell</>}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -766,8 +797,8 @@ export default function RunPage() {
                 </div>
               )}
 
-              {/* Emulator live-team (local dev sync; additive, never overwrites tracked data) */}
-              {isMyFocus && import.meta.env.DEV && (
+              {/* Emulator live-team — only in Live-Sync mode (local dev sync; additive) */}
+              {isMyFocus && import.meta.env.DEV && liveSyncMode && (
                 <EmulatorLivePanel
                   game={currentRun.game}
                   importedSpeciesIds={myEncounterSpeciesIds}
@@ -985,11 +1016,14 @@ export default function RunPage() {
       </div>
 
       {/* Invisible: keeps emulator-imported encounters in sync by stable PID (evolution etc.) */}
-      {import.meta.env.DEV && myPlayerId && (
+      {import.meta.env.DEV && myPlayerId && liveSyncMode && (
         <EmulatorReconciler encounters={myEncounters} runId={currentRun.id} />
       )}
 
       {/* ══ Modals ════════════════════════════════════════════════════════ */}
+      {showModeModal && (
+        <ChangeModeModal current={runMode} onApply={applyMode} onClose={() => setShowModeModal(false)} />
+      )}
       {showEditEdition && (
         <ChangeEditionModal
           currentGame={currentRun.game}

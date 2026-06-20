@@ -10,7 +10,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { useRunStore } from '../store/runStore'
 import { useToastStore } from '../store/toastStore'
 import { GAME_LIST } from '../lib/routes'
+import { setRunMode, type RunMode } from '../lib/runMode'
 import UserMenu from '../components/UserMenu'
+import RunModeCards from '../components/RunModeCards'
 import type { Run, Player } from '../types/database'
 
 function PokeBall({ className = '' }: { className?: string }) {
@@ -226,6 +228,7 @@ function Dashboard() {
   const { setCurrentRun } = useRunStore()
   const toast = useToastStore()
   const [game, setGame] = useState(GAME_LIST[0])
+  const [mode, setMode] = useState<RunMode>('manual')
   const [customCode, setCustomCode] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [busy, setBusy] = useState(false)
@@ -277,6 +280,7 @@ function Dashboard() {
         .insert({ run_id: run.id, name: profile.username, player_number: 1, auth_user_id: user.id })
         .select().single()
       if (pErr) throw pErr
+      setRunMode(run.id, mode)   // gewählten Spielmodus lokal für diesen Run speichern
       setCurrentRun(run as Run, [player as Player], (player as Player).id)
       navigate(`/run/${run.id}`)
     } catch (err: unknown) {
@@ -359,6 +363,10 @@ function Dashboard() {
               <input value={customCode} onChange={(e) => setCustomCode(e.target.value)} placeholder="Automatisch generieren" className="pk-input font-mono" maxLength={12} />
               <button type="button" onClick={() => setCustomCode('')} title="Zufällig" className="shrink-0 w-12 flex items-center justify-center rounded-xl border border-[#2e2e42] text-slate-400 hover:text-white hover:border-slate-500 transition-colors" style={{ background: '#16161f' }}><Shuffle className="w-4 h-4" /></button>
             </div>
+          </div>
+          <div>
+            <label className="text-slate-300 text-sm font-bold mb-2 block">Spielmodus</label>
+            <RunModeCards selected={mode} onSelect={setMode} />
           </div>
           <p className="text-slate-600 text-xs">Spielername: <span className="text-slate-400 font-bold">{profile?.username}</span> (aus deinem Account)</p>
           <button type="submit" disabled={busy} className="btn-primary w-full py-3.5">{busy ? 'Wird erstellt…' : '⚡ Run starten'}</button>
