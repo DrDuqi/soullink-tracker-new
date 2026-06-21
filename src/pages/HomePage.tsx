@@ -212,6 +212,7 @@ function Dashboard() {
   const { setCurrentRun } = useRunStore()
   const toast = useToastStore()
   const [game, setGame] = useState(GAME_LIST[0])
+  const [runName, setRunName] = useState('')
   const [mode, setMode] = useState<RunMode>('manual')
   const [playerCount, setPlayerCount] = useState(2)
   const [customCode, setCustomCode] = useState('')
@@ -259,7 +260,7 @@ function Dashboard() {
     if (!user || !profile) return
     setBusy(true); setError('')
     try {
-      const payload: Record<string, unknown> = { name: `${profile.username}'s Run`, game, owner_user_id: user.id }
+      const payload: Record<string, unknown> = { name: runName.trim() || `${profile.username}'s Run`, game, owner_user_id: user.id }
       if (customCode.trim()) payload.share_code = customCode.trim().toLowerCase()
       const { data: run, error: runErr } = await supabase.from('runs').insert(payload).select().single()
       if (runErr) throw runErr
@@ -358,6 +359,10 @@ function Dashboard() {
       <div className="grid md:grid-cols-2 gap-5 mb-10">
         <form onSubmit={handleCreate} className="pk-card p-6 space-y-4">
           <div className="flex items-center gap-2 text-white font-black"><Swords className="w-5 h-5 text-pk-red" /> Neuer Run</div>
+          <div>
+            <label className="text-slate-300 text-sm font-bold mb-2 block">Run-Name <span className="text-slate-600 font-normal">(optional)</span></label>
+            <input value={runName} onChange={(e) => setRunName(e.target.value)} placeholder="z. B. Mein Platin SoulLink" maxLength={40} className="pk-input" />
+          </div>
           <div>
             <label className="text-slate-300 text-sm font-bold mb-2 block">Spiel</label>
             <select value={game} onChange={(e) => setGame(e.target.value)} className="pk-input">{GAME_LIST.map((g) => <option key={g}>{g}</option>)}</select>
