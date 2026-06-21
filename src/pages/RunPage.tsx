@@ -607,7 +607,7 @@ export default function RunPage() {
   return (
     <>
       {/* ══ Fixed AAA atmosphere background (visual layer only — z-0) ═══════ */}
-      <AtmosphereBackground />
+      <AtmosphereBackground game={currentRun.game} />
 
       {/* ══ App shell ═════════════════════════════════════════════════════ */}
       <div className="relative z-10 min-h-screen flex flex-col">

@@ -291,7 +291,10 @@ body {
 .atmo-neb-b { inset: -25%; background: radial-gradient(40% 42% at 80% 20%, rgba(28,66,176,0.38), transparent 68%); animation: atmoNebB 78s ease-in-out infinite; }
 .atmo-neb-c { inset: -25%; background: radial-gradient(30% 26% at 62% 64%, rgba(22,150,186,0.12), transparent 70%); animation: atmoNebA 96s ease-in-out infinite reverse; }
 .atmo-lines { position: absolute; inset: 0; width: 100%; height: 100%; animation: atmoLines 80s ease-in-out infinite; will-change: transform; }
-.atmo-core { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; }
+.atmo-core { position: absolute; top: 50%; left: 50%; display: grid; place-items: center;
+  transform: translate(-50%, -50%) translate3d(calc(var(--mx,0) * 2px), calc(var(--my,0) * 2px), 0); transition: transform .4s ease-out; }
+.atmo-mon { position: absolute; transform: translate3d(calc(var(--mx,0) * var(--pl,3px)), calc(var(--my,0) * var(--pt,3px)), 0); transition: transform .45s ease-out; will-change: transform; }
+.atmo-mon img { width: 100%; height: auto; display: block; user-select: none; }
 .atmo-ring { position: absolute; aspect-ratio: 1; border-radius: 50%; animation-name: atmoSpin; animation-timing-function: linear; animation-iteration-count: infinite; will-change: transform; }
 .atmo-ring svg { width: 100%; height: 100%; display: block; }
 .atmo-rev { animation-direction: reverse; }
