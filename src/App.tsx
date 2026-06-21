@@ -10,6 +10,7 @@ import './index.css'
 // run view (modals, analysis engine, …) and vice-versa.
 const HomePage = lazy(() => import('./pages/HomePage'))
 const RunPage = lazy(() => import('./pages/RunPage'))
+const SetupPage = lazy(() => import('./pages/SetupPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
@@ -32,6 +33,7 @@ export default function App() {
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/" element={<HomePage />} />
+                <Route path="/setup" element={<SetupPage />} />
                 <Route path="/run/:runId" element={<RunPage />} />
                 {/* Unknown paths fall back to the landing page instead of a blank screen. */}
                 <Route path="*" element={<Navigate to="/" replace />} />

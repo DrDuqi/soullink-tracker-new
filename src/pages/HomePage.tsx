@@ -222,6 +222,8 @@ function Dashboard() {
   const [deleteFor, setDeleteFor] = useState<RunVM | null>(null)
   const [transferFor, setTransferFor] = useState<RunVM | null>(null)
   const [actionBusy, setActionBusy] = useState(false)
+  // Onboarding entry — shown until the Companion has been set up at least once.
+  const [showOnboard] = useState(() => { try { return localStorage.getItem('onboard-companion-seen') !== '1' } catch { return true } })
 
   const { data: myRuns = [], isLoading, refetch } = useQuery<RunVM[]>({
     queryKey: ['my-runs', user?.id],
@@ -336,6 +338,20 @@ function Dashboard() {
         <h1 className="text-3xl font-black text-white">Willkommen, {profile?.display_name || profile?.username} 👋</h1>
         <p className="text-slate-500 mt-1">Erstelle einen neuen Run oder tritt mit einem Code bei.</p>
       </div>
+
+      {showOnboard && (
+        <button onClick={() => navigate('/setup')} className="w-full text-left rounded-2xl p-5 mb-8 flex items-center gap-4 transition-transform active:scale-[0.99]"
+          style={{ background: 'linear-gradient(120deg, rgba(204,0,0,0.20), rgba(204,0,0,0.05))', border: '1px solid rgba(204,0,0,0.35)' }}>
+          <div className="shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(204,0,0,0.22)' }}>
+            <Zap className="w-6 h-6 text-pk-red" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-black text-lg">Erste Einrichtung – in 5 Minuten spielbereit</div>
+            <div className="text-slate-300 text-sm">Companion, BizHawk & Live-Sync Schritt für Schritt einrichten.</div>
+          </div>
+          <span className="shrink-0 hidden sm:flex items-center gap-1.5 text-pk-red font-bold text-sm">Starten <ArrowRight className="w-4 h-4" /></span>
+        </button>
+      )}
 
       {error && <div className="bg-red-950/60 border border-red-800 text-red-400 rounded-xl p-4 mb-6 text-sm font-medium">{error}</div>}
 
