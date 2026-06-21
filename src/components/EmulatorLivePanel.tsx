@@ -286,6 +286,15 @@ export default function EmulatorLivePanel({
     const res = await launchEmulator(eff, restart)
     if (!res.ok) {
       if (res.error === 'rom_not_found') {
+        // Self-heal: nach einem Ordner-Umzug kennt der Companion die neue ROM oft
+        // schon (aus seiner gespeicherten Config) → automatisch übernehmen, statt
+        // den Nutzer neu auswählen zu lassen.
+        if (!override) {
+          const cfg = await companionConfig()
+          if (cfg?.config.rom && cfg.config.rom !== eff.romPath) {
+            updateSettings({ romPath: cfg.config.rom }); launchSync(restart, { romPath: cfg.config.rom }); return
+          }
+        }
         setLaunching(false)
         setLaunchErr({ msg: 'ROM wurde verschoben.', actionLabel: 'Neue ROM auswählen', action: () => romPick.current?.click() })
       } else if (res.error === 'lua_not_found') {
@@ -294,9 +303,15 @@ export default function EmulatorLivePanel({
         if (d?.lua) { updateSettings({ luaPath: d.lua, syncFolder: d.syncFolder }); launchSync(restart, { luaPath: d.lua }) }
         else { setLaunching(false); setLaunchErr({ msg: 'Sync-Script nicht gefunden.', actionLabel: 'Einrichtung öffnen', action: () => setShowWizard(true) }) }
       } else {
-        // BizHawk-Start fehlgeschlagen → der gespeicherte Pfad zeigt evtl. auf eine
-        // LOSE EmuHawk.exe. Einmal eine VOLLSTÄNDIGE Installation auto-suchen & neu versuchen.
+        // BizHawk-Start fehlgeschlagen. Erst den Companion fragen (kennt nach einem
+        // Umzug evtl. den neuen Pfad), dann eine VOLLSTÄNDIGE Installation auto-suchen.
         if (!override) {
+          const cfg = await companionConfig()
+          if (cfg?.config.bizhawk && cfg.config.bizhawk !== eff.bizhawkPath) {
+            updateSettings({ bizhawkPath: cfg.config.bizhawk })
+            launchSync(restart, { bizhawkPath: cfg.config.bizhawk })
+            return
+          }
           const better = await findFile(fileName(eff.bizhawkPath) || 'EmuHawk.exe')
           if (better && better !== eff.bizhawkPath) {
             updateSettings({ bizhawkPath: better })
@@ -429,8 +444,8 @@ export default function EmulatorLivePanel({
 
       {showWizard && <EmulatorSetupWizard onClose={() => setShowWizard(false)} />}
       {showSettings && <EmulatorSettingsModal onClose={() => setShowSettings(false)} />}
-      <input ref={romPick} type="file" accept=".nds,.gba,.gbc,.gb" className="hidden" onChange={(e) => reselectRom(e.target.files?.[0])} />
-      <input ref={bizPick} type="file" accept=".exe" className="hidden" onChange={(e) => reselectBizhawk(e.target.files?.[0])} />
+      <input ref={romPick} type="file" accept=".nds,.gba,.gbc,.gb" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => reselectRom(e.target.files?.[0])} />
+      <input ref={bizPick} type="file" accept=".exe" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => reselectBizhawk(e.target.files?.[0])} />
 
       {/* Spiel-Mismatch — auch im eingeklappten Zustand sichtbar */}
       {enabled && mismatch && (
