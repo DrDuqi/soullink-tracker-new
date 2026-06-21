@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, type React
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useRunStore } from '../store/runStore'
+import { randomShinyUrl } from '../lib/shinyAvatar'
 import type { Profile } from '../types/database'
 
 interface AuthResult { error?: string }
@@ -75,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return { error: 'Registrierung fehlgeschlagen. Bitte erneut versuchen.' }
 
     const { error: profErr } = await supabase.from('profiles').insert({
-      user_id: user.id, username: uname, display_name: uname,
+      user_id: user.id, username: uname, display_name: uname, avatar_url: randomShinyUrl(),
     })
     if (profErr) {
       if (profErr.code === '23505') return { error: 'Benutzername ist bereits vergeben.' }

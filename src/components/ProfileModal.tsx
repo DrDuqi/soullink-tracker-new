@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { X, User as UserIcon } from 'lucide-react'
+import { X, Star } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToastStore } from '../store/toastStore'
+import ShinyAvatar from './ShinyAvatar'
+import ShinyAvatarPicker from './ShinyAvatarPicker'
+import { avatarPokemonId } from '../lib/shinyAvatar'
 
 interface Props {
   onClose: () => void
@@ -14,6 +17,7 @@ export default function ProfileModal({ onClose }: Props) {
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? '')
   const [saving, setSaving] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -41,11 +45,7 @@ export default function ProfileModal({ onClose }: Props) {
 
         <form onSubmit={handleSave} className="px-6 py-6 space-y-5">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-[#16161f] border border-[#2e2e42] flex items-center justify-center overflow-hidden shrink-0">
-              {avatarUrl
-                ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                : <UserIcon className="w-7 h-7 text-slate-600" />}
-            </div>
+            <ShinyAvatar src={avatarUrl} size={64} />
             <div className="min-w-0">
               <div className="text-white font-black">{profile?.username}</div>
               <div className="text-slate-500 text-xs truncate">{user?.email}</div>
@@ -64,8 +64,11 @@ export default function ProfileModal({ onClose }: Props) {
           </div>
 
           <div>
-            <label className="text-slate-300 text-sm font-bold mb-2 block">Avatar-URL <span className="text-slate-600 font-normal">(optional)</span></label>
-            <input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://…" className="pk-input" />
+            <label className="text-slate-300 text-sm font-bold mb-2 block">Shiny-Avatar</label>
+            <button type="button" onClick={() => setPickerOpen(true)} className="btn-ghost flex items-center gap-2">
+              <Star className="w-4 h-4 text-pk-yellow" /> Shiny auswählen
+            </button>
+            <p className="text-slate-600 text-xs mt-1.5">Wähle ein Shiny-Pokémon als Avatar – er erscheint überall, wo du angezeigt wirst.</p>
           </div>
 
           <div className="flex gap-3 pt-1">
@@ -74,6 +77,13 @@ export default function ProfileModal({ onClose }: Props) {
           </div>
         </form>
       </div>
+      {pickerOpen && (
+        <ShinyAvatarPicker
+          currentId={avatarPokemonId(avatarUrl)}
+          onSelect={(url) => { setAvatarUrl(url); setPickerOpen(false) }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </div>
   )
 }

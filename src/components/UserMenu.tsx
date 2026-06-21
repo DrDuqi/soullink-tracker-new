@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronDown, User as UserIcon, LayoutGrid, Settings, LogOut } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import ProfileModal from './ProfileModal'
+import ShinyAvatar from './ShinyAvatar'
 
 export default function UserMenu() {
   const { profile, user, signOut } = useAuth()
@@ -52,11 +53,7 @@ export default function UserMenu() {
           className="flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl transition-all border"
           style={{ background: '#1c1c26', borderColor: '#2e2e42', color: '#e2e8f0' }}
         >
-          <span className="w-6 h-6 rounded-full bg-[#16161f] border border-[#2e2e42] flex items-center justify-center overflow-hidden shrink-0">
-            {profile?.avatar_url
-              ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-              : <UserIcon className="w-3.5 h-3.5 text-slate-400" />}
-          </span>
+          <ShinyAvatar src={profile?.avatar_url} size={26} />
           <span className="max-w-[120px] truncate">{name}</span>
           <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>

@@ -1,16 +1,18 @@
 import { Users, Crown } from 'lucide-react'
+import ShinyAvatar from './ShinyAvatar'
 import type { Player } from '../types/database'
 
 /** Run roster with online status. Renders maxPlayers slots (2 or 3); filled slots
- *  show the player + a green/grey dot, empty slots show "frei". */
+ *  show the player's shiny avatar + name + a green/grey dot, empty slots "frei". */
 export default function PlayersPanel({
-  players, maxPlayers, myPlayerId, ownerUserId, online,
+  players, maxPlayers, myPlayerId, ownerUserId, online, avatars,
 }: {
   players: Player[]
   maxPlayers: number
   myPlayerId: string
   ownerUserId?: string | null
   online: Set<string>
+  avatars?: Record<string, string | null>
 }) {
   const slots = Array.from({ length: Math.max(2, Math.min(3, maxPlayers)) }, (_, i) => i + 1)
 
@@ -34,6 +36,7 @@ export default function PlayersPanel({
               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: isOnline ? '#4ade80' : filled ? '#64748b' : '#3e3e52' }} title={isOnline ? 'Online' : 'Offline'} />
               {filled ? (
                 <>
+                  <ShinyAvatar src={p!.auth_user_id ? avatars?.[p!.auth_user_id] : null} size={24} />
                   <span className="text-sm font-bold truncate" style={{ color: isMe ? '#CC0000' : '#e2e8f0' }}>{p!.name}</span>
                   {isOwner && <Crown className="w-3 h-3 text-pk-yellow shrink-0" />}
                   {isMe && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-400 shrink-0">Du</span>}

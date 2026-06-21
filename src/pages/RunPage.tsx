@@ -15,6 +15,7 @@ import { useToastStore } from '../store/toastStore'
 import { supabase } from '../lib/supabase'
 import AddEncounterModal, { type EncounterPrefill } from '../components/AddEncounterModal'
 import { isLiveSynced } from '../lib/liveSync'
+import ShinyAvatar from '../components/ShinyAvatar'
 import SoulLinkModal from '../components/SoulLinkModal'
 import SoulLink3Modal from '../components/SoulLink3Modal'
 import EncounterCard from '../components/EncounterCard'
@@ -69,7 +70,7 @@ function SectionLabel({ label, sub, className = '' }: { label: string; sub?: str
 }
 
 function PlayerStatCard({
-  player, isMe, isActive, encounters, pairs, teamCount, onClick,
+  player, isMe, isActive, encounters, pairs, teamCount, onClick, avatarUrl,
 }: {
   player: Player | undefined
   isMe: boolean
@@ -78,6 +79,7 @@ function PlayerStatCard({
   pairs: SoulLinkPair[]
   teamCount: number
   onClick: () => void
+  avatarUrl?: string | null
 }) {
   const alive = encounters.filter((e) => e.status === 'alive').length
   const dead = encounters.filter((e) => e.status === 'dead').length
@@ -95,10 +97,7 @@ function PlayerStatCard({
       }}
     >
       <div className="flex items-start gap-2.5 mb-3">
-        <div
-          className="w-3 h-3 rounded-full shrink-0 mt-0.5 transition-all"
-          style={{ background: isActive ? accentColor : '#3e3e52', boxShadow: isActive ? `0 0 8px ${accentColor}` : 'none' }}
-        />
+        <ShinyAvatar src={avatarUrl} size={36} className="mt-0.5" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-white font-black text-base leading-tight truncate">{player?.name ?? '…'}</span>
@@ -223,6 +222,24 @@ export default function RunPage() {
 
   const myPlayer = players.find((p) => p.id === myPlayerId)
   const partnerPlayer = players.find((p) => p.id !== myPlayerId)
+
+  // Member shiny avatars (profiles by auth_user_id) for the roster + focus cards.
+  const [memberAvatars, setMemberAvatars] = useState<Record<string, string | null>>({})
+  const memberKey = players.map((p) => p.auth_user_id).filter(Boolean).sort().join(',')
+  useEffect(() => {
+    const ids = players.map((p) => p.auth_user_id).filter(Boolean) as string[]
+    if (ids.length === 0) { setMemberAvatars({}); return }
+    let cancelled = false
+    supabase.from('profiles').select('user_id, avatar_url').in('user_id', ids).then(({ data }) => {
+      if (cancelled || !data) return
+      const m: Record<string, string | null> = {}
+      for (const pr of data as { user_id: string; avatar_url: string | null }[]) m[pr.user_id] = pr.avatar_url
+      setMemberAvatars(m)
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberKey])
+  const avatarOf = (p?: Player) => (p?.auth_user_id ? memberAvatars[p.auth_user_id] : null)
 
   // Online-Status der Mitspieler (Supabase Realtime Presence) + Spieleranzahl des Runs.
   const onlinePlayers = usePresence(runId ?? null, myPlayer ? { playerId: myPlayer.id, name: myPlayer.name } : null)
@@ -733,6 +750,7 @@ export default function RunPage() {
                   encounters={myEncounters}
                   pairs={pairs}
                   teamCount={myTeamCount}
+                  avatarUrl={avatarOf(myPlayer)}
                   onClick={() => setFocusedPlayerId(myPlayerId ?? null)}
                 />
                 <PlayerStatCard
@@ -742,6 +760,7 @@ export default function RunPage() {
                   encounters={partnerEncounters}
                   pairs={pairs}
                   teamCount={partnerTeamCount}
+                  avatarUrl={avatarOf(partnerPlayer)}
                   onClick={() => setFocusedPlayerId(partnerPlayer?.id ?? null)}
                 />
               </div>
@@ -991,6 +1010,7 @@ export default function RunPage() {
                 myPlayerId={myPlayerId ?? ''}
                 ownerUserId={currentRun.owner_user_id}
                 online={onlinePlayers}
+                avatars={memberAvatars}
               />
 
               {/* Encounter checklist (3-Spieler: eigene N-Spieler-Variante) */}
