@@ -173,7 +173,7 @@ export default function SetupPage() {
             {/* 1 · Companion */}
             <StepCard n={1} done={installed && running} title="SoulLink Companion installieren & starten"
               desc="Eine kleine App auf deinem PC, die BizHawk für dich startet. Sie läuft unsichtbar im Hintergrund (Symbol unten rechts im System-Tray).">
-              <a href={DOWNLOADS.companion} target="_blank" rel="noreferrer" className={btnRed} style={{ background: '#CC0000' }}>
+              <a href={DOWNLOADS.companion} download className={btnRed} style={{ background: '#CC0000' }}>
                 <Download className="w-4 h-4" /> Companion herunterladen
               </a>
               <p className="text-slate-500 text-xs sm:ml-1">

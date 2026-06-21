@@ -13,11 +13,11 @@ import LocationMapManager from './LocationMapManager'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
 import { useCompanion } from '../hooks/useCompanion'
 import { USES_COMPANION, companionConfig, saveCompanionConfig } from '../lib/companion'
+import { DOWNLOADS } from '../lib/downloads'
 
 const ENABLED_KEY = 'soullink-emusync-enabled'
 const COLLAPSED_KEY = 'soullink-emusync-collapsed'
 const GAME_LABEL: Record<string, string> = { platinum: 'Platinum', heartgold: 'HeartGold', firered: 'FireRed', emerald: 'Emerald', black: 'Black' }
-const COMPANION_DOWNLOAD = 'https://github.com/DrDuqi/soullink-tracker-new/releases'
 // Chromium browsers (Chrome/Edge/Brave/Opera) allow the HTTPS→localhost
 // (Private Network Access) call to the Companion; Firefox/Safari may block it.
 const IS_CHROMIUM = typeof navigator !== 'undefined'
@@ -172,7 +172,7 @@ function CompanionBanner({ status, onRecheck }: { status: 'checking' | 'absent';
       </p>
       <ol className="text-slate-300 text-[12px] leading-relaxed list-decimal pl-5 space-y-1 mb-2.5">
         <li>
-          <a href={COMPANION_DOWNLOAD} target="_blank" rel="noreferrer" className="text-amber-300 font-semibold underline underline-offset-2">
+          <a href={DOWNLOADS.companion} download className="text-amber-300 font-semibold underline underline-offset-2">
             SoulLink Companion herunterladen &amp; installieren
           </a>
         </li>
