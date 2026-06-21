@@ -39,10 +39,11 @@
       "runAfterFinish": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "SoulLink Companion"
+      "shortcutName": "SoulLink Companion",
+      "artifactName": "SoulLink-Companion-Setup.${ext}"
     },
     "publish": [
-      { "provider": "github", "owner": "DrDuqi", "repo": "soullink-tracker-new" }
+      { "provider": "github", "owner": "DrDuqi", "repo": "soullink-tracker-new", "releaseType": "release" }
     ]
   }
 }

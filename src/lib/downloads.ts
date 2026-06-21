@@ -3,8 +3,11 @@
 // (always "latest" so the links never go stale).
 
 export const DOWNLOADS = {
-  // Always the newest Companion installer (GitHub Releases of this repo).
-  companion: 'https://github.com/DrDuqi/soullink-tracker-new/releases/latest',
+  // Direct download of the newest Companion installer. GitHub's /releases/latest/
+  // download/<asset> always serves the asset of that exact name from the latest
+  // published release — and the installer is built with a STABLE name
+  // (SoulLink-Companion-Setup.exe), so this link never has to change again.
+  companion: 'https://github.com/DrDuqi/soullink-tracker-new/releases/latest/download/SoulLink-Companion-Setup.exe',
   // Official BizHawk releases.
   bizhawk: 'https://github.com/TASEmulators/BizHawk/releases/latest',
   // Universal Pokémon Randomizer ZX (official).

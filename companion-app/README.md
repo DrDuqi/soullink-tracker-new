@@ -28,12 +28,15 @@ unter Windows das **Symlink-Recht** (Entwicklermodus oder Admin). CI-Runner habe
 das, ein normaler Shell-Build nicht.
 
 - **Actions-Tab → „Build SoulLink Companion" → Run workflow** → lädt den Installer
-  als Artefakt hoch.
-- **Tag `companion-v1.0.0` pushen** → baut **und** veröffentlicht ihn als GitHub
-  Release (Quelle für Auto-Updates).
+  als Artefakt hoch (kein Release).
+- **Version-Tag `vX.Y.Z` pushen** → baut **und** veröffentlicht ein öffentliches
+  GitHub Release mit angehängtem Installer (`SoulLink-Companion-Setup.exe`). Die
+  App-Version wird automatisch aus dem Tag übernommen. Das ist die Quelle für den
+  Website-Download (`releases/latest/download/…`) und die Auto-Updates.
 
 ```bash
-git tag companion-v1.0.0 && git push origin companion-v1.0.0
+git tag v1.0.0 && git push origin v1.0.0      # erstes Release
+git tag v1.0.1 && git push origin v1.0.1      # jedes weitere Release
 ```
 
 **Lokal bauen** (nur mit Symlink-Recht):
