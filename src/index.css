@@ -285,38 +285,49 @@ body {
 }
 .route-flash { animation: routeFlash 1.8s ease-out; border-radius: 22px; }
 
-/* ── AAA atmosphere background (visual layer only) ──── */
-.atmo-fog {
-  position: absolute; inset: -16%;
-  animation-name: pkFog; animation-timing-function: ease-in-out; animation-iteration-count: infinite;
-  will-change: transform;
-}
-.atmo-center {
-  position: absolute; top: 50%; left: 50%;
-  display: grid; place-items: center;
-  transform: translate(-50%, -50%) translate3d(calc(var(--mx,0) * var(--d,9) * 1px), calc(var(--my,0) * var(--d,9) * 1px), 0);
-  transition: transform .3s ease-out;
-}
-.atmo-ring {
-  position: absolute; border-radius: 50%;
-  border: 1px solid rgba(204,0,0,0.06);
-  animation-name: atmoSpin; animation-timing-function: linear; animation-iteration-count: infinite;
-  will-change: transform;
-}
-.atmo-ball { color: #aab0d8; opacity: 0.06; animation: atmoBallPulse 12s ease-in-out infinite; }
-.atmo-sil {
-  position: absolute;
-  transform: translate3d(calc(var(--mx,0) * var(--px,18px)), calc(var(--my,0) * var(--py,12px)), 0);
-  transition: transform .35s ease-out;
-  will-change: transform;
-}
-.atmo-sil-float { width: 100%; height: 100%; will-change: transform; }
-.atmo-sil-img { width: 100%; height: 100%; object-fit: contain; user-select: none; }
+/* ── AAA launcher atmosphere (pure CSS/SVG, GPU only) ── */
+.atmo-neb { position: absolute; will-change: transform; }
+.atmo-neb-r { inset: -25%; background: radial-gradient(36% 40% at 24% 82%, rgba(150,24,38,0.38), transparent 68%); animation: atmoNebA 64s ease-in-out infinite; }
+.atmo-neb-b { inset: -25%; background: radial-gradient(40% 42% at 80% 20%, rgba(28,66,176,0.38), transparent 68%); animation: atmoNebB 78s ease-in-out infinite; }
+.atmo-neb-c { inset: -25%; background: radial-gradient(30% 26% at 62% 64%, rgba(22,150,186,0.12), transparent 70%); animation: atmoNebA 96s ease-in-out infinite reverse; }
+.atmo-lines { position: absolute; inset: 0; width: 100%; height: 100%; animation: atmoLines 80s ease-in-out infinite; will-change: transform; }
+.atmo-core { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; }
+.atmo-ring { position: absolute; aspect-ratio: 1; border-radius: 50%; animation-name: atmoSpin; animation-timing-function: linear; animation-iteration-count: infinite; will-change: transform; }
+.atmo-ring svg { width: 100%; height: 100%; display: block; }
+.atmo-rev { animation-direction: reverse; }
+.atmo-ball { color: #b3bbe6; opacity: 0.05; animation: atmoSpin 120s linear infinite, atmoBallPulse 16s ease-in-out infinite; will-change: transform, opacity; }
+.atmo-stars { position: absolute; inset: -45%; pointer-events: none; will-change: transform; }
+.atmo-stars-1 { opacity: 0.5; background-size: 300px 300px; animation: atmoStar1 130s linear infinite;
+  background-image:
+    radial-gradient(1px 1px at 14% 24%, rgba(255,255,255,0.7), transparent 60%),
+    radial-gradient(1px 1px at 64% 14%, rgba(200,220,255,0.6), transparent 60%),
+    radial-gradient(1.3px 1.3px at 40% 70%, rgba(255,255,255,0.55), transparent 60%),
+    radial-gradient(1px 1px at 84% 54%, rgba(180,210,255,0.5), transparent 60%),
+    radial-gradient(1px 1px at 26% 88%, rgba(255,255,255,0.5), transparent 60%),
+    radial-gradient(1px 1px at 92% 84%, rgba(210,225,255,0.45), transparent 60%); }
+.atmo-stars-2 { opacity: 0.32; background-size: 460px 460px; animation: atmoStar2 210s linear infinite;
+  background-image:
+    radial-gradient(1px 1px at 8% 60%, rgba(255,255,255,0.6), transparent 60%),
+    radial-gradient(1px 1px at 48% 32%, rgba(190,215,255,0.5), transparent 60%),
+    radial-gradient(1.4px 1.4px at 76% 76%, rgba(255,255,255,0.5), transparent 60%),
+    radial-gradient(1px 1px at 30% 12%, rgba(200,220,255,0.45), transparent 60%); }
+.atmo-p { position: absolute; width: 2px; height: 2px; border-radius: 50%; background: rgba(150,200,235,0.55);
+  box-shadow: 0 0 6px 1px rgba(90,150,210,0.35); animation-name: atmoFloat; animation-timing-function: ease-in-out; animation-iteration-count: infinite; will-change: transform, opacity; }
+.atmo-flare { position: absolute; border-radius: 50%; will-change: opacity; }
+.atmo-flare-r { left: 13%; bottom: 20%; width: 6px; height: 6px; background: radial-gradient(circle, rgba(255,110,110,0.55), transparent 70%); box-shadow: 0 0 30px 6px rgba(210,40,40,0.16); animation: atmoFlare 10s ease-in-out infinite; }
+.atmo-flare-b { right: 14%; top: 18%; width: 6px; height: 6px; background: radial-gradient(circle, rgba(120,170,255,0.55), transparent 70%); box-shadow: 0 0 30px 6px rgba(40,90,210,0.16); animation: atmoFlare 13s ease-in-out infinite 2s; }
+.atmo-flare-c { left: 60%; top: 62%; width: 4px; height: 4px; background: radial-gradient(circle, rgba(120,225,235,0.45), transparent 70%); box-shadow: 0 0 22px 4px rgba(30,170,190,0.12); animation: atmoFlare 16s ease-in-out infinite 5s; }
 @keyframes atmoSpin { to { transform: rotate(360deg); } }
-@keyframes atmoBallPulse { 0%, 100% { opacity: .045; } 50% { opacity: .085; } }
+@keyframes atmoBallPulse { 0%, 100% { opacity: 0.04; } 50% { opacity: 0.075; } }
+@keyframes atmoNebA { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(3%,-2%) scale(1.06); } }
+@keyframes atmoNebB { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-3%,2%) scale(1.05); } }
+@keyframes atmoLines { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-1.5%); } }
+@keyframes atmoStar1 { from { transform: translateY(0); } to { transform: translateY(-300px); } }
+@keyframes atmoStar2 { from { transform: translateY(0); } to { transform: translateY(-460px); } }
+@keyframes atmoFloat { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 0.7; } 85% { opacity: 0.7; } 100% { transform: translateY(-120px); opacity: 0; } }
+@keyframes atmoFlare { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.7; } }
 @media (prefers-reduced-motion: reduce) {
-  .atmo-fog, .atmo-ring, .atmo-ball, .atmo-sil-float { animation: none !important; }
-  .atmo-center, .atmo-sil { transition: none; }
+  .atmo-neb, .atmo-lines, .atmo-ring, .atmo-ball, .atmo-stars, .atmo-p, .atmo-flare { animation: none !important; }
 }
 
 /* ── Glassmorphism + partner frame ─────────────────── */
