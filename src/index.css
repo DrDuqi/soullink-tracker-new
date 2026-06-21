@@ -17,7 +17,7 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: #111116;
+  background: #08080c;
   color: #e2e8f0;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -284,6 +284,40 @@ body {
   100% { box-shadow: 0 0 0 0 rgba(255,203,5,0); }
 }
 .route-flash { animation: routeFlash 1.8s ease-out; border-radius: 22px; }
+
+/* ── AAA atmosphere background (visual layer only) ──── */
+.atmo-fog {
+  position: absolute; inset: -16%;
+  animation-name: pkFog; animation-timing-function: ease-in-out; animation-iteration-count: infinite;
+  will-change: transform;
+}
+.atmo-center {
+  position: absolute; top: 50%; left: 50%;
+  display: grid; place-items: center;
+  transform: translate(-50%, -50%) translate3d(calc(var(--mx,0) * var(--d,9) * 1px), calc(var(--my,0) * var(--d,9) * 1px), 0);
+  transition: transform .3s ease-out;
+}
+.atmo-ring {
+  position: absolute; border-radius: 50%;
+  border: 1px solid rgba(204,0,0,0.06);
+  animation-name: atmoSpin; animation-timing-function: linear; animation-iteration-count: infinite;
+  will-change: transform;
+}
+.atmo-ball { color: #aab0d8; opacity: 0.06; animation: atmoBallPulse 12s ease-in-out infinite; }
+.atmo-sil {
+  position: absolute;
+  transform: translate3d(calc(var(--mx,0) * var(--px,18px)), calc(var(--my,0) * var(--py,12px)), 0);
+  transition: transform .35s ease-out;
+  will-change: transform;
+}
+.atmo-sil-float { width: 100%; height: 100%; will-change: transform; }
+.atmo-sil-img { width: 100%; height: 100%; object-fit: contain; user-select: none; }
+@keyframes atmoSpin { to { transform: rotate(360deg); } }
+@keyframes atmoBallPulse { 0%, 100% { opacity: .045; } 50% { opacity: .085; } }
+@media (prefers-reduced-motion: reduce) {
+  .atmo-fog, .atmo-ring, .atmo-ball, .atmo-sil-float { animation: none !important; }
+  .atmo-center, .atmo-sil { transition: none; }
+}
 
 /* ── Glassmorphism + partner frame ─────────────────── */
 .glass {

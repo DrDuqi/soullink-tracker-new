@@ -32,6 +32,7 @@ import SlotPickerModal from '../components/SlotPickerModal'
 import UserMenu from '../components/UserMenu'
 import EmulatorLivePanel from '../components/EmulatorLivePanel'
 import EmulatorReconciler from '../components/EmulatorReconciler'
+import AtmosphereBackground from '../components/AtmosphereBackground'
 import TeamOverview from '../components/TeamOverview'
 import ChangeEditionModal from '../components/ChangeEditionModal'
 import ChangeModeModal from '../components/ChangeModeModal'
@@ -42,39 +43,6 @@ import { usePresence } from '../hooks/usePresence'
 import { useCompanion } from '../hooks/useCompanion'
 import { useAuth } from '../contexts/AuthContext'
 import type { Encounter, Run, Player, SoulLinkPair, LinkRequest, ActivityLogEntry } from '../types/database'
-
-// ─── Background artworks (large, floating, glowing) ───────────────────────────
-interface BgArt {
-  id: number
-  pos: React.CSSProperties
-  size: number
-  op: number
-  acc: string
-  glow: number
-  dur: number
-  delay: number
-  alt: boolean
-}
-const BG_ARTWORKS: BgArt[] = [
-  { id: 6,   pos: { bottom: '-70px', left: '-120px' }, size: 500, op: 0.10, acc: 'rgba(204,0,0,0.55)',    glow: 70, dur: 11, delay: 0,   alt: false }, // Glurak
-  { id: 9,   pos: { bottom: '-80px', right: '-130px' }, size: 480, op: 0.09, acc: 'rgba(56,140,255,0.55)', glow: 70, dur: 13, delay: 2,   alt: true  }, // Turtok
-  { id: 384, pos: { top: '-90px',    right: '-50px' }, size: 420, op: 0.07, acc: 'rgba(74,222,128,0.5)',  glow: 60, dur: 16, delay: 1,   alt: false }, // Rayquaza
-  { id: 150, pos: { top: '-70px',    left: '-50px' }, size: 380, op: 0.08, acc: 'rgba(167,139,250,0.5)', glow: 60, dur: 14, delay: 3,   alt: true  }, // Mewtu
-  { id: 25,  pos: { top: '40%',      left: '1%' }, size: 180, op: 0.13, acc: 'rgba(255,203,5,0.6)',   glow: 50, dur: 9,  delay: 1.5, alt: false }, // Pikachu
-  { id: 94,  pos: { top: '44%',      right: '2%' }, size: 210, op: 0.10, acc: 'rgba(167,139,250,0.55)', glow: 52, dur: 12, delay: 4,   alt: true  }, // Gengar
-  { id: 249, pos: { bottom: '24%',   right: '-40px' }, size: 300, op: 0.06, acc: 'rgba(56,140,255,0.45)', glow: 55, dur: 17, delay: 5,   alt: false }, // Lugia
-  { id: 248, pos: { bottom: '-50px', left: '34%' }, size: 320, op: 0.06, acc: 'rgba(150,170,90,0.45)',  glow: 55, dur: 15, delay: 2.5, alt: true  }, // Despotar
-]
-
-const PARTICLE_COLORS = ['#CC0000', '#388cff', '#FFCB05']
-const BG_PARTICLES = Array.from({ length: 14 }, (_, i) => ({
-  left: `${(i * 7.3 + 4) % 96}%`,
-  size: 14 + ((i * 13) % 22),
-  dur: 13 + ((i * 5) % 12),
-  delay: (i * 1.7) % 14,
-  op: 0.22 + ((i * 17) % 28) / 100,
-  color: PARTICLE_COLORS[i % 3],
-}))
 
 // ─── Small shared helpers ─────────────────────────────────────────────────────
 function PokeBall({ className = '' }: { className?: string }) {
@@ -638,77 +606,8 @@ export default function RunPage() {
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* ══ Fixed Pokémon atmosphere background ════════════════════════════ */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        {/* Colour / light accents (red · blue · gold) */}
-        <div className="absolute inset-0" style={{
-          background: [
-            'radial-gradient(ellipse at 10% 88%, rgba(204,0,0,0.12) 0%, transparent 45%)',
-            'radial-gradient(ellipse at 90% 12%, rgba(56,140,255,0.10) 0%, transparent 42%)',
-            'radial-gradient(ellipse at 85% 85%, rgba(255,203,5,0.07) 0%, transparent 40%)',
-            'radial-gradient(ellipse at 50% 50%, rgba(10,10,22,0.45) 0%, transparent 72%)',
-          ].join(', '),
-        }} />
-
-        {/* Pokéball tile */}
-        <div className="absolute inset-0 pokeball-bg" style={{ opacity: 0.28 }} />
-
-        {/* Drifting fog layers */}
-        <div className="absolute" style={{ inset: '-12%', background: 'radial-gradient(ellipse at 30% 40%, rgba(120,140,255,0.05), transparent 60%)', animation: 'pkFog 26s ease-in-out infinite' }} />
-        <div className="absolute" style={{ inset: '-12%', background: 'radial-gradient(ellipse at 70% 60%, rgba(204,0,0,0.05), transparent 60%)', animation: 'pkFog 34s ease-in-out infinite reverse' }} />
-
-        {/* Large floating artworks with glow */}
-        {BG_ARTWORKS.map((p) => (
-          <div
-            key={p.id}
-            className="absolute"
-            style={{ ...p.pos, width: p.size, height: p.size, animation: `${p.alt ? 'pkArtFloatAlt' : 'pkArtFloat'} ${p.dur}s ease-in-out ${p.delay}s infinite` }}
-          >
-            {/* glow halo */}
-            <div
-              className="absolute rounded-full"
-              style={{
-                inset: '-8%',
-                background: `radial-gradient(circle, ${p.acc} 0%, transparent 68%)`,
-                filter: `blur(${p.glow * 0.4}px)`,
-                animation: `pkGlowPulse ${p.dur * 0.8}s ease-in-out ${p.delay}s infinite`,
-              }}
-            />
-            <img
-              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${p.id}.png`}
-              alt=""
-              className="absolute inset-0 w-full h-full object-contain select-none"
-              style={{
-                filter: `drop-shadow(0 0 ${p.glow}px ${p.acc}) saturate(0.85)`,
-                animation: `pkArtPulse ${p.dur * 0.7}s ease-in-out ${p.delay}s infinite`,
-                ['--pk-op' as string]: p.op,
-              } as React.CSSProperties}
-            />
-          </div>
-        ))}
-
-        {/* Rising pokéball particles */}
-        {BG_PARTICLES.map((p, i) => (
-          <div
-            key={i}
-            className="absolute"
-            style={{
-              left: p.left,
-              bottom: '-50px',
-              width: p.size,
-              height: p.size,
-              color: p.color,
-              animation: `pkParticle ${p.dur}s linear ${p.delay}s infinite`,
-              ['--pk-pop' as string]: p.op,
-            } as React.CSSProperties}
-          >
-            <PokeBall className="w-full h-full" />
-          </div>
-        ))}
-
-        {/* Vignette to keep content readable */}
-        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 45%, transparent 40%, rgba(0,0,0,0.64) 100%)' }} />
-      </div>
+      {/* ══ Fixed AAA atmosphere background (visual layer only — z-0) ═══════ */}
+      <AtmosphereBackground />
 
       {/* ══ App shell ═════════════════════════════════════════════════════ */}
       <div className="relative z-10 min-h-screen flex flex-col">

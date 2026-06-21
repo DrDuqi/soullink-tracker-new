@@ -13,6 +13,7 @@ import { GAME_LIST } from '../lib/routes'
 import { setRunMode, type RunMode } from '../lib/runMode'
 import UserMenu from '../components/UserMenu'
 import RunModeCards from '../components/RunModeCards'
+import AtmosphereBackground from '../components/AtmosphereBackground'
 import type { Run, Player } from '../types/database'
 
 function PokeBall({ className = '' }: { className?: string }) {
@@ -27,27 +28,10 @@ function PokeBall({ className = '' }: { className?: string }) {
   )
 }
 
-const DECO_POKEMON = [
-  { id: 6,   side: 'left',  bottom: '0',   size: 240, opacity: 0.18 },
-  { id: 9,   side: 'right', bottom: '0',   size: 220, opacity: 0.16 },
-  { id: 25,  side: 'left',  bottom: '55%', size: 140, opacity: 0.12 },
-  { id: 150, side: 'right', bottom: '52%', size: 180, opacity: 0.10 },
-]
-
 function Shell({ children, showMenu }: { children: React.ReactNode; showMenu?: boolean }) {
   return (
-    <div className="relative min-h-screen pokeball-bg overflow-hidden flex flex-col">
-      {DECO_POKEMON.map((d) => (
-        <img
-          key={d.id}
-          src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${d.id}.png`}
-          alt="" aria-hidden="true"
-          className="absolute pointer-events-none select-none hidden lg:block"
-          style={{ [d.side]: '-20px', bottom: d.bottom, width: d.size, height: d.size, opacity: d.opacity, filter: 'drop-shadow(0 0 40px rgba(204,0,0,0.2))', objectFit: 'contain' }}
-        />
-      ))}
-      <div className="absolute top-[-80px] right-[-80px] w-[320px] h-[320px] rounded-full border-[40px] border-pk-red/8 pointer-events-none hidden lg:block" />
-      <div className="absolute bottom-[-60px] left-[-60px] w-[280px] h-[280px] rounded-full border-[35px] border-pk-red/6 pointer-events-none hidden lg:block" />
+    <div className="relative min-h-screen overflow-hidden flex flex-col">
+      <AtmosphereBackground />
 
       {/* z-50 so the user-menu dropdown always sits above the page content below */}
       <header className="relative z-50 border-b border-white/5 bg-pk-red/5 backdrop-blur-sm">
