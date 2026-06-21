@@ -14,6 +14,7 @@ import { usePendingRequests, useRequests, useCreateRequest } from '../hooks/useR
 import { useToastStore } from '../store/toastStore'
 import { supabase } from '../lib/supabase'
 import AddEncounterModal, { type EncounterPrefill } from '../components/AddEncounterModal'
+import { isLiveSynced } from '../lib/liveSync'
 import SoulLinkModal from '../components/SoulLinkModal'
 import SoulLink3Modal from '../components/SoulLink3Modal'
 import EncounterCard from '../components/EncounterCard'
@@ -587,6 +588,7 @@ export default function RunPage() {
           teamEligible={elig.eligible}
           teamBlockReason={elig.reason}
           editionGame={currentRun?.game}
+          statusAutoManaged={liveSyncMode && isLiveSynced(enc)}
           onClick={() => setSelectedEncounter(enc)}
           draggable={false}
           onAddToTeam={isEditable && enc.status !== 'dead' ? () => handleAddToTeam(enc) : undefined}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Skull, Heart, Box, HelpCircle, Trash2, ChevronDown, Link2, Eye, Star, Plus, Lock, AlertTriangle } from 'lucide-react'
+import { Skull, Heart, Box, HelpCircle, Trash2, ChevronDown, Link2, Eye, Star, Plus, Lock, AlertTriangle, Zap } from 'lucide-react'
 import { getSpriteUrl, getTypeColor } from '../lib/pokemon-api'
 import { routeMismatchesEdition } from '../lib/routes'
 import { useUpdateEncounterStatus, useDeleteEncounter } from '../hooks/useEncounters'
@@ -29,6 +29,10 @@ interface Props {
   teamBlockReason?: string
   /** Current run edition — when set, routes of a different edition get a warning badge. */
   editionGame?: string
+  /** Live-sync: this Pokémon's state (alive/HP/box) is read from the emulator →
+   *  the manual status dropdown is replaced by a read-only badge + hint. Death /
+   *  revive stay available for LINKED Pokémon (they are SoulLink requests). */
+  statusAutoManaged?: boolean
   // Callbacks
   onAddToTeam?: () => void
   onDeathRequest?: () => void
@@ -38,7 +42,7 @@ interface Props {
 
 export default function EncounterCard({
   encounter, isLinked, isInTeam, compact, onClick, draggable,
-  isMyEncounter = true, linkedInfo, teamEligible = true, teamBlockReason, editionGame,
+  isMyEncounter = true, linkedInfo, teamEligible = true, teamBlockReason, editionGame, statusAutoManaged,
   onAddToTeam, onDeathRequest, onReviveRequest, onNavigateToPairs,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -239,7 +243,33 @@ export default function EncounterCard({
 
         {/* Status + badges row */}
         <div className="flex items-center gap-2 mt-4 flex-wrap">
-          {isMyEncounter ? (
+          {!isMyEncounter || statusAutoManaged ? (
+            <>
+              {/* Read-only status badge (partner's card, or live-sync auto-managed) */}
+              <span className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-bold"
+                style={{ color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}` }}
+                title={statusAutoManaged ? 'Status wird im Live-Sync automatisch vom Emulator verwaltet' : undefined}>
+                {cfg.icon} {cfg.label}
+              </span>
+              {/* Death / revive stay available for LINKED Pokémon — these are SoulLink requests */}
+              {statusAutoManaged && isLinked && !isDead && onDeathRequest && (
+                <button onClick={(e) => { e.stopPropagation(); onDeathRequest() }}
+                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all hover:opacity-80"
+                  style={{ color: '#f87171', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)' }}
+                  title="Als besiegt melden – löst die SoulLink-Anfrage aus">
+                  <Skull className="w-3 h-3" /> Besiegt melden
+                </button>
+              )}
+              {statusAutoManaged && isLinked && isDead && onReviveRequest && (
+                <button onClick={(e) => { e.stopPropagation(); onReviveRequest() }}
+                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all hover:opacity-80"
+                  style={{ color: '#4ade80', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)' }}
+                  title="Wiederbeleben – löst die SoulLink-Anfrage aus">
+                  <Heart className="w-3 h-3" /> Wiederbeleben
+                </button>
+              )}
+            </>
+          ) : (
             <div className="relative">
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
@@ -263,11 +293,6 @@ export default function EncounterCard({
                 </div>
               )}
             </div>
-          ) : (
-            <span className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-bold"
-              style={{ color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}` }}>
-              {cfg.icon} {cfg.label}
-            </span>
           )}
 
           {isLinked && !linkedInfo && (
@@ -298,6 +323,13 @@ export default function EncounterCard({
             <span className="text-slate-600 text-xs font-mono ml-auto">#{String(encounter.pokemon_id).padStart(3, '0')}</span>
           )}
         </div>
+
+        {isMyEncounter && statusAutoManaged && (
+          <div className="flex items-center gap-1.5 mt-2.5 text-[10px] text-slate-500">
+            <Zap className="w-3 h-3 shrink-0" style={{ color: 'rgba(255,203,5,0.7)' }} />
+            Status wird im Live-Sync automatisch vom Emulator verwaltet.
+          </div>
+        )}
       </div>
 
       {confirmDelete && (
