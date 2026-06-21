@@ -133,6 +133,29 @@ body {
 .anim-link-glow { animation: linkGlow 1.5s ease infinite; }
 .anim-toast     { animation: toastSlide 0.4s cubic-bezier(.16,1,.3,1) both; }
 
+/* ── Shiny avatar picker ───────────────────────────── */
+.shiny-tile {
+  transition: transform 0.18s cubic-bezier(.34,1.56,.64,1), box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  will-change: transform;
+}
+.shiny-tile:hover {
+  transform: translateY(-4px) scale(1.07);
+  border-color: rgba(255,203,5,0.45) !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.45), 0 0 22px rgba(255,203,5,0.22);
+  background: #1f1f2b !important;
+  z-index: 2;
+}
+.shiny-tile:active { transform: translateY(-2px) scale(1.03); }
+/* Modern, soft scrollbar for the gallery (overrides the slim global one). */
+.shiny-scroll { scrollbar-width: thin; scrollbar-color: #3a3a52 transparent; }
+.shiny-scroll::-webkit-scrollbar { width: 12px; }
+.shiny-scroll::-webkit-scrollbar-track { background: transparent; }
+.shiny-scroll::-webkit-scrollbar-thumb {
+  background: #33334a; border-radius: 10px;
+  border: 3px solid transparent; background-clip: padding-box;
+}
+.shiny-scroll::-webkit-scrollbar-thumb:hover { background: #45456a; background-clip: padding-box; }
+
 /* ── Stagger delays ────────────────────────────────── */
 .delay-1 { animation-delay: 0.05s; }
 .delay-2 { animation-delay: 0.10s; }
