@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Swords, Users, Zap, Shuffle, LogIn, UserPlus, ArrowRight, Link2, Clock,
-  Eye, EyeOff, MoreVertical, Crown, Trash2, LogOut, X,
+  Swords, Users, Zap, Shuffle, ArrowRight, Link2, Clock,
+  MoreVertical, Crown, Trash2, LogOut, X,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -14,6 +14,7 @@ import { setRunMode, type RunMode } from '../lib/runMode'
 import UserMenu from '../components/UserMenu'
 import RunModeCards from '../components/RunModeCards'
 import AtmosphereBackground from '../components/AtmosphereBackground'
+import LandingPage from './LandingPage'
 import type { Run, Player } from '../types/database'
 
 function PokeBall({ className = '' }: { className?: string }) {
@@ -53,144 +54,6 @@ function Shell({ children, showMenu }: { children: React.ReactNode; showMenu?: b
 
       <main className="relative z-10 flex-1 flex flex-col items-center px-4 py-12">{children}</main>
     </div>
-  )
-}
-
-// ─── Password field with show/hide toggle ─────────────────────────────────────
-function PasswordField({
-  value, onChange, placeholder, autoComplete, minLength,
-}: {
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  autoComplete?: string
-  minLength?: number
-}) {
-  const [show, setShow] = useState(false)
-  return (
-    <div className="relative">
-      <input
-        type={show ? 'text' : 'password'}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="pk-input pr-11"
-        required
-        minLength={minLength}
-        autoComplete={autoComplete}
-      />
-      <button
-        type="button"
-        tabIndex={-1}
-        onClick={() => setShow((s) => !s)}
-        aria-label={show ? 'Passwort verbergen' : 'Passwort anzeigen'}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-      >
-        {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-      </button>
-    </div>
-  )
-}
-
-// ─── Logged-out: Login / Register ─────────────────────────────────────────────
-function AuthView() {
-  const { signIn, signUp, signInWithGoogle } = useAuth()
-  const [tab, setTab] = useState<'login' | 'register'>('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [username, setUsername] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true); setError('')
-    const { error } = await signIn(email, password)
-    setLoading(false); if (error) setError(error)
-  }
-  async function handleRegister(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true); setError('')
-    const { error } = await signUp(email, password, username)
-    setLoading(false); if (error) setError(error)
-  }
-  async function handleGoogle() {
-    setError('')
-    const { error } = await signInWithGoogle()
-    if (error) setError(error)
-  }
-
-  return (
-    <>
-      <div className="text-center mb-10 anim-fade-up">
-        <div className="flex items-center justify-center gap-3 mb-5">
-          <PokeBall className="w-12 h-12 text-pk-red" />
-          <h1 className="text-5xl md:text-6xl font-black text-white tracking-tight leading-none">Soul<span className="text-pk-red">Link</span></h1>
-          <PokeBall className="w-12 h-12 text-pk-red" />
-        </div>
-        <p className="text-slate-400 text-xl font-medium">Gemeinsam überleben. Gemeinsam sterben.</p>
-        <p className="text-slate-600 text-sm mt-2">Melde dich an, um Runs zu erstellen und beizutreten.</p>
-      </div>
-
-      <div className="w-full max-w-md anim-fade-up delay-2">
-        <div className="flex bg-[#1c1c26] border border-[#2e2e42] rounded-2xl p-1.5 mb-5">
-          <button type="button" onClick={() => { setTab('login'); setError('') }}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all"
-            style={tab === 'login' ? { background: '#CC0000', color: 'white' } : { color: '#94a3b8' }}>
-            <LogIn className="w-4 h-4" /> Anmelden
-          </button>
-          <button type="button" onClick={() => { setTab('register'); setError('') }}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all"
-            style={tab === 'register' ? { background: '#CC0000', color: 'white' } : { color: '#94a3b8' }}>
-            <UserPlus className="w-4 h-4" /> Registrieren
-          </button>
-        </div>
-
-        {error && <div className="bg-red-950/60 border border-red-800 text-red-400 rounded-xl p-4 mb-5 text-sm font-medium">{error}</div>}
-
-        {tab === 'login' ? (
-          <form onSubmit={handleLogin} className="pk-card p-7 space-y-5">
-            <div>
-              <label className="text-slate-300 text-sm font-bold mb-2 block">E-Mail</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="du@beispiel.de" className="pk-input" required autoComplete="email" />
-            </div>
-            <div>
-              <label className="text-slate-300 text-sm font-bold mb-2 block">Passwort</label>
-              <PasswordField value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" />
-            </div>
-            <button type="submit" disabled={loading} className="btn-primary w-full text-base py-4">{loading ? 'Anmelden…' : '⚡ Anmelden'}</button>
-            <GoogleButton onClick={handleGoogle} />
-          </form>
-        ) : (
-          <form onSubmit={handleRegister} className="pk-card p-7 space-y-5">
-            <div>
-              <label className="text-slate-300 text-sm font-bold mb-2 block">Benutzername</label>
-              <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="z. B. Valon" className="pk-input" required minLength={3} />
-              <p className="text-slate-600 text-xs mt-1.5">Eindeutig · wird automatisch als dein Spielername verwendet.</p>
-            </div>
-            <div>
-              <label className="text-slate-300 text-sm font-bold mb-2 block">E-Mail</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="du@beispiel.de" className="pk-input" required autoComplete="email" />
-            </div>
-            <div>
-              <label className="text-slate-300 text-sm font-bold mb-2 block">Passwort</label>
-              <PasswordField value={password} onChange={setPassword} placeholder="Mind. 6 Zeichen" autoComplete="new-password" minLength={6} />
-            </div>
-            <button type="submit" disabled={loading} className="btn-primary w-full text-base py-4">{loading ? 'Konto wird erstellt…' : '🔥 Konto erstellen'}</button>
-            <GoogleButton onClick={handleGoogle} />
-          </form>
-        )}
-      </div>
-    </>
-  )
-}
-
-function GoogleButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick}
-      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border border-[#2e2e42] text-slate-300 hover:bg-white/5 transition-colors"
-      title="Erfordert aktivierten Google-Provider in Supabase">
-      <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="#fff" d="M12 11v2.8h3.9c-.2 1-1.3 2.9-3.9 2.9-2.3 0-4.2-1.9-4.2-4.3S9.7 7.8 12 7.8c1.3 0 2.2.6 2.7 1.1l1.8-1.8C15.4 6 13.9 5.3 12 5.3 8.3 5.3 5.3 8.3 5.3 12s3 6.7 6.7 6.7c3.9 0 6.4-2.7 6.4-6.6 0-.4 0-.8-.1-1.1H12z"/></svg>
-      Mit Google fortfahren
-    </button>
   )
 }
 
@@ -551,5 +414,6 @@ export default function HomePage() {
       </div>
     )
   }
-  return <Shell showMenu={!!user}>{user ? <Dashboard /> : <AuthView />}</Shell>
+  if (!user) return <LandingPage />
+  return <Shell showMenu><Dashboard /></Shell>
 }
