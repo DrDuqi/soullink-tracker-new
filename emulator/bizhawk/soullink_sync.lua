@@ -34,13 +34,20 @@ local CONFIG = {
   -- die BizHawk-Konsole (Lua Console). Damit lässt sich der Zeichensatz exakt
   -- prüfen/fixen. Aktivieren → Script neu laden → Zeile + echten Namen melden.
   debug           = false,
-  -- PERF/DEBUG: misst pro Sekunde Lua-Durchlaufzeiten (buildJson vs. Datei-Write),
-  -- Reads & Emits in die Lua-Console. Standard AUS (keine Verhaltensänderung).
+  -- PERF/DEBUG: misst pro Sekunde Lua-Durchlaufzeiten, Reads, Writes & FPS in die
+  -- Lua-Console. Standard AUS (keine Verhaltensänderung).
   perf            = false,
+  -- DIAGNOSE-Testmodus (zur Eingrenzung des Ruckelns), aktiviert automatisch perf:
+  --   0 = aus (normal)
+  --   1 = liest das Team, schreibt aber NICHTS (Variante 2: Datei-Write komplett aus)
+  --   2 = schreibt höchstens alle 5 s (Variante 3: minimaler Sync)
+  test_mode       = 0,
 }
 
--- Messzähler für den Performance-Modus (nur aktiv bei CONFIG.perf).
+-- Messzähler für Performance-/Testmodus.
 local PERF = { reads = 0, emits = 0, writes = 0, build_s = 0, build_max = 0, write_s = 0, write_max = 0, t0 = os.clock() }
+-- Mess-/Logausgabe an, sobald perf ODER ein Testmodus aktiv ist.
+local PERF_ON = CONFIG.perf or (CONFIG.test_mode or 0) > 0
 
 -- Gen-4 Block-Reihenfolge (Permutation per ((PID>>13)&0x1F)%24)
 local ORDERS = {
@@ -113,7 +120,7 @@ end
 local function readArray(addr, len)
   local arr
   local ok = pcall(function() arr = memory.read_bytes_as_array(addr, len) end)
-  if CONFIG.perf then PERF.reads = PERF.reads + 1 end
+  if PERF_ON then PERF.reads = PERF.reads + 1 end
   if not ok or type(arr) ~= "table" then return nil, 0 end
   local bi = (arr[0] ~= nil) and 0 or 1
   return arr, bi
@@ -717,17 +724,19 @@ local SLOW_WRITE_MS = 50         -- ab hier gilt ein Write als zu langsam → Hi
 -- ignoriert), atomar, debounced und mit Dauer-Messung. Im Stillstand entsteht so
 -- KEIN Datei-I/O mehr → kein Emulator-Ruckeln durch Defender/Indexer/Cloud-Hooks.
 local function emit(json)
+  if CONFIG.test_mode == 1 then return end             -- Variante 2: gar nicht schreiben (nur Reads laufen)
   local sig = json:gsub('"capturedAt":%-?%d+', '')     -- volatilen Zeitstempel ausblenden
   if sig == _lastSig then return end                    -- nichts geändert → NICHT schreiben
   local now = os.clock()
-  if (now - _lastWriteAt) < MIN_WRITE_INTERVAL then return end   -- Debounce (nächster Emit holt es nach)
+  local minIv = (CONFIG.test_mode == 2) and 5.0 or MIN_WRITE_INTERVAL   -- Variante 3: höchstens alle 5 s
+  if (now - _lastWriteAt) < minIv then return end       -- Debounce (nächster Emit holt es nach)
   _lastSig = sig
   _lastWriteAt = now
 
   local t0 = os.clock()
   atomicWrite(OUT_FILE, json)
   local ms = (os.clock() - t0) * 1000
-  if CONFIG.perf then
+  if PERF_ON then
     PERF.writes = PERF.writes + 1
     PERF.write_s = PERF.write_s + ms
     if ms > PERF.write_max then PERF.write_max = ms end
@@ -779,12 +788,15 @@ local function stepOnce(frame)
   pcall(function() memory.usememorydomain(profile.domain) end)
   if CONFIG.find_location then lfStep() end                  -- Kalibrierhilfe (nur Lesen + Log)
   if frame % CONFIG.interval_frames == 0 then logLocationChange() end
-  -- PERF: einmal pro ~Sekunde die Messwerte ausgeben + Fenster zurücksetzen.
-  if CONFIG.perf and frame > 0 and frame % 60 == 0 then
+  -- PERF: alle 60 Frames die Messwerte ausgeben + Fenster zurücksetzen. Da der
+  -- Report FRAME-getaktet ist, ist FPS = 60/dt die ECHTE Emulationsgeschwindigkeit
+  -- (Lua-Last + Emulation zusammen). 60 = flüssig, deutlich darunter = Ruckeln.
+  if PERF_ON and frame > 0 and frame % 60 == 0 then
     local dt = os.clock() - PERF.t0
+    local fps = dt > 0 and (60 / dt) or 0
     console.log(string.format(
-      "[perf] %.2fs · Emits=%d · Writes=%d (uebersprungen=%d) · Reads=%d · buildJson O%.1f/max%.1f ms · Datei-Write O%.1f/max%.1f ms · Ziel=%s",
-      dt, PERF.emits, PERF.writes, PERF.emits - PERF.writes, PERF.reads,
+      "[perf] FPS~%.0f · Mode=%d · Writes=%d (uebersprungen=%d) · Reads=%d · buildJson O%.1f/max%.1f ms · Datei-Write O%.1f/max%.1f ms · Ziel=%s",
+      fps, CONFIG.test_mode or 0, PERF.writes, PERF.emits - PERF.writes, PERF.reads,
       PERF.emits > 0 and PERF.build_s / PERF.emits or 0, PERF.build_max,
       PERF.writes > 0 and PERF.write_s / PERF.writes or 0, PERF.write_max, OUT_FILE))
     PERF.reads, PERF.emits, PERF.writes, PERF.build_s, PERF.build_max, PERF.write_s, PERF.write_max, PERF.t0 = 0, 0, 0, 0, 0, 0, 0, os.clock()
@@ -801,7 +813,7 @@ local function stepOnce(frame)
       local count = safeU32(profile.party_addr - 4)
       if readMon(profile, 0) then
         if count and count >= 1 and count <= 6 then profile.team_size = count end
-        if CONFIG.perf then
+        if PERF_ON then
           local t1 = os.clock(); local json = buildJson(profile); local t2 = os.clock()
           PERF.emits = PERF.emits + 1
           local b = (t2 - t1) * 1000
