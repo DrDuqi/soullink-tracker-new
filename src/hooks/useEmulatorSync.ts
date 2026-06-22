@@ -24,6 +24,22 @@ const POLL_MS = 1200
 const FRESH_MS = 6000
 const FAIL_LIMIT = 3
 
+// Guard against transient garbage reads from the emulator (e.g. during battle or
+// save-block switches): a single bad frame must never flip team/box membership or
+// show impossible HP like 4223/4223. We reject the whole frame and keep the last
+// good team — legitimate changes still arrive on the next clean frame.
+function plausibleMon(m: EmulatorMon): boolean {
+  return (
+    Number.isFinite(m.level) && m.level >= 1 && m.level <= 100 &&
+    Number.isFinite(m.maxHp) && m.maxHp >= 1 && m.maxHp <= 1000 &&
+    Number.isFinite(m.hp) && m.hp >= 0 && m.hp <= m.maxHp &&
+    Number.isFinite(m.speciesId) && m.speciesId >= 1 && m.speciesId <= 1025
+  )
+}
+function plausibleFrame(team: EmulatorMon[]): boolean {
+  return Array.isArray(team) && team.length >= 1 && team.length <= 6 && team.every(plausibleMon)
+}
+
 /** Polls the local sync endpoint. State only changes on real changes (no flicker);
  *  an isolated 1s ticker refreshes the "last update Xs ago" display. */
 export function useEmulatorSync(enabled = true): EmulatorSyncState {
@@ -37,6 +53,7 @@ export function useEmulatorSync(enabled = true): EmulatorSyncState {
 
   const lastAt = useRef<number | null>(null)
   const lastTeamText = useRef<string | null>(null)
+  const goodLen = useRef(0)
   const fails = useRef(0)
 
   useEffect(() => {
@@ -59,12 +76,17 @@ export function useEmulatorSync(enabled = true): EmulatorSyncState {
         setCurLocName(data.currentLocationName ?? null)
         setCurLocId(data.currentLocationId ?? null)
 
-        const text = JSON.stringify(data.team ?? [])
-        if (text !== lastTeamText.current) { lastTeamText.current = text; setTeam(data.team ?? []) }
+        // Only accept clean frames. A garbage/partial frame is ignored so the
+        // last good team stays put (no team↔box flip, no impossible HP).
+        const rawTeam = data.team ?? []
+        if (plausibleFrame(rawTeam)) {
+          goodLen.current = rawTeam.length
+          const text = JSON.stringify(rawTeam)
+          if (text !== lastTeamText.current) { lastTeamText.current = text; setTeam(rawTeam) }
+        }
 
         const fresh = Date.now() - env.last.at < FRESH_MS
-        const hasMons = (data.team?.length ?? 0) > 0
-        setPhase(fresh && hasMons ? 'connected' : 'waiting')
+        setPhase(fresh && goodLen.current > 0 ? 'connected' : 'waiting')
       } catch {
         if (cancelled) return
         fails.current += 1

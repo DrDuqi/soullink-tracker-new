@@ -57,7 +57,10 @@ export function useStoryProgress(runGame: string | null): StoryProgress {
   const locationName = useEmuTeamStore((s) => s.currentLocationName)
   const locationId = useEmuTeamStore((s) => s.currentLocationId)
   const connected = useEmuTeamStore((s) => s.connected)
-  const team = useEmuTeamStore((s) => s.team)
+  // Derive a primitive (avg level) so the guide only re-renders when it actually
+  // changes — NOT on every in-battle HP tick that mutates the team array.
+  const teamAvgLevel = useEmuTeamStore((s) =>
+    s.team.length ? Math.round(s.team.reduce((a, m) => a + (m.level || 0), 0) / s.team.length) : null)
 
   const story = useMemo(() => getStory(emuGame) ?? getStory(runGame), [emuGame, runGame])
   // Prefer the name the Lua sends; fall back to the app's learned id → route map.
@@ -72,7 +75,6 @@ export function useStoryProgress(runGame: string | null): StoryProgress {
   useEffect(() => { if (detectedIndex != null) setViewed(null) }, [detectedIndex])
 
   const activeIndex = viewed ?? detectedIndex ?? 0
-  const teamAvgLevel = team.length ? Math.round(team.reduce((a, m) => a + (m.level || 0), 0) / team.length) : null
 
   return {
     story, activeIndex, detectedIndex, locationName: effectiveLocation, connected, teamAvgLevel,

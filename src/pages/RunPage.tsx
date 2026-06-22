@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Plus, Link2, Copy, Check, ArrowLeft, Heart, Skull,
@@ -223,6 +223,16 @@ export default function RunPage() {
 
   const myPlayer = players.find((p) => p.id === myPlayerId)
   const partnerPlayer = players.find((p) => p.id !== myPlayerId)
+
+  // Route names where I already have a (non-missing) encounter — for the Story
+  // Guide's read-only "Encounter gefangen?" check. Memoized so the guide doesn't
+  // re-render on unrelated RunPage updates.
+  const storyCaughtLocations = useMemo(
+    () => new Set((encounters as Encounter[])
+      .filter((e) => e.player_id === myPlayerId && e.status !== 'missing')
+      .map((e) => e.location.toLowerCase().trim())),
+    [encounters, myPlayerId],
+  )
 
   // Member shiny avatars (profiles by auth_user_id) for the roster + focus cards.
   const [memberAvatars, setMemberAvatars] = useState<Record<string, string | null>>({})
@@ -934,12 +944,7 @@ export default function RunPage() {
 
                 {/* STORY GUIDE view */}
                 {mainView === 'story' && (
-                  <StoryGuide
-                    runGame={currentRun?.game ?? null}
-                    caughtLocations={new Set((encounters as Encounter[])
-                      .filter((e) => e.player_id === myPlayerId && e.status !== 'missing')
-                      .map((e) => e.location.toLowerCase().trim()))}
-                  />
+                  <StoryGuide runGame={currentRun?.game ?? null} caughtLocations={storyCaughtLocations} />
                 )}
 
                 {/* PAIRS view */}
