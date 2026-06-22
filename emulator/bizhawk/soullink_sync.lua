@@ -414,6 +414,8 @@ local function retryDelay(fails)
   return math.floor(math.min(1800, 120 * 2 ^ math.min(math.max(fails, 1) - 1, 4)))
 end
 
+local saveCachedAddr   -- Persistenter Party-Cache (erst NACH OUT_FILE definiert)
+
 local function detectStart(profile)
   DET.running = true; DET.base = 0; DET.found = {}
   profile.party_addr = nil; profile.team_size = nil
@@ -428,27 +430,34 @@ local function detectStart(profile)
   end
 end
 
--- Liest einen Chunk und prüft jeden 4-Byte-Offset. Gibt true zurück wenn fertig.
--- Wirft NIE: bei fehlgeschlagenem Read wird der Chunk übersprungen.
+-- Inkrementeller, ZEIT-BUDGETIERTER Scan: pro Frame wird nur so viel gescannt, wie
+-- in ~SCAN_BUDGET_S passt (kleine 4-KB-Teilschritte). So entsteht NIE ein 30–50ms-
+-- Block pro Frame — egal wie schnell der PC ist. Gibt true zurück, wenn fertig.
+-- Wirft NIE: bei fehlgeschlagenem Read wird der Teilschritt übersprungen.
+local SCAN_SUB = 0x1000           -- 4 KB pro Teilschritt
+local SCAN_BUDGET_S = 0.003       -- max ~3 ms Scan pro Frame
 local function detectStep(profile)
   if DET.size <= 0 then return true end
-  local remaining = DET.size - DET.base
-  local chunkLen = math.min(CONFIG.scan_chunk, remaining)
-  if chunkLen <= 0 then return true end
-  -- + mon_size Überlappung, damit ein an der Chunk-Grenze beginnender Mon komplett ist
-  local readLen = math.min(chunkLen + profile.mon_size, remaining)
-  local arr, bi = readArray(DET.base, readLen)
-  if arr then
-    local maxO = readLen - profile.mon_size      -- nur Offsets, an denen ein ganzer Mon passt
-    local lastO = math.min(chunkLen - 1, maxO)
-    local o = 0
-    while o <= lastO do
-      local mon = validateGen4(arr, bi + o, profile.max_species)
-      if mon then DET.found[#DET.found + 1] = { addr = DET.base + o, hp = mon.hp } end
-      o = o + 4
+  local t0 = os.clock()
+  while DET.base < DET.size do
+    local remaining = DET.size - DET.base
+    local chunkLen = math.min(SCAN_SUB, remaining)
+    -- + mon_size Überlappung, damit ein an der Teilschritt-Grenze beginnender Mon komplett ist
+    local readLen = math.min(chunkLen + profile.mon_size, remaining)
+    local arr, bi = readArray(DET.base, readLen)
+    if arr then
+      local maxO = readLen - profile.mon_size     -- nur Offsets, an denen ein ganzer Mon passt
+      local lastO = math.min(chunkLen - 1, maxO)
+      local o = 0
+      while o <= lastO do
+        local mon = validateGen4(arr, bi + o, profile.max_species)
+        if mon then DET.found[#DET.found + 1] = { addr = DET.base + o, hp = mon.hp } end
+        o = o + 4
+      end
     end
+    DET.base = DET.base + chunkLen                 -- IMMER weiterrücken (auch bei Read-Fehler)
+    if (os.clock() - t0) >= SCAN_BUDGET_S then break end   -- Frame-Budget erschöpft → Rest nächster Frame
   end
-  DET.base = DET.base + chunkLen                  -- IMMER weiterrücken (auch bei Read-Fehler)
   return DET.base >= DET.size
 end
 
@@ -498,8 +507,7 @@ local function detectFinish(profile)
     profile.team_size  = best.team
     console.log(string.format("[scan] OK Spieler-Party @ 0x%X · %d Pokemon%s",
       best.addr, best.team, bestScore >= 1000 and " (Header bestaetigt)" or " (laengster Lauf)"))
-    local f = io.open("soullink_party_addr.txt", "w")
-    if f then f:write(string.format("%s party_addr = 0x%X (team %d)\n", CONFIG.game, best.addr, best.team)); f:close() end
+    if saveCachedAddr then saveCachedAddr(best.addr, best.team) end   -- persistent → nächster Start ohne Scan
   else
     profile.party_addr = nil; profile.team_size = nil
     console.log("[scan] Keine gueltige Party gefunden (0 Kandidaten). Auto-Scan pausiert und versucht es seltener erneut.")
@@ -724,6 +732,29 @@ end
 local OUT_FILE = resolveOutFile()
 console.log("[sync] Schreibe Team nach: " .. OUT_FILE)
 
+-- Persistenter Party-Adress-Cache (neben der Team-Datei). Nach der ERSTEN
+-- erfolgreichen Erkennung wird die Adresse gespeichert; beim nächsten Start wird
+-- sie nur noch validiert → KEIN Scan mehr (auch über Neustarts hinweg).
+local PARTY_CACHE = (OUT_FILE:match("^(.*[/\\])") or "") .. "soullink_party_addr.txt"
+saveCachedAddr = function(addr, team)   -- weist die oben deklarierte local zu
+  local f = io.open(PARTY_CACHE, "w")
+  if f then f:write(string.format("%s %d %d\n", CONFIG.game, addr, team or 0)); f:close() end
+end
+local function loadCachedAddr(profile)
+  local f = io.open(PARTY_CACHE, "r"); if not f then return false end
+  local line = f:read("*l"); f:close()
+  if not line then return false end
+  local g, a = line:match("^(%S+)%s+(%d+)")
+  if g ~= CONFIG.game or not a then return false end
+  profile.party_addr = tonumber(a)
+  if readMon(profile, 0) then            -- nur übernehmen, wenn die Adresse noch gültig ist
+    console.log(string.format("[scan] Party-Adresse aus Cache @ 0x%X — kein Scan noetig.", profile.party_addr))
+    return true
+  end
+  profile.party_addr = nil
+  return false
+end
+
 -- Atomarer Write: erst .tmp schreiben, dann über die Zieldatei umbenennen, damit
 -- der Companion nie eine halbfertige Datei liest. Windows: rename scheitert über
 -- eine existierende Datei → vorher entfernen; Fallback = direkter Write.
@@ -811,7 +842,10 @@ end
 if CONFIG.location_addr then
   console.log(string.format("[location] location_addr = 0x%X gesetzt — IDs werden bei Wechsel geloggt.", CONFIG.location_addr))
 end
-detectStart(profile)
+-- Erst den persistenten Cache versuchen (sofort, kein Scan); nur scannen, wenn keine
+-- gültige Adresse gespeichert ist.
+pcall(function() memory.usememorydomain(profile.domain) end)
+if not loadCachedAddr(profile) then detectStart(profile) end
 
 -- Ein Frame Arbeit (wird vom Loop in pcall ausgeführt)
 local function stepOnce(frame)
