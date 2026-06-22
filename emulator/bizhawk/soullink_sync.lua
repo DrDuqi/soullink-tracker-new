@@ -26,15 +26,21 @@ local CONFIG = {
   -- bleibt null. Adresse mit find_location (siehe unten) finden, hier eintragen.
   -- Sobald gesetzt, loggt das Script die ID bei jedem Ortswechsel → IDs in LOCATIONS
   -- eintragen. currentLocationId wird dann immer geliefert, der Name nur bei Mapping.
-  location_addr   = nil,
+  location_addr   = 0x010D8E,
   -- Kalibrierhilfe: findet die Location-Adresse per Differenz-Suche (Tasten 1/2/3 im
   -- Emu-Fenster, Anleitung erscheint in der Lua-Console). Aktivieren → Script neu laden.
-  find_location   = true,
+  find_location   = false,
   -- Kalibrier-Hilfe: einmaliges Loggen der Spitznamen-Rohwerte des 1. Pokemon in
   -- die BizHawk-Konsole (Lua Console). Damit lässt sich der Zeichensatz exakt
   -- prüfen/fixen. Aktivieren → Script neu laden → Zeile + echten Namen melden.
   debug           = false,
+  -- PERF/DEBUG: misst pro Sekunde Lua-Durchlaufzeiten (buildJson vs. Datei-Write),
+  -- Reads & Emits in die Lua-Console. Standard AUS (keine Verhaltensänderung).
+  perf            = false,
 }
+
+-- Messzähler für den Performance-Modus (nur aktiv bei CONFIG.perf).
+local PERF = { reads = 0, emits = 0, build_s = 0, build_max = 0, write_s = 0, write_max = 0, t0 = os.clock() }
 
 -- Gen-4 Block-Reihenfolge (Permutation per ((PID>>13)&0x1F)%24)
 local ORDERS = {
@@ -107,6 +113,7 @@ end
 local function readArray(addr, len)
   local arr
   local ok = pcall(function() arr = memory.read_bytes_as_array(addr, len) end)
+  if CONFIG.perf then PERF.reads = PERF.reads + 1 end
   if not ok or type(arr) ~= "table" then return nil, 0 end
   local bi = (arr[0] ~= nil) and 0 or 1
   return arr, bi
@@ -723,6 +730,16 @@ local function stepOnce(frame)
   pcall(function() memory.usememorydomain(profile.domain) end)
   if CONFIG.find_location then lfStep() end                  -- Kalibrierhilfe (nur Lesen + Log)
   if frame % CONFIG.interval_frames == 0 then logLocationChange() end
+  -- PERF: einmal pro ~Sekunde die Messwerte ausgeben + Fenster zurücksetzen.
+  if CONFIG.perf and frame > 0 and frame % 60 == 0 then
+    local dt = os.clock() - PERF.t0
+    console.log(string.format(
+      "[perf] %.2fs · Emits=%d · Reads=%d · buildJson Ø%.1f/max%.1f ms · Datei-Write Ø%.1f/max%.1f ms · Ziel=%s",
+      dt, PERF.emits, PERF.reads,
+      PERF.emits > 0 and PERF.build_s / PERF.emits or 0, PERF.build_max,
+      PERF.emits > 0 and PERF.write_s / PERF.emits or 0, PERF.write_max, OUT_FILE))
+    PERF.reads, PERF.emits, PERF.build_s, PERF.build_max, PERF.write_s, PERF.write_max, PERF.t0 = 0, 0, 0, 0, 0, 0, os.clock()
+  end
   if DET.running then
     if detectStep(profile) then detectFinish(profile) end
   elseif not profile.party_addr then
@@ -735,7 +752,17 @@ local function stepOnce(frame)
       local count = safeU32(profile.party_addr - 4)
       if readMon(profile, 0) then
         if count and count >= 1 and count <= 6 then profile.team_size = count end
-        emit(buildJson(profile))
+        if CONFIG.perf then
+          local t1 = os.clock(); local json = buildJson(profile)
+          local t2 = os.clock(); emit(json)
+          local t3 = os.clock()
+          PERF.emits = PERF.emits + 1
+          local b = (t2 - t1) * 1000; local w = (t3 - t2) * 1000
+          PERF.build_s = PERF.build_s + b; if b > PERF.build_max then PERF.build_max = b end
+          PERF.write_s = PERF.write_s + w; if w > PERF.write_max then PERF.write_max = w end
+        else
+          emit(buildJson(profile))
+        end
       else
         console.log("[sync] Party-Adresse ungueltig (Save-Block-Wechsel?) — scanne neu ...")
         detectStart(profile)
