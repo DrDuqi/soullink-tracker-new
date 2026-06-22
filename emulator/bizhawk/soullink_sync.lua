@@ -407,11 +407,10 @@ end
 -- ── Auto-Detect: Speicher in Frame-Chunks scannen ───────────────────────────
 local DET = { running = false, base = 0, found = {}, size = 0, fails = 0, nextAt = 0 }
 
--- Back-off: nach fehlgeschlagenem Scan immer SELTENER erneut versuchen, damit ein
--- nicht gefundener (z. B. falscher Core) Zustand den Emulator NIE dauerscant.
--- ~2s, 4s, 8s, 16s, dann gedeckelt 30s.
+-- Back-off: ohne gefundenes Team (z. B. während der Starterauswahl) immer SELTENER
+-- erneut prüfen → kein Dauerscan, kaum Last. ~5s, 10s, 20s, 40s, dann gedeckelt 60s.
 local function retryDelay(fails)
-  return math.floor(math.min(1800, 120 * 2 ^ math.min(math.max(fails, 1) - 1, 4)))
+  return math.floor(math.min(3600, 300 * 2 ^ math.min(math.max(fails, 1) - 1, 4)))
 end
 
 local saveCachedAddr   -- Persistenter Party-Cache (erst NACH OUT_FILE definiert)
@@ -423,7 +422,9 @@ local function detectStart(profile)
   pcall(function() sz = memory.getmemorydomainsize(profile.domain) end)
   if not sz then pcall(function() sz = memory.getmemorydomainsize() end) end
   DET.size = sz or 0
-  console.log(string.format("[scan] Suche Party automatisch ... (%d KB)", DET.size // 1024))
+  if DET.fails == 0 then    -- nur beim ersten Versuch ankündigen (kein Spam beim Warten)
+    console.log(string.format("[scan] Suche Party automatisch ... (%d KB)", DET.size // 1024))
+  end
   if DET.size == 0 then
     console.log("[scan] Domain '" .. profile.domain .. "' nicht lesbar. Verfügbar: "
       .. table.concat(memory.getmemorydomainlist(), ", "))
@@ -431,13 +432,15 @@ local function detectStart(profile)
 end
 
 -- Inkrementeller, ZEIT-BUDGETIERTER Scan: pro Frame wird nur so viel gescannt, wie
--- in ~SCAN_BUDGET_S passt (kleine 4-KB-Teilschritte). So entsteht NIE ein 30–50ms-
--- Block pro Frame — egal wie schnell der PC ist. Gibt true zurück, wenn fertig.
--- Wirft NIE: bei fehlgeschlagenem Read wird der Teilschritt übersprungen.
-local SCAN_SUB = 0x1000           -- 4 KB pro Teilschritt
-local SCAN_BUDGET_S = 0.003       -- max ~3 ms Scan pro Frame
+-- ins Frame-Budget (s. unten) passt (kleine 1-KB-Teilschritte). So entsteht NIE ein
+-- 30–50ms-Block pro Frame — egal wie schnell der PC ist. Gibt true zurück, wenn
+-- fertig. Wirft NIE: bei fehlgeschlagenem Read wird der Teilschritt übersprungen.
+local SCAN_SUB = 0x400            -- 1 KB pro Teilschritt (feine Granularität → sehr dünn)
 local function detectStep(profile)
   if DET.size <= 0 then return true end
+  -- Erste Suche zügig (ein vorhandenes Team schnell finden); Wiederhol-Scans ohne
+  -- Team (z. B. Starterauswahl) extra dünn → keine spürbaren Mikro-Freezes.
+  local budget = (DET.fails == 0) and 0.0025 or 0.0010
   local t0 = os.clock()
   while DET.base < DET.size do
     local remaining = DET.size - DET.base
@@ -456,7 +459,7 @@ local function detectStep(profile)
       end
     end
     DET.base = DET.base + chunkLen                 -- IMMER weiterrücken (auch bei Read-Fehler)
-    if (os.clock() - t0) >= SCAN_BUDGET_S then break end   -- Frame-Budget erschöpft → Rest nächster Frame
+    if (os.clock() - t0) >= budget then break end          -- Frame-Budget erschöpft → Rest nächster Frame
   end
   return DET.base >= DET.size
 end
@@ -510,8 +513,12 @@ local function detectFinish(profile)
     if saveCachedAddr then saveCachedAddr(best.addr, best.team) end   -- persistent → nächster Start ohne Scan
   else
     profile.party_addr = nil; profile.team_size = nil
-    console.log("[scan] Keine gueltige Party gefunden (0 Kandidaten). Auto-Scan pausiert und versucht es seltener erneut.")
-    console.log("[scan] Tipp: mind. 1 Pokemon im Team? Sonst stimmt evtl. der NDS-Core/Memory-Domain nicht.")
+    -- Kein Team vorhanden (z. B. Starterauswahl): freundlich + selten melden, NICHT spammen.
+    local now = os.clock()
+    if (now - (DET.waitMsgAt or -100)) > 12 then
+      DET.waitMsgAt = now
+      console.log("[scan] Noch kein Team gefunden – warte auf dein erstes Pokemon. (Seltener, ruckelfreier Re-Check.)")
+    end
   end
 end
 
