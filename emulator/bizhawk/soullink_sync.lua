@@ -47,6 +47,19 @@ local CONFIG = {
   profile         = false,
 }
 
+-- Profiler/Testmodus lassen sich OHNE Datei-Bearbeitung aktivieren — per
+-- Umgebungsvariable, die der Companion an BizHawk weiterreicht:
+--   SOULLINK_PROFILE = 1        → Per-Funktions-Profiler an
+--   SOULLINK_TEST_MODE = 1 | 2  → Diagnose-Testmodus (1 = kein Write, 2 = alle 5 s)
+-- Gesetzte ENV-Werte haben Vorrang vor den CONFIG-Defaults oben. So genügt ein
+-- Companion-Update + ein Schalter (ENV) — niemand muss diese Datei bearbeiten.
+do
+  local p = os.getenv("SOULLINK_PROFILE")
+  if p == "1" or p == "true" then CONFIG.profile = true end
+  local tm = tonumber(os.getenv("SOULLINK_TEST_MODE") or "")
+  if tm ~= nil then CONFIG.test_mode = tm end
+end
+
 -- Messzähler für Performance-/Testmodus.
 local PERF = { reads = 0, emits = 0, writes = 0, build_s = 0, build_max = 0, write_s = 0, write_max = 0, t0 = os.clock() }
 -- Mess-/Logausgabe an, sobald perf ODER ein Testmodus aktiv ist.
