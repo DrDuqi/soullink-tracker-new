@@ -60,6 +60,30 @@ do
   if tm ~= nil then CONFIG.test_mode = tm end
 end
 
+-- ── Entwickler-Diagnose-Log ──────────────────────────────────────────────────
+-- Wenn der Companion SOULLINK_DEVLOG=<Logs-Ordner> setzt (nur auf der Entwickler-
+-- Maschine), schreibt die Lua automatisch eine current.log: Session-Header, die
+-- Perf-Werte, Scan-/Cache-Events und [WARN]-Marker — Pfade anonymisiert. Bei
+-- normalen Nutzern ist die Variable NICHT gesetzt → kein Logging, kein Overhead.
+-- Rotation/Archiv/Pruning übernimmt der Companion VOR dem Start (current.log ist
+-- beim Start frisch); hier wird nur angehängt.
+local LUA_REV = "1.0.13"
+local DEVLOG_FILE = (function() local d = os.getenv("SOULLINK_DEVLOG"); return (d and d ~= "") and (d .. "/current.log") or nil end)()
+local DEV_VERSION = os.getenv("SOULLINK_VERSION") or "?"
+local function anonPath(s) return s and (tostring(s):gsub("[Cc]:[/\\][Uu]sers[/\\][^/\\]+", "C:\\Users\\<USER>")) or s end
+local function devlog(line)
+  if not DEVLOG_FILE then return end
+  local f = io.open(DEVLOG_FILE, "a")
+  if f then f:write(string.format("[%s] %s\n", os.date("%Y-%m-%d %H:%M:%S"), anonPath(tostring(line)))); f:close() end
+end
+if DEVLOG_FILE then
+  CONFIG.perf = true   -- leichte Perf-Zeile (FPS/Reads/Writes) ins Log; der schwere
+                       -- Per-Funktions-Profiler bleibt opt-in via SOULLINK_PROFILE
+  devlog("===== SoulLink Dev-Session =====")
+  devlog(string.format("Companion v%s · Lua-Rev %s · Spiel=%s · Intervall=%d Frames · TestMode=%d",
+    DEV_VERSION, LUA_REV, CONFIG.game, CONFIG.interval_frames, CONFIG.test_mode))
+end
+
 -- Messzähler für Performance-/Testmodus.
 local PERF = { reads = 0, emits = 0, writes = 0, build_s = 0, build_max = 0, write_s = 0, write_max = 0, t0 = os.clock() }
 -- Mess-/Logausgabe an, sobald perf ODER ein Testmodus aktiv ist.
@@ -514,6 +538,7 @@ local function detectFinish(profile)
     profile.team_size  = best.team
     console.log(string.format("[scan] OK Spieler-Party @ 0x%X · %d Pokemon%s",
       best.addr, best.team, bestScore >= 1000 and " (Header bestaetigt)" or " (laengster Lauf)"))
+    devlog(string.format("Party gefunden @ 0x%X · %d Mon · %s", best.addr, best.team, bestScore >= 1000 and "Header" or "laengster Lauf"))
     if saveCachedAddr then saveCachedAddr(best.addr, best.team) end   -- persistent → nächster Start ohne Scan
   else
     profile.party_addr = nil; profile.team_size = nil
@@ -522,6 +547,7 @@ local function detectFinish(profile)
     if (now - (DET.waitMsgAt or -100)) > 12 then
       DET.waitMsgAt = now
       console.log("[scan] Noch kein Team gefunden – warte auf dein erstes Pokemon. (Seltener, ruckelfreier Re-Check.)")
+      devlog("[WARN] Kein Team gefunden — Re-Scan (z. B. Starterauswahl, oder Core/Domain pruefen)")
     end
   end
 end
@@ -780,8 +806,10 @@ local function loadCachedAddr(profile)
   DET.missStreak = 0
   if readMon(profile, 0) then
     console.log(string.format("[scan] Party-Adresse aus Cache @ 0x%X — kein Scan noetig.", profile.party_addr))
+    devlog(string.format("Cache-Hit: Party-Adresse @ 0x%X (kein Scan)", profile.party_addr))
   else
     console.log(string.format("[scan] Party-Adresse aus Cache @ 0x%X — wird im Spiel validiert.", profile.party_addr))
+    devlog(string.format("Cache-Adresse @ 0x%X — wird im Spiel validiert", profile.party_addr))
   end
   return true
 end
@@ -837,6 +865,7 @@ local function emit(json)
     _slowWarnedAt = now
     console.log(string.format(
       "[sync] WARN: Datei-Write dauerte %.0f ms. Tipp: SoulLink-Companion-AppData-Ordner in Windows Defender als Ausnahme hinzufuegen. Ziel=%s", ms, OUT_FILE))
+    devlog(string.format("[WARN] Datei-Write langsam: %.0f ms (Ziel=%s)", ms, anonPath(OUT_FILE)))
   end
 
   local _, n = json:gsub('"slot":', '')
@@ -889,11 +918,18 @@ local function stepOnce(frame)
   if PERF_ON and frame > 0 and frame % 60 == 0 then
     local dt = os.clock() - PERF.t0
     local fps = dt > 0 and (60 / dt) or 0
-    console.log(string.format(
+    local line = string.format(
       "[perf] FPS~%.0f · Mode=%d · Writes=%d (uebersprungen=%d) · Reads=%d · buildJson O%.1f/max%.1f ms · Datei-Write O%.1f/max%.1f ms · Ziel=%s",
       fps, CONFIG.test_mode or 0, PERF.writes, PERF.emits - PERF.writes, PERF.reads,
       PERF.emits > 0 and PERF.build_s / PERF.emits or 0, PERF.build_max,
-      PERF.writes > 0 and PERF.write_s / PERF.writes or 0, PERF.write_max, OUT_FILE))
+      PERF.writes > 0 and PERF.write_s / PERF.writes or 0, PERF.write_max, OUT_FILE)
+    console.log(line)
+    -- Dev-Log: Perf-Zeile ~alle 5s, FPS-Einbruch sofort als [WARN] (Pfad anonymisiert).
+    if DEVLOG_FILE then
+      if frame % 300 == 0 then devlog((line:gsub("· Ziel=.*$", ""))) end
+      if fps < 50 then devlog(string.format("[WARN] FPS niedrig: %.0f (Soll 60)", fps)) end
+      if PERF.write_max > 50 then devlog(string.format("[WARN] Datei-Write Ausreisser: %.0f ms", PERF.write_max)) end
+    end
     PERF.reads, PERF.emits, PERF.writes, PERF.build_s, PERF.build_max, PERF.write_s, PERF.write_max, PERF.t0 = 0, 0, 0, 0, 0, 0, 0, os.clock()
   end
   if DET.running then
@@ -942,6 +978,7 @@ local function stepOnce(frame)
         if DET.missStreak >= MISS_LIMIT then
           DET.missStreak = 0
           console.log("[sync] Party-Adresse dauerhaft ungueltig — suche einmal neu ...")
+          devlog("[WARN] Party-Adresse verloren (anhaltend) — Neu-Scan ausgeloest")
           detectStart(profile)
         end
       end

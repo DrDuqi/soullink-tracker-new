@@ -22,7 +22,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 import { createServer } from 'node:http'
-import { readFileSync, writeFileSync, statSync, existsSync, readdirSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, statSync, existsSync, readdirSync, mkdirSync, renameSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -88,6 +88,43 @@ function pickDefaultDir(kind) {
     }
   }
   return home || undefined
+}
+
+// ── Developer diagnostics: automatic logging (dev machine only) ──────────────
+// Active only when SOULLINK_DEV_LOG_DIR is set OR the developer's project folder
+// exists → normal users get NOTHING (no env passed to BizHawk → zero overhead).
+// We own rotation/archive/pruning so current.log is fresh each launch and the
+// Lua just appends. Logs live in the dev project Logs folder (or the env dir).
+const DEV_PROJECT = 'C:\\Users\\VShah\\Desktop\\SoulLink Projekt'
+function resolveDevLogDir() {
+  if (process.env.SOULLINK_DEV_LOG_DIR) return process.env.SOULLINK_DEV_LOG_DIR
+  try { if (existsSync(DEV_PROJECT)) return join(DEV_PROJECT, 'Logs') } catch { /* ignore */ }
+  return null
+}
+function setupDevLog() {
+  const dir = resolveDevLogDir()
+  if (!dir) return null
+  try {
+    const arch = join(dir, 'Archive')
+    mkdirSync(dir, { recursive: true })
+    mkdirSync(arch, { recursive: true })
+    const cur = join(dir, 'current.log')
+    // Archive the previous session (if any), so current.log is always THIS run.
+    try { if (statSync(cur).size > 0) {
+      const ts = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-')
+      renameSync(cur, join(arch, `session_${ts}.log`))
+    } } catch { /* no previous current.log */ }
+    // Keep only the newest 10 archived sessions (no huge folders).
+    try {
+      const old = readdirSync(arch).filter((f) => f.endsWith('.log'))
+        .map((f) => ({ f, t: statSync(join(arch, f)).mtimeMs })).sort((a, b) => b.t - a.t)
+      for (const e of old.slice(10)) { try { unlinkSync(join(arch, e.f)) } catch { /* ignore */ } }
+    } catch { /* ignore */ }
+    return dir
+  } catch (e) {
+    console.error('[dev] Log-Setup fehlgeschlagen:', e?.message || e)
+    return null
+  }
 }
 
 // The Lua ships WITH the Companion. Candidate locations, in priority order:
@@ -442,6 +479,13 @@ function handleRequest(req, res) {
 
       // Tell the Lua where to write (AppData) so both sides always agree.
       const launchEnv = { ...process.env, SOULLINK_TEAM_FILE: TEAM_FILE }
+      // Developer diagnostics (dev machine only): point the Lua at the rotated log.
+      const devDir = setupDevLog()
+      if (devDir) {
+        launchEnv.SOULLINK_DEVLOG = devDir
+        launchEnv.SOULLINK_VERSION = appVersion || ''
+        console.log('[dev] Diagnose-Log →', join(devDir, 'current.log'))
+      }
       const variants = [
         { label: 'rom --lua', args: [rom, '--lua=' + lua] },
         { label: '--lua rom', args: ['--lua=' + lua, rom] },
