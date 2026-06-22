@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Plus, Link2, Copy, Check, ArrowLeft, Heart, Skull,
-  LayoutGrid, List, Zap, Eye, Lock, Pencil, Gamepad2, X,
+  LayoutGrid, List, Zap, Eye, Lock, Pencil, Gamepad2, X, BookOpen,
 } from 'lucide-react'
 import { useRunStore } from '../store/runStore'
 import { useEncounters, useReorderEncounters, useUpdateEncounterStatus } from '../hooks/useEncounters'
@@ -36,6 +36,7 @@ import EmulatorLivePanel from '../components/EmulatorLivePanel'
 import EmulatorReconciler from '../components/EmulatorReconciler'
 import AtmosphereBackground from '../components/AtmosphereBackground'
 import TeamOverview from '../components/TeamOverview'
+import StoryGuide from '../components/StoryGuide'
 import ChangeEditionModal from '../components/ChangeEditionModal'
 import ChangeModeModal from '../components/ChangeModeModal'
 import PlayersPanel from '../components/PlayersPanel'
@@ -191,7 +192,7 @@ export default function RunPage() {
   const [showSoulLink, setShowSoulLink] = useState(false)
   const [copied, setCopied] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [mainView, setMainView] = useState<'encounters' | 'pairs'>('encounters')
+  const [mainView, setMainView] = useState<'encounters' | 'pairs' | 'story'>('encounters')
   const [selectedEncounter, setSelectedEncounter] = useState<Encounter | null>(null)
   const [slotPickerEncounter, setSlotPickerEncounter] = useState<Encounter | null>(null)
   const [dragOverEncId, setDragOverEncId] = useState<string | null>(null)
@@ -876,6 +877,13 @@ export default function RunPage() {
                     >
                       <Link2 className="w-3 h-3" /> Soul Links ({is3 ? groups.length : pairs.length})
                     </button>
+                    <button
+                      onClick={() => setMainView('story')}
+                      className="flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1"
+                      style={mainView === 'story' ? { background: '#CC0000', color: 'white' } : { color: '#64748b' }}
+                    >
+                      <BookOpen className="w-3 h-3" /> Story
+                    </button>
                   </div>
 
                   {!isMyFocus && (
@@ -922,6 +930,16 @@ export default function RunPage() {
                       {focusedEncounters.map((enc) => renderEnc(enc, true))}
                     </div>
                   )
+                )}
+
+                {/* STORY GUIDE view */}
+                {mainView === 'story' && (
+                  <StoryGuide
+                    runGame={currentRun?.game ?? null}
+                    caughtLocations={new Set((encounters as Encounter[])
+                      .filter((e) => e.player_id === myPlayerId && e.status !== 'missing')
+                      .map((e) => e.location.toLowerCase().trim()))}
+                  />
                 )}
 
                 {/* PAIRS view */}
