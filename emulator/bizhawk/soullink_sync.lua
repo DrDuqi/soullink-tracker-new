@@ -21,7 +21,7 @@ local CONFIG = {
   file_path       = "",
   interval_frames = 30,            -- ~2x pro Sekunde
   trainer_name    = "Trainer",
-  scan_chunk      = 0x20000,       -- Bytes pro Frame beim Auto-Scan
+  scan_chunk      = 0x8000,        -- Bytes pro Frame beim Auto-Scan (klein → ruckelfrei)
   -- Aktuelle Map-/Location-ID: Main-RAM-Offset (u16). Standard nil → currentLocation
   -- bleibt null. Adresse mit find_location (siehe unten) finden, hier eintragen.
   -- Sobald gesetzt, loggt das Script die ID bei jedem Ortswechsel → IDs in LOCATIONS
@@ -405,7 +405,14 @@ local function logLocationChange()
 end
 
 -- ── Auto-Detect: Speicher in Frame-Chunks scannen ───────────────────────────
-local DET = { running = false, base = 0, found = {}, size = 0 }
+local DET = { running = false, base = 0, found = {}, size = 0, fails = 0, nextAt = 0 }
+
+-- Back-off: nach fehlgeschlagenem Scan immer SELTENER erneut versuchen, damit ein
+-- nicht gefundener (z. B. falscher Core) Zustand den Emulator NIE dauerscant.
+-- ~2s, 4s, 8s, 16s, dann gedeckelt 30s.
+local function retryDelay(fails)
+  return math.floor(math.min(1800, 120 * 2 ^ math.min(math.max(fails, 1) - 1, 4)))
+end
 
 local function detectStart(profile)
   DET.running = true; DET.base = 0; DET.found = {}
@@ -461,35 +468,42 @@ local function detectFinish(profile)
     i = j + 1
   end
 
-  local best, bestScore = nil, 0
+  -- Bewertung: der LÄNGSTE Lauf gültiger Party-Mon IST die Spieler-Party. Der
+  -- Save-Block-Count-Header (u32 @ addr-4 = 1..6) ist nur noch ein BONUS, KEINE
+  -- Pflicht mehr — manche ROMs/Save-Layouts (u. a. randomisiert) haben ihn nicht
+  -- an dieser Stelle, was sonst zu endlosem Neuscan + Ruckeln führte. validateGen4
+  -- ist extrem streng (Prüfsumme + Party-Stats); Box-Mon haben keine Party-Stats
+  -- → Fehltreffer praktisch ausgeschlossen.
+  local best, bestScore = nil, -1
   for _, r in ipairs(runs) do
     local count = (r.addr >= 4) and safeU32(r.addr - 4) or nil
     local anchored = (count ~= nil and count >= 1 and count <= 6)
     r.team = anchored and count or r.len
-    local score = 0
+    local score = r.len * 100                                   -- längster Lauf gewinnt
     if anchored then
-      score = 1000                                              -- Save-Block-Party-Header vorhanden
-      if count == r.len then score = score + 500 end            -- Count passt exakt zur Anzahl
-      local clean = true                                        -- ungenutzte Slots im Save-Block sind 0
+      score = score + 1000                                      -- echter Save-Block-Header → klarer Favorit
+      if count == r.len then score = score + 500 end
+      local clean = true
       for k = count, 5 do if (safeU32(r.addr + k * profile.mon_size) or 0) ~= 0 then clean = false; break end end
       if clean then score = score + 300 end
-      if r.hp and r.hp > 0 then score = score + 10 end          -- lebende Lead-Mon
     end
-    console.log(string.format("[scan] Kandidat @ 0x%X · %d Mon · count(-4)=%s · score=%d",
-      r.addr, r.len, tostring(count), score))
+    if r.hp and r.hp > 0 then score = score + 10 end            -- lebende Lead-Mon
+    console.log(string.format("[scan] Kandidat @ 0x%X · %d Mon · count(-4)=%s · anchor=%s · score=%d",
+      r.addr, r.len, tostring(count), tostring(anchored), score))
     if score > bestScore then best, bestScore = r, score end
   end
 
-  if best and bestScore >= 1000 then
+  if best then
     profile.party_addr = best.addr
     profile.team_size  = best.team
-    console.log(string.format("[scan] OK Spieler-Party @ 0x%X · %d Pokemon", best.addr, best.team))
+    console.log(string.format("[scan] OK Spieler-Party @ 0x%X · %d Pokemon%s",
+      best.addr, best.team, bestScore >= 1000 and " (Header bestaetigt)" or " (laengster Lauf)"))
     local f = io.open("soullink_party_addr.txt", "w")
     if f then f:write(string.format("%s party_addr = 0x%X (team %d)\n", CONFIG.game, best.addr, best.team)); f:close() end
   else
     profile.party_addr = nil; profile.team_size = nil
-    console.log("[scan] Keine eindeutige SPIELER-Party (Save-Block-Header) gefunden — neuer Versuch folgt.")
-    console.log("[scan] Tipp: mind. 1 Pokemon im Team? Falls weiter falsch: obiges Kandidaten-Log senden.")
+    console.log("[scan] Keine gueltige Party gefunden (0 Kandidaten). Auto-Scan pausiert und versucht es seltener erneut.")
+    console.log("[scan] Tipp: mind. 1 Pokemon im Team? Sonst stimmt evtl. der NDS-Core/Memory-Domain nicht.")
   end
 end
 
@@ -818,9 +832,17 @@ local function stepOnce(frame)
     PERF.reads, PERF.emits, PERF.writes, PERF.build_s, PERF.build_max, PERF.write_s, PERF.write_max, PERF.t0 = 0, 0, 0, 0, 0, 0, 0, os.clock()
   end
   if DET.running then
-    if detectStep(profile) then detectFinish(profile) end
+    if detectStep(profile) then
+      detectFinish(profile)
+      if profile.party_addr then
+        DET.fails = 0                                            -- gefunden → Zähler zurücksetzen
+      else
+        DET.fails = DET.fails + 1
+        DET.nextAt = frame + retryDelay(DET.fails)               -- Back-off: immer seltener neu scannen
+      end
+    end
   elseif not profile.party_addr then
-    if frame % 120 == 0 then detectStart(profile) end          -- alle ~2s neu versuchen
+    if frame >= (DET.nextAt or 0) then detectStart(profile) end  -- mit Back-off (kein Dauerscan mehr)
   else
     if frame % CONFIG.interval_frames == 0 then
       -- Anker erneut prüfen: Lead-Mon muss lesbar sein.
