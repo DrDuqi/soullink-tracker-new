@@ -50,6 +50,21 @@ export async function companionConfig(signal?: AbortSignal): Promise<CompanionCo
   }
 }
 
+/** Open the Companion's NATIVE file dialog (Electron) and return the absolute path.
+ *  `{ error: 'no_dialog' }` means the running Companion can't show a dialog (CLI/dev)
+ *  → caller falls back to the browser picker; `'cancelled'` means the user closed it. */
+export async function pickCompanionFile(kind: 'biz' | 'rom'): Promise<{ path?: string; error?: string }> {
+  if (!USES_COMPANION) return { error: 'no_dialog' }
+  try {
+    const r = await fetch(`${EMU_BASE}/api/companion/pick?kind=${kind}`, { cache: 'no-store' })
+    const j = await r.json().catch(() => null)
+    if (j?.ok && j.path) return { path: j.path as string }
+    return { error: (j?.error as string) || 'failed' }
+  } catch {
+    return { error: 'failed' }
+  }
+}
+
 /** Persist picked paths in the Companion so the next start needs no wizard. */
 export async function saveCompanionConfig(patch: { bizhawk?: string; rom?: string; lua?: string }): Promise<boolean> {
   if (!USES_COMPANION) return false

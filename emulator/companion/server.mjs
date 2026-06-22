@@ -48,6 +48,11 @@ const TEAM_FILE = join(APPDATA_DIR, 'soullink_team.json')
 // Which team file to read. Env override wins; otherwise the AppData file above.
 let currentTeamFile = process.env.SOULLINK_TEAM_FILE || TEAM_FILE
 
+// Set by the Electron host (main.cjs) → opens a NATIVE file dialog and returns the
+// absolute path. null in CLI mode (no Electron) → the website falls back to its
+// (path-less) browser picker.
+let nativePick = null
+
 // ── persistent config (BizHawk/ROM paths the user picked once) ───────────────
 // The Companion — not the browser — is the machine-bound part, so it remembers the
 // paths. This makes setup survive a browser change / cache reset and is the basis
@@ -63,6 +68,23 @@ function saveConfig(patch) {
   try { writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2)) }
   catch (e) { console.error('[config] Speichern fehlgeschlagen:', e?.message || e) }
   return next
+}
+
+// Sensible start folder for the native file dialog: last-used path → SoulLink
+// subfolder → Desktop → Downloads → home.
+function pickDefaultDir(kind) {
+  const cfg = loadConfig()
+  const last = kind === 'biz' ? cfg.bizhawk : cfg.rom
+  if (last) { try { const d = dirname(last); if (existsSync(d)) return d } catch { /* ignore */ } }
+  let home = null
+  try { home = homedir() } catch { /* none */ }
+  if (home) {
+    const sub = kind === 'biz' ? 'BizHawk' : 'ROMs'
+    for (const d of [join(home, 'Desktop', 'SoulLink', sub), join(home, 'SoulLink', sub), join(home, 'Desktop'), join(home, 'Downloads')]) {
+      if (existsSync(d)) return d
+    }
+  }
+  return home || undefined
 }
 
 // The Lua ships WITH the Companion. Candidate locations, in priority order:
@@ -159,23 +181,32 @@ function tryLaunch(exe, args, cwd, ms, env) {
 // browser file picker hides. Scans the repo + parent only.
 function detectEmulatorPaths(root) {
   const parent = dirname(root)
+  let home = null
+  try { home = homedir() } catch { /* none */ }
+  const slDirs = home ? [join(home, 'Desktop', 'SoulLink'), join(home, 'SoulLink')] : []
 
-  let bizhawk = null
-  for (const base of [root, parent]) {
-    const direct = join(base, 'EmuHawk.exe')
-    if (existsSync(direct)) { bizhawk = direct; break }
+  // ── BizHawk: collect ALL EmuHawk.exe candidates (repo, parent, SoulLink/BizHawk,
+  //    Desktop, Downloads) so we can auto-pick when there is exactly one and tell
+  //    the user when there are several.
+  const bizRoots = [root, parent, ...slDirs.map((p) => join(p, 'BizHawk')), ...slDirs]
+  if (home) bizRoots.push(join(home, 'Desktop'), join(home, 'Downloads'))
+  const bizSet = new Set(); const bizhawkCandidates = []
+  const addBiz = (p) => { try { if (p && existsSync(p) && !bizSet.has(p)) { bizSet.add(p); bizhawkCandidates.push(p) } } catch { /* ignore */ } }
+  for (const base of bizRoots) {
+    addBiz(join(base, 'EmuHawk.exe'))
     try {
       for (const ent of readdirSync(base, { withFileTypes: true })) {
-        if (ent.isDirectory() && /bizhawk|emuhawk/i.test(ent.name)) {
-          const cand = join(base, ent.name, 'EmuHawk.exe')
-          if (existsSync(cand)) { bizhawk = cand; break }
-        }
+        if (ent.isDirectory() && /bizhawk|emuhawk/i.test(ent.name)) addBiz(join(base, ent.name, 'EmuHawk.exe'))
       }
-    } catch { /* unreadable dir → skip */ }
-    if (bizhawk) break
+    } catch { /* unreadable → skip */ }
+    if (bizhawkCandidates.length >= 8) break
   }
+  // Prefer a COMPLETE install (has its DLLs); else the first found.
+  const bizhawk = bizhawkCandidates.find((p) => bizhawkFolderInfo(dirname(p)).complete) || bizhawkCandidates[0] || null
 
-  const romDirs = [root, join(root, 'roms'), join(root, 'ROMs'), join(root, 'emulator'), parent, join(parent, 'roms')]
+  const romDirs = [root, join(root, 'roms'), join(root, 'ROMs'), join(root, 'emulator'), parent, join(parent, 'roms'),
+    ...slDirs.map((p) => join(p, 'ROMs')), ...slDirs]
+  if (home) romDirs.push(join(home, 'Desktop'), join(home, 'Downloads'))
   const roms = []
   const seen = new Set()
   for (const dir of romDirs) {
@@ -187,13 +218,13 @@ function detectEmulatorPaths(root) {
         }
       }
     } catch { /* skip */ }
-    if (roms.length >= 60) break
+    if (roms.length >= 80) break
   }
 
   // The Lua is the Companion's own bundled asset — resolve it the same way the
   // launch does (never a root-relative guess that fails in the packaged app).
   const luaR = resolveLua(null)
-  return { lua: luaR, syncFolder: luaR ? dirname(luaR) : join(root, 'emulator', 'bizhawk'), bizhawk, roms }
+  return { lua: luaR, syncFolder: luaR ? dirname(luaR) : join(root, 'emulator', 'bizhawk'), bizhawk, bizhawkCandidates, roms }
 }
 
 // Resolve a file the user picked in the browser dialog (base name only) to an
@@ -339,6 +370,22 @@ function handleRequest(req, res) {
     return
   }
 
+  // ── pick: native file dialog via the Electron host → returns an ABSOLUTE path ─
+  // Fixes the browser picker, which can never reveal the real filesystem path.
+  if (path === '/api/companion/pick') {
+    if (typeof nativePick !== 'function') { sendJson(res, { ok: false, error: 'no_dialog' }); return }
+    const kind = url.searchParams.get('kind') === 'biz' ? 'biz' : 'rom'
+    Promise.resolve(nativePick({ kind, defaultPath: pickDefaultDir(kind) }))
+      .then((picked) => {
+        if (!picked) { sendJson(res, { ok: false, error: 'cancelled' }); return }
+        saveConfig(kind === 'biz' ? { bizhawk: picked } : { rom: picked })   // persist → auto-loads next time
+        console.log('[pick] %s = %s', kind, picked)
+        sendJson(res, { ok: true, path: picked })
+      })
+      .catch((e) => sendJson(res, { ok: false, error: String(e?.message || e) }))
+    return
+  }
+
   // ── launch: POST { bizhawk, rom, lua, restart } ─────────────────────────────
   if (path === '/api/emulator-launch') {
     if (req.method !== 'POST') { sendJson(res, { ok: false }, 405); return }
@@ -447,7 +494,8 @@ function handleRequest(req, res) {
 // the Electron tray app — one implementation, no drift. Resolves with the server
 // once it is listening; rejects on bind error (e.g. EADDRINUSE) so the caller
 // decides what to do (CLI exits; the tray app shows "läuft bereits").
-export function startCompanion({ port = PORT, quiet = false } = {}) {
+export function startCompanion({ port = PORT, quiet = false, pickFile = null } = {}) {
+  nativePick = typeof pickFile === 'function' ? pickFile : null
   return new Promise((resolve, reject) => {
     const server = createServer(handleRequest)
     server.once('error', reject)

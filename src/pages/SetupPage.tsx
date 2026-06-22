@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useCompanion } from '../hooks/useCompanion'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
-import { companionConfig, saveCompanionConfig, USES_COMPANION } from '../lib/companion'
+import { companionConfig, saveCompanionConfig, pickCompanionFile, USES_COMPANION } from '../lib/companion'
 import { useEmulatorSettings, useEmulatorSettingsStore, findFile, launchEmulator } from '../lib/emulatorSettings'
 import { DOWNLOADS } from '../lib/downloads'
 import AtmosphereBackground from '../components/AtmosphereBackground'
@@ -82,17 +82,33 @@ export default function SetupPage() {
   const bizInput = useRef<HTMLInputElement>(null)
   const [resolving, setResolving] = useState<'rom' | 'biz' | null>(null)
   const [pickErr, setPickErr] = useState<{ k: 'rom' | 'biz'; msg: string } | null>(null)
+  async function applyPicked(path: string, kind: 'rom' | 'biz') {
+    updateSettings(kind === 'rom' ? { romPath: path } : { bizhawkPath: path })
+    await saveCompanionConfig(kind === 'rom' ? { rom: path } : { bizhawk: path })
+    refetchCfg()
+  }
+
+  // Primary path: ask the Companion for a NATIVE file dialog (returns the real path).
+  // Falls back to the browser picker only when the Companion can't show a dialog.
+  async function pickFile(kind: 'rom' | 'biz') {
+    setResolving(kind); setPickErr(null)
+    const res = await pickCompanionFile(kind)
+    if (res.path) { await applyPicked(res.path, kind); setResolving(null); return }
+    setResolving(null)
+    if (res.error === 'cancelled') return                 // user closed the dialog → nothing
+    ;(kind === 'biz' ? bizInput : romInput).current?.click()   // no_dialog/failed → browser picker
+  }
+
+  // Browser-picker fallback: resolve the chosen base name to an absolute path.
   async function resolvePicked(file: File | undefined, kind: 'rom' | 'biz') {
     if (!file) return
     setResolving(kind); setPickErr(null)
     const path = await findFile(file.name)
     setResolving(null)
     if (path) {
-      updateSettings(kind === 'rom' ? { romPath: path } : { bizhawkPath: path })
-      await saveCompanionConfig(kind === 'rom' ? { rom: path } : { bizhawk: path })
-      refetchCfg()
+      await applyPicked(path, kind)
     } else {
-      setPickErr({ k: kind, msg: `„${file.name}" wurde nicht gefunden. Lege die Datei in deinen Downloads- oder Projektordner und versuche es erneut.` })
+      setPickErr({ k: kind, msg: `„${file.name}" wurde nicht gefunden. Tipp: Lege die Datei in deinen Desktop-, Downloads- oder SoulLink-Ordner – oder gib den Pfad unten manuell ein.` })
     }
   }
 
@@ -189,10 +205,11 @@ export default function SetupPage() {
               <a href={DOWNLOADS.bizhawk} target="_blank" rel="noreferrer" className={btnRed} style={{ background: '#CC0000' }}>
                 <Download className="w-4 h-4" /> BizHawk herunterladen
               </a>
-              <button onClick={() => bizInput.current?.click()} disabled={!running || resolving === 'biz'} className={btnGhost + ' disabled:opacity-40'}>
-                {resolving === 'biz' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gamepad2 className="w-4 h-4" />} EmuHawk.exe auswählen
+              <button onClick={() => pickFile('biz')} disabled={!running || resolving === 'biz'} className={btnGhost + ' disabled:opacity-40'}>
+                {resolving === 'biz' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gamepad2 className="w-4 h-4" />} BizHawk auswählen
               </button>
               {!running && <p className="text-slate-500 text-xs sm:ml-1">Starte zuerst den Companion (Schritt 1).</p>}
+              {running && !bizhawkFound && !pickErr && <p className="text-slate-400 text-xs basis-full">Wir konnten BizHawk noch nicht automatisch finden. Klicke einfach auf <b>„BizHawk auswählen"</b> und wähle deine <b>EmuHawk.exe</b> aus.</p>}
               {pickErr?.k === 'biz' && <p className="text-yellow-400/90 text-xs basis-full">{pickErr.msg}</p>}
             </StepCard>
 
@@ -216,10 +233,11 @@ export default function SetupPage() {
                   Aus rechtlichen Gründen können wir keine Pokémon-ROMs bereitstellen. Bitte verwende ausschließlich deine eigene ROM.
                 </p>
               </div>
-              <button onClick={() => romInput.current?.click()} disabled={!running || resolving === 'rom'} className={btnRed + ' disabled:opacity-40'} style={{ background: '#CC0000' }}>
-                {resolving === 'rom' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />} Eigene ROM auswählen
+              <button onClick={() => pickFile('rom')} disabled={!running || resolving === 'rom'} className={btnRed + ' disabled:opacity-40'} style={{ background: '#CC0000' }}>
+                {resolving === 'rom' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />} ROM auswählen
               </button>
               {!running && <p className="text-slate-500 text-xs sm:ml-1">Starte zuerst den Companion (Schritt 1).</p>}
+              {running && !romFound && !pickErr && <p className="text-slate-400 text-xs basis-full">Wir konnten deine ROM noch nicht automatisch finden. Klicke einfach auf <b>„ROM auswählen"</b> und wähle die ROM aus, mit der du spielst.</p>}
               {pickErr?.k === 'rom' && <p className="text-yellow-400/90 text-xs basis-full">{pickErr.msg}</p>}
             </StepCard>
 

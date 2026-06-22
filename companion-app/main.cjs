@@ -8,7 +8,7 @@
 // by dynamically importing emulator/companion/server.mjs (bundled as a resource),
 // so there is one implementation and no drift.
 
-const { app, Tray, Menu, shell, nativeImage, Notification } = require('electron')
+const { app, Tray, Menu, shell, nativeImage, Notification, dialog } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
@@ -67,6 +67,23 @@ function notify(title, body) {
   try { if (Notification.isSupported()) new Notification({ title, body }).show() } catch { /* ignore */ }
 }
 
+// Native file dialog for the setup wizard (the browser picker can't reveal real
+// paths). Returns an absolute path or null (cancelled). Called by the server via
+// the pickFile hook passed to startCompanion.
+async function pickFile({ kind, defaultPath }) {
+  const filters = kind === 'biz'
+    ? [{ name: 'BizHawk (EmuHawk.exe)', extensions: ['exe'] }, { name: 'Alle Dateien', extensions: ['*'] }]
+    : [{ name: 'Pokémon-ROM', extensions: ['nds', 'gba', 'gbc', 'gb'] }, { name: 'Alle Dateien', extensions: ['*'] }]
+  const title = kind === 'biz' ? 'EmuHawk.exe auswählen' : 'Pokémon-ROM auswählen'
+  try {
+    try { app.focus({ steal: true }) } catch { /* ignore */ }
+    const r = await dialog.showOpenDialog({ title, defaultPath: defaultPath || undefined, properties: ['openFile'], filters })
+    return (!r.canceled && r.filePaths && r.filePaths[0]) ? r.filePaths[0] : null
+  } catch {
+    return null
+  }
+}
+
 async function startServer() {
   const userData = app.getPath('userData')
   // The Lua writes its team JSON next to itself, so it must live in a WRITABLE
@@ -78,7 +95,7 @@ async function startServer() {
 
   try {
     const mod = await import(pathToFileURL(serverPath).href)
-    await mod.startCompanion({ quiet: true })
+    await mod.startCompanion({ quiet: true, pickFile })
     serverState = 'running'
   } catch (e) {
     if (e && e.code === 'EADDRINUSE') {
