@@ -10,7 +10,7 @@ import EmulatorSetupWizard from './EmulatorSetupWizard'
 import { useEmulatorSettings, useEmulatorSettingsStore, isConfigured, launchEmulator, detectEmulator, findFile, fileName, type EmulatorSettings } from '../lib/emulatorSettings'
 import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
 import LocationMapManager from './LocationMapManager'
-import { useEmulatorSync } from '../hooks/useEmulatorSync'
+import { useEmulatorSync, useEmulatorAgeSec } from '../hooks/useEmulatorSync'
 import { useCompanion } from '../hooks/useCompanion'
 import { USES_COMPANION, companionConfig, saveCompanionConfig } from '../lib/companion'
 import { DOWNLOADS } from '../lib/downloads'
@@ -27,6 +27,14 @@ const IS_CHROMIUM = typeof navigator !== 'undefined'
 // Resolves ability / item / move names (by id, cached) for one Pokémon and
 // renders the enriched detail. Keyed on the ids so the 1s status ticker doesn't
 // cause refetches; cache makes repeats free.
+// Isolated leaf: the only element that re-renders every second (for "vor Xs"),
+// so the heavy live panel doesn't.
+function SyncAge() {
+  const age = useEmulatorAgeSec()
+  if (age == null) return null
+  return <span className="text-slate-500 font-medium"> · vor {age}s</span>
+}
+
 function MonRich({ mon, imported, game, currentLocationName, currentLocationId, suppressLocation, onImport }: {
   mon: EmulatorMon
   imported: boolean
@@ -256,7 +264,7 @@ export default function EmulatorLivePanel({
     setShowWizard(true)
   }, [settingsHydrated, configured, companion.status, companionPulled])
 
-  const { phase, team, game: liveGame, currentLocationName, currentLocationId, ageSec } = useEmulatorSync(enabled && companionReady)
+  const { phase, team, game: liveGame, currentLocationName, currentLocationId } = useEmulatorSync(enabled && companionReady)
 
   // ── One-click launch (▶ Live-Sync starten) ───────────────────────────────
   const [launching, setLaunching] = useState(false)
@@ -402,7 +410,7 @@ export default function EmulatorLivePanel({
   else if (phase === 'waiting') { icon = <Loader2 className="w-4 h-4 animate-spin" />; title = 'Datei gefunden – warte auf Pokémon'; color = '#fbbf24' }
   else { icon = <Wifi className="w-4 h-4" />; title = `Verbunden mit ${gameName}`; color = '#4ade80' }
 
-  const showAge = enabled && ageSec != null && (phase === 'connected' || phase === 'waiting')
+  const showAge = enabled && (phase === 'connected' || phase === 'waiting')
   const monCount = enabled && phase === 'connected' ? team.length : null
 
   return (
@@ -414,7 +422,7 @@ export default function EmulatorLivePanel({
           <div className="text-[11px] font-bold truncate" style={{ color }}>
             {title}
             {monCount != null && <span className="text-slate-400 font-medium"> · {monCount} Pokémon</span>}
-            {showAge && <span className="text-slate-500 font-medium"> · vor {ageSec}s</span>}
+            {showAge && <SyncAge />}
           </div>
         </div>
         <button

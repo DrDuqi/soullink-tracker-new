@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { SYNC_ENDPOINT } from '../lib/emulatorSync'
 import type { EmulatorMon, SyncEnvelope } from '../lib/emulatorSync'
 
@@ -17,7 +17,6 @@ export interface EmulatorSyncState {
   trainer: string | null
   currentLocationName: string | null
   currentLocationId: number | null
-  ageSec: number | null   // seconds since the file was last written (null if unknown)
 }
 
 const POLL_MS = 1200
@@ -40,66 +39,103 @@ function plausibleFrame(team: EmulatorMon[]): boolean {
   return Array.isArray(team) && team.length >= 1 && team.length <= 6 && team.every(plausibleMon)
 }
 
-/** Polls the local sync endpoint. State only changes on real changes (no flicker);
- *  an isolated 1s ticker refreshes the "last update Xs ago" display. */
-export function useEmulatorSync(enabled = true): EmulatorSyncState {
-  const [phase, setPhase] = useState<SyncPhase>('init')
-  const [team, setTeam] = useState<EmulatorMon[]>([])
-  const [game, setGame] = useState<string | null>(null)
-  const [trainer, setTrainer] = useState<string | null>(null)
-  const [curLocName, setCurLocName] = useState<string | null>(null)
-  const [curLocId, setCurLocId] = useState<number | null>(null)
-  const [, tick] = useState(0)
+// ── Single shared poller ──────────────────────────────────────────────────────
+// One fetch loop for the whole app, regardless of how many components read the
+// sync. The reactive snapshot deliberately EXCLUDES the "last update" timestamp,
+// so it only changes on a real data change (no per-second re-render storm). The
+// age display reads `frameAt` via its own isolated 1s ticker (useEmulatorAgeSec).
+const EMPTY: EmulatorSyncState = {
+  phase: 'init', team: [], game: null, trainer: null, currentLocationName: null, currentLocationId: null,
+}
+let snapshot: EmulatorSyncState = EMPTY
+let frameAt: number | null = null
+let lastTeamText: string | null = null
+let goodLen = 0
+let fails = 0
 
-  const lastAt = useRef<number | null>(null)
-  const lastTeamText = useRef<string | null>(null)
-  const goodLen = useRef(0)
-  const fails = useRef(0)
+const listeners = new Set<() => void>()
+let pollId: ReturnType<typeof setInterval> | null = null
+let enabledCount = 0
 
-  useEffect(() => {
-    if (!enabled) return
-    let cancelled = false
+function commit(next: EmulatorSyncState) {
+  if (
+    next.phase === snapshot.phase &&
+    next.team === snapshot.team &&
+    next.game === snapshot.game &&
+    next.trainer === snapshot.trainer &&
+    next.currentLocationName === snapshot.currentLocationName &&
+    next.currentLocationId === snapshot.currentLocationId
+  ) return                                   // nothing changed → no re-render
+  snapshot = next
+  for (const l of listeners) l()
+}
 
-    async function poll() {
-      try {
-        const res = await fetch(SYNC_ENDPOINT, { cache: 'no-store' })
-        if (!res.ok) throw new Error(String(res.status))
-        const env = (await res.json()) as SyncEnvelope
-        if (cancelled) return
-        fails.current = 0
+async function pollOnce() {
+  try {
+    const res = await fetch(SYNC_ENDPOINT, { cache: 'no-store' })
+    if (!res.ok) throw new Error(String(res.status))
+    const env = (await res.json()) as SyncEnvelope
+    fails = 0
 
-        if (!env.last || !env.last.data) { setPhase('offline'); return }
-        const data = env.last.data
-        lastAt.current = env.last.at
-        setGame(data.game ?? null)           // primitive → React bails if unchanged
-        setTrainer(data.trainer ?? null)
-        setCurLocName(data.currentLocationName ?? null)
-        setCurLocId(data.currentLocationId ?? null)
+    if (!env.last || !env.last.data) { commit({ ...snapshot, phase: 'offline' }); return }
+    const data = env.last.data
+    frameAt = env.last.at
 
-        // Only accept clean frames. A garbage/partial frame is ignored so the
-        // last good team stays put (no team↔box flip, no impossible HP).
-        const rawTeam = data.team ?? []
-        if (plausibleFrame(rawTeam)) {
-          goodLen.current = rawTeam.length
-          const text = JSON.stringify(rawTeam)
-          if (text !== lastTeamText.current) { lastTeamText.current = text; setTeam(rawTeam) }
-        }
-
-        const fresh = Date.now() - env.last.at < FRESH_MS
-        setPhase(fresh && goodLen.current > 0 ? 'connected' : 'waiting')
-      } catch {
-        if (cancelled) return
-        fails.current += 1
-        if (fails.current >= FAIL_LIMIT) setPhase('error')
-      }
+    // Only accept clean frames; a garbage/partial frame keeps the last good team.
+    let team = snapshot.team
+    const rawTeam = data.team ?? []
+    if (plausibleFrame(rawTeam)) {
+      goodLen = rawTeam.length
+      const text = JSON.stringify(rawTeam)
+      if (text !== lastTeamText) { lastTeamText = text; team = rawTeam }
     }
 
-    poll()
-    const pollId = setInterval(poll, POLL_MS)
-    const tickId = setInterval(() => tick((n) => (n + 1) % 1_000_000), 1000) // age refresh only
-    return () => { cancelled = true; clearInterval(pollId); clearInterval(tickId) }
-  }, [enabled])
+    const fresh = Date.now() - env.last.at < FRESH_MS
+    commit({
+      phase: fresh && goodLen > 0 ? 'connected' : 'waiting',
+      team,
+      game: data.game ?? null,
+      trainer: data.trainer ?? null,
+      currentLocationName: data.currentLocationName ?? null,
+      currentLocationId: data.currentLocationId ?? null,
+    })
+  } catch {
+    fails += 1
+    if (fails >= FAIL_LIMIT) commit({ ...snapshot, phase: 'error' })
+  }
+}
 
-  const ageSec = lastAt.current != null ? Math.max(0, Math.floor((Date.now() - lastAt.current) / 1000)) : null
-  return { phase, team, game, trainer, currentLocationName: curLocName, currentLocationId: curLocId, ageSec }
+function acquire() {
+  enabledCount += 1
+  if (pollId == null) { fails = 0; pollOnce(); pollId = setInterval(pollOnce, POLL_MS) }
+}
+function release() {
+  enabledCount = Math.max(0, enabledCount - 1)
+  if (enabledCount === 0 && pollId != null) { clearInterval(pollId); pollId = null }
+}
+
+function subscribe(cb: () => void) { listeners.add(cb); return () => { listeners.delete(cb) } }
+function getSnapshot() { return snapshot }
+
+/** Reactive emulator state from the shared poller. `enabled` only gates whether
+ *  THIS consumer keeps the poll loop alive (ref-counted) — the snapshot is shared. */
+export function useEmulatorSync(enabled = true): EmulatorSyncState {
+  const snap = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  useEffect(() => {
+    if (!enabled) return
+    acquire()
+    return release
+  }, [enabled])
+  return snap
+}
+
+/** Seconds since the last frame — re-renders ONLY its caller (use in a tiny leaf
+ *  so the heavy live panel never re-renders just to update "vor Xs"). */
+export function useEmulatorAgeSec(): number | null {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => (n + 1) % 1_000_000), 1000)
+    return () => clearInterval(id)
+  }, [])
+  return frameAt != null ? Math.max(0, Math.floor((Date.now() - frameAt) / 1000)) : null
 }
