@@ -420,6 +420,7 @@ local saveCachedAddr   -- Persistenter Party-Cache (erst NACH OUT_FILE definiert
 
 local function detectStart(profile)
   DET.running = true; DET.base = 0; DET.found = {}
+  DET.lastSig = nil                       -- nach (Neu-)Scan die nächste Party wieder senden
   profile.party_addr = nil; profile.team_size = nil
   local sz
   pcall(function() sz = memory.getmemorydomainsize(profile.domain) end)
@@ -532,6 +533,20 @@ local function readMon(profile, slot)
   local arr, bi = readArray(base, profile.mon_size)
   if not arr then return nil end
   return validateGen4(arr, bi, profile.max_species)
+end
+
+-- Billige Änderungs-Signatur der GANZEN Party aus ROHEN Bytes (KEINE Entschlüsselung):
+-- pro Slot PID (0x00) + Block-Checksumme (0x06, ändert sich bei Block-Änderungen wie
+-- Spezies/Attacken/Item/Spitzname) + die Party-Stat-Words (0x88/0x8C/0x8E, ändern sich
+-- bei HP/Level/Status). Ändert sich nichts → identische Signatur → kein teures buildJson.
+local function partySig(arr, bi, profile)
+  local p = {}
+  for s = 0, 5 do
+    local b = bi + s * profile.mon_size
+    p[#p + 1] = U32(arr, b) .. "." .. U16(arr, b + 6) .. "." ..
+                U16(arr, b + 0x88) .. "." .. U16(arr, b + 0x8C) .. "." .. U16(arr, b + 0x8E)
+  end
+  return table.concat(p, "|")
 end
 
 -- Gen-4 Western-Zeichensatz für Spitznamen (konservativ; A-Z/a-z/0-9/Space).
@@ -895,21 +910,28 @@ local function stepOnce(frame)
     if frame >= (DET.nextAt or 0) then detectStart(profile) end  -- mit Back-off (kein Dauerscan mehr)
   else
     if frame % CONFIG.interval_frames == 0 then
-      -- Anker erneut prüfen: Lead-Mon muss lesbar sein.
-      -- count(-4) wird aktualisiert, wenn er einen sinnvollen Wert hat, beeinflusst
-      -- aber die Ausgabe NICHT mehr (buildJson liest immer alle 6 Slots).
-      local count = safeU32(profile.party_addr - 4)
-      if readMon(profile, 0) then
+      -- EIN Bulk-Read der ganzen Party dient ZWEI Zwecken: Gültigkeitsprüfung (Lead-Mon)
+      -- UND billige Änderungserkennung (partySig, ohne Entschlüsselung). Das teure
+      -- buildJson (Entschlüsseln aller 6 Slots + JSON) läuft NUR bei echter Änderung →
+      -- im Stillstand/Laufen praktisch keine Last (kein Mikro-Freeze).
+      local arr, bi = readArray(profile.party_addr, 6 * profile.mon_size)
+      local lead = arr and validateGen4(arr, bi, profile.max_species) or nil
+      if lead then
         DET.missStreak = 0                        -- gültiger Read → Fehlserie zurücksetzen
-        if count and count >= 1 and count <= 6 then profile.team_size = count end
-        if PERF_ON then
-          local t1 = os.clock(); local json = buildJson(profile); local t2 = os.clock()
-          PERF.emits = PERF.emits + 1
-          local b = (t2 - t1) * 1000
-          PERF.build_s = PERF.build_s + b; if b > PERF.build_max then PERF.build_max = b end
-          emit(json)          -- misst die Schreibdauer selbst (nur bei echter Änderung)
-        else
-          emit(buildJson(profile))
+        local sig = partySig(arr, bi, profile)
+        if sig ~= DET.lastSig then                -- nur bei ECHTER Änderung weiterarbeiten
+          DET.lastSig = sig
+          local count = safeU32(profile.party_addr - 4)
+          if count and count >= 1 and count <= 6 then profile.team_size = count end
+          if PERF_ON then
+            local t1 = os.clock(); local json = buildJson(profile); local t2 = os.clock()
+            PERF.emits = PERF.emits + 1
+            local b = (t2 - t1) * 1000
+            PERF.build_s = PERF.build_s + b; if b > PERF.build_max then PERF.build_max = b end
+            emit(json)          -- misst die Schreibdauer selbst (nur bei echter Änderung)
+          else
+            emit(buildJson(profile))
+          end
         end
       else
         -- EINZELNER Fehlversuch (Kampf/Menü/Übergang/Save-Block) → letzten guten Stand
