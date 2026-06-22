@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 // One dialog shell for the whole app. Always centered, never clipped at the top
@@ -23,8 +24,11 @@ export default function Modal({
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
   }, [onClose])
 
-  return (
-    <div className="fixed inset-0 z-[210] overflow-y-auto anim-fade" style={{ background: 'rgba(4,5,9,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }} onClick={onClose}>
+  // Rendered into <body> via a portal so no ancestor stacking context (e.g. the
+  // header's backdrop-blur, which becomes a containing block for fixed children)
+  // can clip or under-layer the dialog. z-index sits above every page element.
+  return createPortal(
+    <div className="fixed inset-0 z-[2000] overflow-y-auto overscroll-contain anim-fade" style={{ background: 'rgba(4,5,9,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }} onClick={onClose}>
       <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
         <div className={`relative w-full ${maxWidth} bg-[#16161f] rounded-3xl border border-[#2e2e42] shadow-2xl anim-pop flex flex-col`}
           style={{ maxHeight: '85vh' }} onClick={(e) => e.stopPropagation()}>
@@ -41,7 +45,8 @@ export default function Modal({
           {footer && <div className="shrink-0 px-6 py-4 border-t border-[#2e2e42]">{footer}</div>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

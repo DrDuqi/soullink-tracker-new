@@ -6,6 +6,7 @@ import { useT } from '../lib/i18n'
 import { LINKS } from '../lib/appInfo'
 import ProfileModal from './ProfileModal'
 import SettingsModal from './SettingsModal'
+import ChangelogModal from './ChangelogModal'
 import ShinyAvatar from './ShinyAvatar'
 
 export default function UserMenu() {
@@ -15,6 +16,7 @@ export default function UserMenu() {
   const [open, setOpen] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showChangelog, setShowChangelog] = useState(false)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -66,8 +68,11 @@ export default function UserMenu() {
             <div className="py-1.5">
               <button role="menuitem" onClick={() => { setOpen(false); setShowProfile(true) }} className={item}><UserIcon className="w-4 h-4" /> {t('menu.profile')}</button>
               <button role="menuitem" onClick={() => { setOpen(false); setShowSettings(true) }} className={item}><Settings className="w-4 h-4" /> {t('menu.settings')}</button>
-              <button role="menuitem" onClick={() => openLink(LINKS.changelog)} className={item}><ScrollText className="w-4 h-4" /> {t('menu.changelog')}</button>
-              <button role="menuitem" onClick={() => openLink(LINKS.discord)} disabled={!LINKS.discord} title={LINKS.discord ? undefined : 'Discord-Link folgt'} className={`${item} disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed`}><MessageCircle className="w-4 h-4" /> {t('menu.discord')}</button>
+              <button role="menuitem" onClick={() => { setOpen(false); setShowChangelog(true) }} className={item}><ScrollText className="w-4 h-4" /> {t('menu.changelog')}</button>
+              <button role="menuitem" onClick={() => openLink(LINKS.discord)} disabled={!LINKS.discord} className={`${item} disabled:hover:bg-transparent disabled:cursor-default`}>
+                <MessageCircle className="w-4 h-4" /> {t('menu.discord')}
+                {!LINKS.discord && <span className="ml-auto text-[9px] font-black uppercase tracking-wide text-pk-yellow bg-pk-yellow/10 px-1.5 py-0.5 rounded">Bald</span>}
+              </button>
             </div>
             <button role="menuitem" onClick={handleSignOut} className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-bold text-red-400 hover:text-red-300 hover:bg-red-400/5 transition-colors border-t border-[#2e2e42]">
               <LogOut className="w-4 h-4" /> {t('menu.signout')}
@@ -78,6 +83,7 @@ export default function UserMenu() {
 
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </>
   )
 }

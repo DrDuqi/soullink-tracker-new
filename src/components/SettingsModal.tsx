@@ -12,6 +12,7 @@ import { DOWNLOADS } from '../lib/downloads'
 import { useToastStore } from '../store/toastStore'
 import type { RunMode } from '../lib/runMode'
 import Modal, { SettingRow, Toggle } from './Modal'
+import ChangelogModal from './ChangelogModal'
 
 type Section = 'appearance' | 'language' | 'gameplay' | 'notifications' | 'performance' | 'companion' | 'about'
 
@@ -52,6 +53,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const toast = useToastStore()
   const navigate = useNavigate()
   const [section, setSection] = useState<Section>('appearance')
+  const [showChangelog, setShowChangelog] = useState(false)
 
   const { data: comp, refetch, isFetching } = useQuery({ queryKey: ['companion-info'], queryFn: () => companionInfo(), staleTime: 30_000 })
 
@@ -71,10 +73,11 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   function reSetup() { onClose(); navigate('/setup') }
 
   return (
+    <>
     <Modal onClose={onClose} title={t('settings.title')} icon={<SettingsIcon className="w-5 h-5 text-pk-red" />} maxWidth="max-w-4xl">
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
-        <nav className="shrink-0 w-44 sm:w-52 border-r border-[#2e2e42] p-3 overflow-y-auto modal-scroll bg-[#13131b]">
+        <nav className="shrink-0 w-36 sm:w-52 border-r border-[#2e2e42] p-2 sm:p-3 overflow-y-auto modal-scroll bg-[#13131b]">
           {NAV.map((n) => (
             <button key={n.id} onClick={() => setSection(n.id)}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-bold mb-1 transition-colors ${section === n.id ? 'bg-pk-red text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
@@ -182,16 +185,18 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                 <SettingRow title={t('settings.companionVersion')}><span className="text-slate-400 text-sm font-mono">{comp?.version ?? '—'}</span></SettingRow>
               </div>
               <div className="grid sm:grid-cols-3 gap-3">
-                <a href={LINKS.changelog} target="_blank" rel="noreferrer" className="lp-action"><ScrollText className="w-4 h-4" /> {t('menu.changelog')}</a>
+                <button type="button" onClick={() => setShowChangelog(true)} className="lp-action"><ScrollText className="w-4 h-4" /> {t('menu.changelog')}</button>
                 <a href={LINKS.github} target="_blank" rel="noreferrer" className="lp-action"><Code2 className="w-4 h-4" /> GitHub</a>
                 {LINKS.discord
                   ? <a href={LINKS.discord} target="_blank" rel="noreferrer" className="lp-action"><MessageCircle className="w-4 h-4" /> Discord</a>
-                  : <span className="lp-action opacity-50 cursor-not-allowed" title="Discord-Link folgt"><MessageCircle className="w-4 h-4" /> Discord</span>}
+                  : <span className="lp-action opacity-50 cursor-default" title="Discord-Link folgt"><MessageCircle className="w-4 h-4" /> Discord <span className="text-[9px] font-black uppercase text-pk-yellow bg-pk-yellow/10 px-1.5 py-0.5 rounded">Bald</span></span>}
               </div>
             </Block>
           )}
         </div>
       </div>
     </Modal>
+    {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
+    </>
   )
 }
