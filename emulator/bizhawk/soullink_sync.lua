@@ -405,7 +405,10 @@ local function logLocationChange()
 end
 
 -- ── Auto-Detect: Speicher in Frame-Chunks scannen ───────────────────────────
-local DET = { running = false, base = 0, found = {}, size = 0, fails = 0, nextAt = 0 }
+local DET = { running = false, base = 0, found = {}, size = 0, fails = 0, nextAt = 0, missStreak = 0 }
+-- So viele aufeinanderfolgende fehlgeschlagene Lead-Mon-Reads (je ~0,5s), bevor ein
+-- erneuter Scan ausgelöst wird. Transiente Fehlversuche lösen damit KEINEN Scan aus.
+local MISS_LIMIT = 20   -- ~10s
 
 -- Back-off: ohne gefundenes Team (z. B. während der Starterauswahl) immer SELTENER
 -- erneut prüfen → kein Dauerscan, kaum Last. ~5s, 10s, 20s, 40s, dann gedeckelt 60s.
@@ -753,13 +756,19 @@ local function loadCachedAddr(profile)
   if not line then return false end
   local g, a = line:match("^(%S+)%s+(%d+)")
   if g ~= CONFIG.game or not a then return false end
+  -- Cache-Adresse ÜBERNEHMEN und KEINEN Start-Scan auslösen. Die tolerante
+  -- Sync-Phase validiert sie laufend: ein vorübergehend fehlschlagender Read (Start
+  -- mitten im Kampf/Menü) verwirft den Cache NICHT mehr; gesendet wird ohnehin nur
+  -- bei erfolgreichem Read (kein Müll). Erst bei dauerhaftem Fehlschlag wird neu
+  -- gesucht. → Nach dem ersten Erfolg: nie wieder ein Scan beim Start.
   profile.party_addr = tonumber(a)
-  if readMon(profile, 0) then            -- nur übernehmen, wenn die Adresse noch gültig ist
+  DET.missStreak = 0
+  if readMon(profile, 0) then
     console.log(string.format("[scan] Party-Adresse aus Cache @ 0x%X — kein Scan noetig.", profile.party_addr))
-    return true
+  else
+    console.log(string.format("[scan] Party-Adresse aus Cache @ 0x%X — wird im Spiel validiert.", profile.party_addr))
   end
-  profile.party_addr = nil
-  return false
+  return true
 end
 
 -- Atomarer Write: erst .tmp schreiben, dann über die Zieldatei umbenennen, damit
@@ -891,6 +900,7 @@ local function stepOnce(frame)
       -- aber die Ausgabe NICHT mehr (buildJson liest immer alle 6 Slots).
       local count = safeU32(profile.party_addr - 4)
       if readMon(profile, 0) then
+        DET.missStreak = 0                        -- gültiger Read → Fehlserie zurücksetzen
         if count and count >= 1 and count <= 6 then profile.team_size = count end
         if PERF_ON then
           local t1 = os.clock(); local json = buildJson(profile); local t2 = os.clock()
@@ -902,8 +912,16 @@ local function stepOnce(frame)
           emit(buildJson(profile))
         end
       else
-        console.log("[sync] Party-Adresse ungueltig (Save-Block-Wechsel?) — scanne neu ...")
-        detectStart(profile)
+        -- EINZELNER Fehlversuch (Kampf/Menü/Übergang/Save-Block) → letzten guten Stand
+        -- behalten und NICHT sofort neu scannen (genau das verursachte die Freezes).
+        -- Erst bei ANHALTENDEM Fehlschlag (~MISS_LIMIT Checks ≈ 10s) ist die Party
+        -- wirklich weg → dann genau EINMAL neu suchen.
+        DET.missStreak = (DET.missStreak or 0) + 1
+        if DET.missStreak >= MISS_LIMIT then
+          DET.missStreak = 0
+          console.log("[sync] Party-Adresse dauerhaft ungueltig — suche einmal neu ...")
+          detectStart(profile)
+        end
       end
     end
   end
