@@ -17,6 +17,7 @@ const WEBSITE = 'https://soullink-tracker-new.vercel.app'
 
 let tray = null
 let serverState = 'starting'   // 'starting' | 'running' | 'shared' | 'error'
+let serverMod = null           // the imported server.mjs (exposes dev helpers)
 
 // Only one instance — a second launch quietly exits; the first keeps serving.
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0) }
@@ -50,6 +51,32 @@ function statusLabel() {
   return 'Companion startet …'
 }
 
+// Developer-only tray section. Returns [] for normal users (no dev log dir → the
+// section is never shown), so it can never confuse or affect a normal install.
+function devMenu() {
+  let dir = null
+  try { dir = serverMod && serverMod.getDevLogDir && serverMod.getDevLogDir() } catch { dir = null }
+  if (!dir) return []
+  const ensure = () => { try { fs.mkdirSync(dir, { recursive: true }) } catch { /* ignore */ } }
+  return [
+    { type: 'separator' },
+    { label: 'Entwickler', submenu: [
+      { label: 'Status: Developer Mode aktiv', enabled: false },
+      { type: 'separator' },
+      { label: 'Logs öffnen', click: () => { ensure(); shell.openPath(dir) } },
+      { label: 'Aktuelle Log-Datei öffnen', click: () => { ensure(); shell.openPath(path.join(dir, 'current.log')) } },
+      { label: 'Diagnose exportieren', click: async () => {
+        try {
+          const r = await serverMod.buildDiagnose()
+          if (r && r.zip) { shell.showItemInFolder(r.zip); notify('SoulLink Diagnose', 'ZIP erstellt: ' + path.basename(r.zip)) }
+          else notify('SoulLink Diagnose', 'Export fehlgeschlagen' + (r && r.error ? ' (' + r.error + ')' : ''))
+        } catch { notify('SoulLink Diagnose', 'Export fehlgeschlagen') }
+      } },
+      { label: 'Logs löschen', click: () => { const ok = serverMod.clearDevLogs(); notify('SoulLink Diagnose', ok ? 'Logs gelöscht.' : 'Konnte Logs nicht löschen.') } },
+    ] },
+  ]
+}
+
 function refreshTray() {
   if (!tray) return
   tray.setToolTip('SoulLink Companion — ' + statusLabel())
@@ -58,6 +85,7 @@ function refreshTray() {
     { type: 'separator' },
     { label: 'Website öffnen', click: () => shell.openExternal(WEBSITE) },
     { label: 'Mit Windows starten', type: 'checkbox', checked: autoStartEnabled(), click: (mi) => setAutoStart(mi.checked) },
+    ...devMenu(),
     { type: 'separator' },
     { label: 'Beenden', click: () => app.quit() },
   ]))
@@ -94,8 +122,8 @@ async function startServer() {
   process.env.SOULLINK_COMPANION_CONFIG = path.join(userData, 'companion-config.json')
 
   try {
-    const mod = await import(pathToFileURL(serverPath).href)
-    await mod.startCompanion({ quiet: true, pickFile, version: app.getVersion() })
+    serverMod = await import(pathToFileURL(serverPath).href)
+    await serverMod.startCompanion({ quiet: true, pickFile, version: app.getVersion() })
     serverState = 'running'
   } catch (e) {
     if (e && e.code === 'EADDRINUSE') {

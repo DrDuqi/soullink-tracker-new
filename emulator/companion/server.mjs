@@ -22,7 +22,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 import { createServer } from 'node:http'
-import { readFileSync, writeFileSync, statSync, existsSync, readdirSync, mkdirSync, renameSync, unlinkSync } from 'node:fs'
+import { readFileSync, writeFileSync, statSync, existsSync, readdirSync, mkdirSync, renameSync, unlinkSync, copyFileSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -114,6 +114,11 @@ function setupDevLog() {
       const ts = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-')
       renameSync(cur, join(arch, `session_${ts}.log`))
     } } catch { /* no previous current.log */ }
+    // The focused views (performance/sync/errors) mirror THIS run only — the full
+    // history lives in the archived current.log — so reset them each launch.
+    for (const v of ['performance.log', 'sync.log', 'errors.log']) {
+      try { unlinkSync(join(dir, v)) } catch { /* not present */ }
+    }
     // Keep only the newest 10 archived sessions (no huge folders).
     try {
       const old = readdirSync(arch).filter((f) => f.endsWith('.log'))
@@ -125,6 +130,78 @@ function setupDevLog() {
     console.error('[dev] Log-Setup fehlgeschlagen:', e?.message || e)
     return null
   }
+}
+
+// Anonymize personal paths (C:\Users\<name>\… → C:\Users\<USER>\…). Tolerant of
+// single OR double backslashes, so it works on raw paths and on JSON-escaped ones.
+function anonDevPath(s) {
+  return typeof s === 'string'
+    ? s.replace(/[Cc]:[\\/]+Users[\\/]+[^\\/"\n]+/g, 'C:\\Users\\<USER>')
+    : s
+}
+
+// ── Tray-facing developer helpers (called by companion-app/main.cjs) ─────────
+// All are inert for normal users: resolveDevLogDir() === null → the tray never
+// shows the developer section, so none of these is reachable.
+export function getDevLogDir() { return resolveDevLogDir() }
+
+// Wipe every dev log (current + views + archive). Returns true on success.
+export function clearDevLogs() {
+  const dir = resolveDevLogDir(); if (!dir) return false
+  try {
+    for (const f of ['current.log', 'performance.log', 'sync.log', 'errors.log']) {
+      try { unlinkSync(join(dir, f)) } catch { /* not present */ }
+    }
+    try { rmSync(join(dir, 'Archive'), { recursive: true, force: true }) } catch { /* ignore */ }
+    return true
+  } catch { return false }
+}
+
+function luaRevFromLog(dir) {
+  try { const m = readFileSync(join(dir, 'current.log'), 'utf8').slice(0, 2000).match(/Lua-Rev\s+(\S+)/); return m ? m[1] : '?' }
+  catch { return '?' }
+}
+
+// Build SoulLink-Diagnose-<ts>.zip in the Logs folder: the 4 logs + a meta.txt
+// (versions + anonymized config). NEVER ROMs, savegames or full personal paths —
+// the logs are already anonymized by the Lua, and meta.txt is anonymized here.
+// Returns a Promise<{ zip } | { error }>. Uses PowerShell Compress-Archive (built
+// into Windows → no extra dependency).
+export function buildDiagnose() {
+  return new Promise((resolve) => {
+    const dir = resolveDevLogDir()
+    if (!dir) return resolve({ error: 'no_dev_mode' })
+    const ts = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-')
+    const stage = join(dir, '_diag_stage')
+    try {
+      mkdirSync(stage, { recursive: true })
+      for (const f of ['current.log', 'performance.log', 'sync.log', 'errors.log']) {
+        const src = join(dir, f)
+        if (existsSync(src)) { try { copyFileSync(src, join(stage, f)) } catch { /* ignore */ } }
+      }
+      let cfg = {}
+      try { cfg = loadConfig() } catch { /* ignore */ }
+      const meta = anonDevPath([
+        `SoulLink Diagnose — ${ts}`,
+        `Companion-Version: ${appVersion || '?'}`,
+        `Lua-Rev: ${luaRevFromLog(dir)}`,
+        `OS: ${process.platform} ${process.arch} · Node ${process.version}`,
+        '',
+        '── Konfiguration (anonymisiert) ──',
+        JSON.stringify(cfg, null, 2),
+      ].join('\n'))
+      writeFileSync(join(stage, 'meta.txt'), meta)
+      const zip = join(dir, `SoulLink-Diagnose-${ts}.zip`)
+      const ps = `Compress-Archive -Path '${stage.replace(/'/g, "''")}\\*' -DestinationPath '${zip.replace(/'/g, "''")}' -Force`
+      exec('powershell -NoProfile -NonInteractive -Command ' + JSON.stringify(ps), (err) => {
+        try { rmSync(stage, { recursive: true, force: true }) } catch { /* ignore */ }
+        resolve(err ? { error: 'zip_failed' } : { zip })
+      })
+    } catch (e) {
+      try { rmSync(stage, { recursive: true, force: true }) } catch { /* ignore */ }
+      resolve({ error: String(e?.message || e) })
+    }
+  })
 }
 
 // The Lua ships WITH the Companion. Candidate locations, in priority order:

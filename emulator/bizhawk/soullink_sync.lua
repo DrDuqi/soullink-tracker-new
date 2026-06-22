@@ -67,16 +67,25 @@ end
 -- normalen Nutzern ist die Variable NICHT gesetzt → kein Logging, kein Overhead.
 -- Rotation/Archiv/Pruning übernimmt der Companion VOR dem Start (current.log ist
 -- beim Start frisch); hier wird nur angehängt.
-local LUA_REV = "1.0.13"
-local DEVLOG_FILE = (function() local d = os.getenv("SOULLINK_DEVLOG"); return (d and d ~= "") and (d .. "/current.log") or nil end)()
+local LUA_REV = "1.0.14"
+local DEVLOG_DIR = (function() local d = os.getenv("SOULLINK_DEVLOG"); return (d and d ~= "") and d or nil end)()
 local DEV_VERSION = os.getenv("SOULLINK_VERSION") or "?"
 local function anonPath(s) return s and (tostring(s):gsub("[Cc]:[/\\][Uu]sers[/\\][^/\\]+", "C:\\Users\\<USER>")) or s end
-local function devlog(line)
-  if not DEVLOG_FILE then return end
-  local f = io.open(DEVLOG_FILE, "a")
+local function _writeLine(file, line)
+  local f = io.open(DEVLOG_DIR .. "/" .. file, "a")
   if f then f:write(string.format("[%s] %s\n", os.date("%Y-%m-%d %H:%M:%S"), anonPath(tostring(line)))); f:close() end
 end
-if DEVLOG_FILE then
+-- devlog(line[, channel]) — current.log holds the FULL unified stream (so a single
+-- upload is enough); channel additionally tees into a focused view:
+--   "perf" → performance.log · "sync" → sync.log · "err" → errors.log
+local function devlog(line, channel)
+  if not DEVLOG_DIR then return end
+  _writeLine("current.log", line)
+  if channel == "perf" then _writeLine("performance.log", line)
+  elseif channel == "sync" then _writeLine("sync.log", line)
+  elseif channel == "err" then _writeLine("errors.log", line) end
+end
+if DEVLOG_DIR then
   CONFIG.perf = true   -- leichte Perf-Zeile (FPS/Reads/Writes) ins Log; der schwere
                        -- Per-Funktions-Profiler bleibt opt-in via SOULLINK_PROFILE
   devlog("===== SoulLink Dev-Session =====")
@@ -538,7 +547,7 @@ local function detectFinish(profile)
     profile.team_size  = best.team
     console.log(string.format("[scan] OK Spieler-Party @ 0x%X · %d Pokemon%s",
       best.addr, best.team, bestScore >= 1000 and " (Header bestaetigt)" or " (laengster Lauf)"))
-    devlog(string.format("Party gefunden @ 0x%X · %d Mon · %s", best.addr, best.team, bestScore >= 1000 and "Header" or "laengster Lauf"))
+    devlog(string.format("Party gefunden @ 0x%X · %d Mon · %s", best.addr, best.team, bestScore >= 1000 and "Header" or "laengster Lauf"), "sync")
     if saveCachedAddr then saveCachedAddr(best.addr, best.team) end   -- persistent → nächster Start ohne Scan
   else
     profile.party_addr = nil; profile.team_size = nil
@@ -547,7 +556,7 @@ local function detectFinish(profile)
     if (now - (DET.waitMsgAt or -100)) > 12 then
       DET.waitMsgAt = now
       console.log("[scan] Noch kein Team gefunden – warte auf dein erstes Pokemon. (Seltener, ruckelfreier Re-Check.)")
-      devlog("[WARN] Kein Team gefunden — Re-Scan (z. B. Starterauswahl, oder Core/Domain pruefen)")
+      devlog("[WARN] Kein Team gefunden — Re-Scan (z. B. Starterauswahl, oder Core/Domain pruefen)", "err")
     end
   end
 end
@@ -806,10 +815,10 @@ local function loadCachedAddr(profile)
   DET.missStreak = 0
   if readMon(profile, 0) then
     console.log(string.format("[scan] Party-Adresse aus Cache @ 0x%X — kein Scan noetig.", profile.party_addr))
-    devlog(string.format("Cache-Hit: Party-Adresse @ 0x%X (kein Scan)", profile.party_addr))
+    devlog(string.format("Cache-Hit: Party-Adresse @ 0x%X (kein Scan)", profile.party_addr), "sync")
   else
     console.log(string.format("[scan] Party-Adresse aus Cache @ 0x%X — wird im Spiel validiert.", profile.party_addr))
-    devlog(string.format("Cache-Adresse @ 0x%X — wird im Spiel validiert", profile.party_addr))
+    devlog(string.format("Cache-Adresse @ 0x%X — wird im Spiel validiert", profile.party_addr), "sync")
   end
   return true
 end
@@ -865,7 +874,7 @@ local function emit(json)
     _slowWarnedAt = now
     console.log(string.format(
       "[sync] WARN: Datei-Write dauerte %.0f ms. Tipp: SoulLink-Companion-AppData-Ordner in Windows Defender als Ausnahme hinzufuegen. Ziel=%s", ms, OUT_FILE))
-    devlog(string.format("[WARN] Datei-Write langsam: %.0f ms (Ziel=%s)", ms, anonPath(OUT_FILE)))
+    devlog(string.format("[WARN] Datei-Write langsam: %.0f ms (Ziel=%s)", ms, anonPath(OUT_FILE)), "err")
   end
 
   local _, n = json:gsub('"slot":', '')
@@ -905,7 +914,10 @@ end
 -- Erst den persistenten Cache versuchen (sofort, kein Scan); nur scannen, wenn keine
 -- gültige Adresse gespeichert ist.
 pcall(function() memory.usememorydomain(profile.domain) end)
-if not loadCachedAddr(profile) then detectStart(profile) end
+if not loadCachedAddr(profile) then
+  devlog("[WARN] Party-Adresse NICHT aus Cache — Voll-Scan beim Start", "err")
+  detectStart(profile)
+end
 
 -- Ein Frame Arbeit (wird vom Loop in pcall ausgeführt)
 local function stepOnce(frame)
@@ -925,10 +937,10 @@ local function stepOnce(frame)
       PERF.writes > 0 and PERF.write_s / PERF.writes or 0, PERF.write_max, OUT_FILE)
     console.log(line)
     -- Dev-Log: Perf-Zeile ~alle 5s, FPS-Einbruch sofort als [WARN] (Pfad anonymisiert).
-    if DEVLOG_FILE then
-      if frame % 300 == 0 then devlog((line:gsub("· Ziel=.*$", ""))) end
-      if fps < 50 then devlog(string.format("[WARN] FPS niedrig: %.0f (Soll 60)", fps)) end
-      if PERF.write_max > 50 then devlog(string.format("[WARN] Datei-Write Ausreisser: %.0f ms", PERF.write_max)) end
+    if DEVLOG_DIR then
+      if frame % 300 == 0 then devlog((line:gsub("· Ziel=.*$", "")), "perf") end
+      if fps < 50 then devlog(string.format("[WARN] FPS niedrig: %.0f (Soll 60)", fps), "err") end
+      if PERF.write_max > 50 then devlog(string.format("[WARN] Datei-Write Ausreisser: %.0f ms", PERF.write_max), "err") end
     end
     PERF.reads, PERF.emits, PERF.writes, PERF.build_s, PERF.build_max, PERF.write_s, PERF.write_max, PERF.t0 = 0, 0, 0, 0, 0, 0, 0, os.clock()
   end
@@ -978,7 +990,7 @@ local function stepOnce(frame)
         if DET.missStreak >= MISS_LIMIT then
           DET.missStreak = 0
           console.log("[sync] Party-Adresse dauerhaft ungueltig — suche einmal neu ...")
-          devlog("[WARN] Party-Adresse verloren (anhaltend) — Neu-Scan ausgeloest")
+          devlog("[WARN] Party-Adresse verloren (anhaltend) — Neu-Scan ausgeloest", "err")
           detectStart(profile)
         end
       end
@@ -1024,10 +1036,12 @@ local function profReport(frameNo)
   local rows = {}
   for label, e in pairs(PROF) do rows[#rows + 1] = { label = label, n = e.n, sum = e.sum, max = e.max } end
   table.sort(rows, function(a, b) return a.sum > b.sum end)
-  console.log(string.format('===== [profile] %.0fs · Frames=%d · FPS~%.1f (Soll 60) =====', dt, frameNo, frameNo / dt))
+  local head = string.format('===== [profile] %.0fs · Frames=%d · FPS~%.1f (Soll 60) =====', dt, frameNo, frameNo / dt)
+  console.log(head); devlog(head, "perf")
   for _, r in ipairs(rows) do
-    console.log(string.format('  %-24s n=%-7d total=%9.1f ms  avg=%7.3f ms  max=%7.1f ms',
-      r.label, r.n, r.sum, r.n > 0 and r.sum / r.n or 0, r.max))
+    local row = string.format('  %-24s n=%-7d total=%9.1f ms  avg=%7.3f ms  max=%7.1f ms',
+      r.label, r.n, r.sum, r.n > 0 and r.sum / r.n or 0, r.max)
+    console.log(row); devlog(row, "perf")
   end
 end
 
