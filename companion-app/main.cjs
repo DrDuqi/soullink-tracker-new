@@ -95,7 +95,7 @@ async function startServer() {
 
   try {
     const mod = await import(pathToFileURL(serverPath).href)
-    await mod.startCompanion({ quiet: true, pickFile })
+    await mod.startCompanion({ quiet: true, pickFile, version: app.getVersion() })
     serverState = 'running'
   } catch (e) {
     if (e && e.code === 'EADDRINUSE') {

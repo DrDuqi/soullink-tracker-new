@@ -28,7 +28,10 @@ import { homedir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawn, exec } from 'node:child_process'
 
-const VERSION = '1.0.0'
+// Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
+// (which CI bumps from the release tag) to startCompanion; CLI falls back to the
+// companion-app package.json. null → the website shows "Version nicht erkannt".
+let appVersion = null
 const PORT = Number(process.env.SOULLINK_COMPANION_PORT || process.env.SYNC_PORT || 8787)
 
 // Repo root = two levels up from this file (…/emulator/companion/server.mjs).
@@ -326,7 +329,7 @@ function handleRequest(req, res) {
   if (path === '/api/companion/health') {
     let ready = false
     try { ready = effectiveConfig().ready } catch { /* detection error → not ready */ }
-    sendJson(res, { ok: true, name: 'soullink-companion', version: VERSION, port: PORT, ready })
+    sendJson(res, { ok: true, name: 'soullink-companion', version: appVersion, port: PORT, ready })
     return
   }
 
@@ -494,8 +497,14 @@ function handleRequest(req, res) {
 // the Electron tray app — one implementation, no drift. Resolves with the server
 // once it is listening; rejects on bind error (e.g. EADDRINUSE) so the caller
 // decides what to do (CLI exits; the tray app shows "läuft bereits").
-export function startCompanion({ port = PORT, quiet = false, pickFile = null } = {}) {
+export function startCompanion({ port = PORT, quiet = false, pickFile = null, version = null } = {}) {
   nativePick = typeof pickFile === 'function' ? pickFile : null
+  // Real version: from the Electron host (app.getVersion()), else the companion-app
+  // package.json (CLI/dev). Never a hardcoded constant.
+  if (version) appVersion = String(version)
+  else if (!appVersion) {
+    try { appVersion = JSON.parse(readFileSync(join(ROOT, 'companion-app', 'package.json'), 'utf8')).version || null } catch { /* unknown */ }
+  }
   return new Promise((resolve, reject) => {
     const server = createServer(handleRequest)
     server.once('error', reject)

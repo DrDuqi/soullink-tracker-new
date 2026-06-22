@@ -11,6 +11,7 @@ import { useEmulatorSettings, useEmulatorSettingsStore, isConfigured, launchEmul
 import { getLearnedRoute, useLocationMap } from '../lib/locationMap'
 import LocationMapManager from './LocationMapManager'
 import { useEmulatorSync, useEmulatorAgeSec } from '../hooks/useEmulatorSync'
+import CompanionVersion from './CompanionVersion'
 import { useCompanion } from '../hooks/useCompanion'
 import { USES_COMPANION, companionConfig, saveCompanionConfig } from '../lib/companion'
 import { DOWNLOADS } from '../lib/downloads'
@@ -449,6 +450,9 @@ export default function EmulatorLivePanel({
           {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
         </button>
       </div>
+
+      {/* Companion-Update/-Version: nur sichtbar, wenn etwas zu tun ist (Update / Version unbekannt) */}
+      <CompanionVersion hideWhenCurrent className="mx-3 mt-3" />
 
       {showWizard && <EmulatorSetupWizard onClose={() => setShowWizard(false)} />}
       {showSettings && <EmulatorSettingsModal onClose={() => setShowSettings(false)} />}
