@@ -19,7 +19,7 @@ local CONFIG = {
   -- Leer = automatisch NEBEN diesem Script schreiben (emulator/bizhawk/soullink_team.json),
   -- sodass der Dev-Server die Datei ohne weitere Einrichtung findet.
   file_path       = "",
-  interval_frames = 45,            -- ~1,3x pro Sekunde (~0,75s) — minimiert den Mikro-Hänger
+  interval_frames = 90,            -- SCHONEND: alle ~1,5s prüfen → flüssigstes Spiel (HP/Team-Update dafür minimal verzögert)
   trainer_name    = "Trainer",
   scan_chunk      = 0x8000,        -- Bytes pro Frame beim Auto-Scan (klein → ruckelfrei)
   -- Aktuelle Map-/Location-ID: Main-RAM-Offset (u16). Standard nil → currentLocation
