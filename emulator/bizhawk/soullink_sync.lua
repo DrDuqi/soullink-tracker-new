@@ -42,6 +42,9 @@ local CONFIG = {
   --   1 = liest das Team, schreibt aber NICHTS (Variante 2: Datei-Write komplett aus)
   --   2 = schreibt höchstens alle 5 s (Variante 3: minimaler Sync)
   test_mode       = 0,
+  -- DIAGNOSE-Profiler: misst jede Kernfunktion einzeln (n/total/avg/max), Bericht
+  -- alle 5 s in die Lua-Console. Standard AUS. Erst messen, dann optimieren.
+  profile         = false,
 }
 
 -- Messzähler für Performance-/Testmodus.
@@ -830,11 +833,57 @@ local function stepOnce(frame)
   end
 end
 
+-- ── DIAGNOSE-Profiler (CONFIG.profile) ───────────────────────────────────────
+-- Misst JEDE Kernfunktion einzeln (n/total/avg/max). Wrappt die bereits
+-- definierten locals; da Lua-Closures dieselbe Upvalue-Zelle teilen, werden auch
+-- verschachtelte Aufrufe (stepOnce → buildJson → readMonRichAt → readArray …)
+-- automatisch erfasst. Bericht alle 5 s, kumulativ → nach ~60 s stabil.
+local PROF = {}
+local PROF_t0 = os.clock()
+local function profAdd(label, ms)
+  local e = PROF[label]; if not e then e = { n = 0, sum = 0, max = 0 }; PROF[label] = e end
+  e.n = e.n + 1; e.sum = e.sum + ms; if ms > e.max then e.max = ms end
+end
+if CONFIG.profile then
+  local function wrap(label, fn)
+    return function(...)
+      local t = os.clock()
+      local r = table.pack(fn(...))
+      profAdd(label, (os.clock() - t) * 1000)
+      return table.unpack(r, 1, r.n)
+    end
+  end
+  readArray     = wrap('readArray(memRead)',    readArray)
+  safeU16       = wrap('safeU16(memRead)',      safeU16)
+  safeU32       = wrap('safeU32(memRead)',      safeU32)
+  readMonRich   = wrap('readMonRich(decrypt)',  readMonRich)
+  readMonRichAt = wrap('readMonRichAt(read+dec)', readMonRichAt)
+  buildJson     = wrap('buildJson(team+JSON)',  buildJson)
+  emit          = wrap('emit(write+sig)',       emit)
+  detectStart   = wrap('detectStart(scaninit)', detectStart)
+  detectStep    = wrap('detectStep(scan)',      detectStep)
+  stepOnce      = wrap('stepOnce(TOTAL/frame)', stepOnce)
+  console.log('[profile] AKTIV — Messung laeuft, Bericht alle 5 s. Bitte ~60 s normal spielen.')
+end
+local function profReport(frameNo)
+  local dt = os.clock() - PROF_t0
+  if dt <= 0 then return end
+  local rows = {}
+  for label, e in pairs(PROF) do rows[#rows + 1] = { label = label, n = e.n, sum = e.sum, max = e.max } end
+  table.sort(rows, function(a, b) return a.sum > b.sum end)
+  console.log(string.format('===== [profile] %.0fs · Frames=%d · FPS~%.1f (Soll 60) =====', dt, frameNo, frameNo / dt))
+  for _, r in ipairs(rows) do
+    console.log(string.format('  %-24s n=%-7d total=%9.1f ms  avg=%7.3f ms  max=%7.1f ms',
+      r.label, r.n, r.sum, r.n > 0 and r.sum / r.n or 0, r.max))
+  end
+end
+
 -- ── Loop (stürzt nie ab) ─────────────────────────────────────────────────────
 local frame = 0
 while true do
   local ok, err = pcall(stepOnce, frame)
   if not ok then console.log("[sync] Frame uebersprungen: " .. tostring(err)) end
+  if CONFIG.profile and frame > 0 and frame % 300 == 0 then profReport(frame) end
   frame = frame + 1
   emu.frameadvance()
 end
