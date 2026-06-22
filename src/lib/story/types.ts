@@ -10,9 +10,10 @@ export interface StoryMon { name: string; level: number }
 
 export interface StoryTrainer {
   name: string
-  title?: string
+  title?: string            // role/context, e.g. "Rivale", "Team Galaktik · Boss", "Top 4"
   team: StoryMon[]
-  danger?: boolean   // flag tough fights so the UI can warn
+  danger?: boolean          // flag tough fights so the UI can warn
+  optional?: boolean        // optional/avoidable trainer
 }
 
 export interface StoryItem { name: string; note?: string }
@@ -40,6 +41,8 @@ export interface StoryChapter {
   trainers?: StoryTrainer[]
   items?: StoryItem[]
   hiddenItems?: StoryItem[]
+  tms?: StoryItem[]               // TMs/VMs available in this chapter
+  optionalAreas?: string[]        // optional side areas worth visiting
   /** Route names (matching the app's route list) to cross-check caught encounters. */
   encounters?: string[]
   gym?: GymInfo
@@ -49,5 +52,7 @@ export interface Story {
   game: string                 // emulator code, e.g. "platinum"
   label: string                // "Pokémon Platin"
   region: string               // "Sinnoh"
+  /** Extra names that should resolve to this story (game labels, localized names). */
+  aliases?: string[]
   chapters: StoryChapter[]
 }

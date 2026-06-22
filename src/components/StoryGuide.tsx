@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   MapPin, Trophy, ArrowRight, CheckCircle2, Circle, Swords, Package, Sparkles,
-  AlertTriangle, Gauge, Lock, Compass, Flag, Wifi, ShieldAlert, BookOpen,
+  AlertTriangle, Gauge, Lock, Compass, Flag, Wifi, ShieldAlert, BookOpen, Disc3, Map as MapIcon,
 } from 'lucide-react'
 import { useStoryProgress, supportedStories, type Story, type StoryChapter } from '../lib/story'
 
@@ -162,9 +162,10 @@ function Guide({ progress, caughtLocations }: { progress: ReturnType<typeof useS
             <div className="grid sm:grid-cols-2 gap-3">
               {chapter.trainers.map((tr) => (
                 <div key={tr.name} className={`rounded-2xl border p-4 ${tr.danger ? 'border-red-900/50 bg-red-950/15' : 'border-[#2e2e42] bg-[#16161f]'}`}>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-white font-black">{tr.name}</span>
                     {tr.danger && <AlertTriangle className="w-4 h-4 text-red-400" />}
+                    {tr.optional && <span className="text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#0e0e16] border border-[#2e2e42] text-slate-500">Optional</span>}
                   </div>
                   {tr.title && <div className="text-slate-500 text-xs mb-2">{tr.title}</div>}
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -212,6 +213,24 @@ function Guide({ progress, caughtLocations }: { progress: ReturnType<typeof useS
             )}
           </div>
         ) : null}
+
+        {/* TMs & HMs */}
+        {chapter.tms && chapter.tms.length > 0 && (
+          <Card icon={<Disc3 className="w-4 h-4 text-pk-red" />} title="TMs & VMs">
+            <ItemList items={chapter.tms} />
+          </Card>
+        )}
+
+        {/* Optional areas */}
+        {chapter.optionalAreas && chapter.optionalAreas.length > 0 && (
+          <Card icon={<MapIcon className="w-4 h-4 text-slate-400" />} title="Optionale Gebiete">
+            <div className="flex flex-wrap gap-2">
+              {chapter.optionalAreas.map((a) => (
+                <span key={a} className="text-sm font-bold px-3 py-1.5 rounded-full bg-[#16161f] border border-[#2e2e42] text-slate-300">{a}</span>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* Team analysis (preparatory) */}
         <div className="lp-card p-5 flex items-center gap-3 opacity-80">

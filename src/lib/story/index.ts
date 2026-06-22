@@ -6,24 +6,26 @@ import type { Story } from './types'
 
 export type { Story, StoryChapter, StoryTrainer, GymInfo, StoryItem } from './types'
 
-// Registry. Add an edition by dropping in another Story and registering it here.
+// Registry. Adding an edition = create story/<edition>.ts and append it here.
+// Nothing else in the engine ever changes: matching, aliases, resolving and the
+// renderer are all fully data-driven.
 const STORIES: Story[] = [platinum]
 
-// Accept emulator codes ("platinum") and German labels ("Pokémon Platin", "Platin").
-const ALIASES: Record<string, string> = {
-  platinum: 'platinum', platin: 'platinum', 'pokémon platin': 'platinum', 'pokemon platin': 'platinum',
-}
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9äöü]/g, '')
 
+/** Resolve by emulator code, story label or any alias listed in the data. */
 export function getStory(game: string | null | undefined): Story | null {
   if (!game) return null
-  const k = game.toLowerCase().trim()
-  const key = ALIASES[k] ?? k
-  return STORIES.find((s) => s.game === key) ?? null
+  const k = norm(game)
+  if (!k) return null
+  return STORIES.find((s) =>
+    norm(s.game) === k ||
+    norm(s.label) === k ||
+    (s.aliases ?? []).some((a) => norm(a) === k),
+  ) ?? null
 }
 
 export function supportedStories(): Story[] { return STORIES }
-
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9äöü]/g, '')
 
 /** Find the chapter whose locations match the live location name (fuzzy). */
 export function resolveChapterIndex(story: Story, locationName: string | null): number | null {
