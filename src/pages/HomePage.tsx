@@ -11,6 +11,7 @@ import { useRunStore } from '../store/runStore'
 import { useToastStore } from '../store/toastStore'
 import { GAME_LIST } from '../lib/routes'
 import { setRunMode, type RunMode } from '../lib/runMode'
+import { useSettings } from '../store/settingsStore'
 import UserMenu from '../components/UserMenu'
 import RunModeCards from '../components/RunModeCards'
 import AtmosphereBackground from '../components/AtmosphereBackground'
@@ -76,8 +77,8 @@ function Dashboard() {
   const toast = useToastStore()
   const [game, setGame] = useState(GAME_LIST[0])
   const [runName, setRunName] = useState('')
-  const [mode, setMode] = useState<RunMode>('manual')
-  const [playerCount, setPlayerCount] = useState(2)
+  const [mode, setMode] = useState<RunMode>(() => useSettings.getState().defaultRunMode)
+  const [playerCount, setPlayerCount] = useState<number>(() => useSettings.getState().defaultPlayers)
   const [customCode, setCustomCode] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [busy, setBusy] = useState(false)

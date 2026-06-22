@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import ToastContainer from './components/Toast'
 import ErrorBoundary from './components/ErrorBoundary'
 import { AuthProvider } from './contexts/AuthContext'
+import { useApplySettings } from './store/settingsStore'
 import './index.css'
 
 // Route-level code splitting: the landing page no longer ships the heavy
@@ -25,6 +26,7 @@ function PageLoader() {
 }
 
 export default function App() {
+  useApplySettings()   // keep accent/theme/perf classes in sync with saved settings
   return (
     <ErrorBoundary>
       <AuthProvider>
