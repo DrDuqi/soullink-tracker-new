@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Palette, Languages, Gamepad2, Bell, Zap, Package, Info, Check, Settings as SettingsIcon,
-  Monitor, RefreshCw, RotateCcw, Code2, MessageCircle, ScrollText, Download, Wifi, WifiOff,
+  Monitor, RefreshCw, RotateCcw, Code2, MessageCircle, ScrollText, Download,
 } from 'lucide-react'
 import { useSettings, ACCENTS, type Accent, type Lang } from '../store/settingsStore'
 import { LANGUAGES, useT } from '../lib/i18n'
@@ -13,6 +13,7 @@ import { useToastStore } from '../store/toastStore'
 import type { RunMode } from '../lib/runMode'
 import Modal, { SettingRow, Toggle } from './Modal'
 import ChangelogModal from './ChangelogModal'
+import CompanionVersion from './CompanionVersion'
 
 type Section = 'appearance' | 'language' | 'gameplay' | 'notifications' | 'performance' | 'companion' | 'about'
 
@@ -161,15 +162,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
           {section === 'companion' && (
             <Block title={t('settings.companion')}>
-              <div className="rounded-2xl border border-[#2e2e42] bg-[#1c1c26] p-5 mb-4 flex items-center gap-3">
-                <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${comp?.ok ? 'bg-green-500/15 text-green-400' : 'bg-slate-700/30 text-slate-500'}`}>
-                  {comp?.ok ? <Wifi className="w-5 h-5" /> : <WifiOff className="w-5 h-5" />}
-                </span>
-                <div className="min-w-0">
-                  <div className="text-white font-bold text-sm">{comp?.ok ? t('settings.companionConnected') : t('settings.companionOffline')}</div>
-                  <div className="text-slate-500 text-xs">{t('settings.companionVersion')}: {comp?.version ?? '—'}</div>
-                </div>
-              </div>
+              <div className="mb-4"><CompanionVersion /></div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <a href={DOWNLOADS.companion} className="lp-action"><Download className="w-4 h-4" /> {t('settings.checkUpdates')}</a>
                 <button onClick={reconnect} disabled={isFetching} className="lp-action"><RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} /> {t('settings.reconnect')}</button>

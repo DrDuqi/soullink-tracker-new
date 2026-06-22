@@ -11,6 +11,7 @@ import { companionConfig, saveCompanionConfig, USES_COMPANION } from '../lib/com
 import { useEmulatorSettings, useEmulatorSettingsStore, findFile, launchEmulator } from '../lib/emulatorSettings'
 import { DOWNLOADS } from '../lib/downloads'
 import AtmosphereBackground from '../components/AtmosphereBackground'
+import CompanionVersion from '../components/CompanionVersion'
 
 // One guided step. Green when done, otherwise shows its action(s) + a support hint.
 function StepCard({ n, title, desc, done, optional, children }: {
@@ -174,11 +175,12 @@ export default function SetupPage() {
             <StepCard n={1} done={installed && running} title="SoulLink Companion installieren & starten"
               desc="Eine kleine App auf deinem PC, die BizHawk für dich startet. Sie läuft unsichtbar im Hintergrund (Symbol unten rechts im System-Tray).">
               <a href={DOWNLOADS.companion} download className={btnRed} style={{ background: '#CC0000' }}>
-                <Download className="w-4 h-4" /> Companion herunterladen
+                <Download className="w-4 h-4" /> SoulLink Companion herunterladen
               </a>
               <p className="text-slate-500 text-xs sm:ml-1">
-                {running ? '' : installed ? 'Schon installiert? Starte ihn über das Startmenü.' : 'Installieren → startet automatisch. Dann wird dieser Punkt grün.'}
+                {running ? '' : installed ? 'Schon installiert? Starte ihn über das Startmenü.' : 'Lädt direkt die richtige Datei (kein GitHub, keine ZIP). Installieren → startet automatisch.'}
               </p>
+              <div className="basis-full mt-1"><CompanionVersion /></div>
             </StepCard>
 
             {/* 2 · BizHawk */}
