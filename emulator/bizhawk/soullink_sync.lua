@@ -40,7 +40,7 @@ local CONFIG = {
 }
 
 -- Messzähler für den Performance-Modus (nur aktiv bei CONFIG.perf).
-local PERF = { reads = 0, emits = 0, build_s = 0, build_max = 0, write_s = 0, write_max = 0, t0 = os.clock() }
+local PERF = { reads = 0, emits = 0, writes = 0, build_s = 0, build_max = 0, write_s = 0, write_max = 0, t0 = os.clock() }
 
 -- Gen-4 Block-Reihenfolge (Permutation per ((PID>>13)&0x1F)%24)
 local ORDERS = {
@@ -669,8 +669,11 @@ local function buildJson(profile)
     CONFIG.game, CONFIG.trainer_name, os.time() * 1000, jnum(locId), jstr(locName), table.concat(parts, ","))
 end
 
--- Zielpfad bestimmen: explizit gesetzt > automatisch neben dem Script > relativ.
+-- Zielpfad bestimmen: ENV (vom Companion gesetzt → lokaler AppData-Ordner) >
+-- CONFIG.file_path > automatisch neben dem Script (Dev) > relativ.
 local function resolveOutFile()
+  local env = os.getenv("SOULLINK_TEAM_FILE")
+  if env and env ~= "" then return env end
   if CONFIG.file_path ~= nil and CONFIG.file_path ~= "" then return CONFIG.file_path end
   local dir
   pcall(function()
@@ -684,11 +687,57 @@ end
 local OUT_FILE = resolveOutFile()
 console.log("[sync] Schreibe Team nach: " .. OUT_FILE)
 
+-- Atomarer Write: erst .tmp schreiben, dann über die Zieldatei umbenennen, damit
+-- der Companion nie eine halbfertige Datei liest. Windows: rename scheitert über
+-- eine existierende Datei → vorher entfernen; Fallback = direkter Write.
+local function atomicWrite(path, data)
+  local tmp = path .. ".tmp"
+  local f = io.open(tmp, "w")
+  if not f then
+    local g = io.open(path, "w"); if g then g:write(data); g:close() end
+    return
+  end
+  f:write(data); f:close()
+  os.remove(path)
+  if not os.rename(tmp, path) then
+    local g = io.open(path, "w"); if g then g:write(data); g:close() end
+    os.remove(tmp)
+  end
+end
+
 local httpWarned = false
 local _lastWrittenCount = -1
+local _lastSig = nil          -- Inhalts-Signatur des zuletzt GESCHRIEBENEN JSON
+local _lastWriteAt = -100     -- os.clock() des letzten Writes (Debounce)
+local _slowWarnedAt = -100    -- Rate-Limit für die "Write zu langsam"-Warnung
+local MIN_WRITE_INTERVAL = 0.4   -- s: nicht häufiger schreiben (Debounce); wird beim nächsten Emit nachgeholt
+local SLOW_WRITE_MS = 50         -- ab hier gilt ein Write als zu langsam → Hinweis
+
+-- Schreibt NUR bei echter Inhaltsänderung (volatiler capturedAt-Zeitstempel wird
+-- ignoriert), atomar, debounced und mit Dauer-Messung. Im Stillstand entsteht so
+-- KEIN Datei-I/O mehr → kein Emulator-Ruckeln durch Defender/Indexer/Cloud-Hooks.
 local function emit(json)
-  local f = io.open(OUT_FILE, "w"); if f then f:write(json); f:close() end   -- primäre Datei (Live-Sync)
-  -- writeJson-Verifikation: wie viele "slot"-Einträge stehen WIRKLICH in der Datei?
+  local sig = json:gsub('"capturedAt":%-?%d+', '')     -- volatilen Zeitstempel ausblenden
+  if sig == _lastSig then return end                    -- nichts geändert → NICHT schreiben
+  local now = os.clock()
+  if (now - _lastWriteAt) < MIN_WRITE_INTERVAL then return end   -- Debounce (nächster Emit holt es nach)
+  _lastSig = sig
+  _lastWriteAt = now
+
+  local t0 = os.clock()
+  atomicWrite(OUT_FILE, json)
+  local ms = (os.clock() - t0) * 1000
+  if CONFIG.perf then
+    PERF.writes = PERF.writes + 1
+    PERF.write_s = PERF.write_s + ms
+    if ms > PERF.write_max then PERF.write_max = ms end
+  end
+  if ms > SLOW_WRITE_MS and (now - _slowWarnedAt) > 5 then
+    _slowWarnedAt = now
+    console.log(string.format(
+      "[sync] WARN: Datei-Write dauerte %.0f ms. Tipp: SoulLink-Companion-AppData-Ordner in Windows Defender als Ausnahme hinzufuegen. Ziel=%s", ms, OUT_FILE))
+  end
+
   local _, n = json:gsub('"slot":', '')
   if n ~= _lastWrittenCount then
     _lastWrittenCount = n
@@ -703,7 +752,7 @@ local function emit(json)
   end)
   if not ok and not httpWarned then
     httpWarned = true
-    console.log("[sync] comm.httpPost nicht verfuegbar — Daten liegen in " .. CONFIG.file_path)
+    console.log("[sync] comm.httpPost nicht verfuegbar — Daten liegen in " .. OUT_FILE)
   end
 end
 
@@ -734,11 +783,11 @@ local function stepOnce(frame)
   if CONFIG.perf and frame > 0 and frame % 60 == 0 then
     local dt = os.clock() - PERF.t0
     console.log(string.format(
-      "[perf] %.2fs · Emits=%d · Reads=%d · buildJson Ø%.1f/max%.1f ms · Datei-Write Ø%.1f/max%.1f ms · Ziel=%s",
-      dt, PERF.emits, PERF.reads,
+      "[perf] %.2fs · Emits=%d · Writes=%d (uebersprungen=%d) · Reads=%d · buildJson O%.1f/max%.1f ms · Datei-Write O%.1f/max%.1f ms · Ziel=%s",
+      dt, PERF.emits, PERF.writes, PERF.emits - PERF.writes, PERF.reads,
       PERF.emits > 0 and PERF.build_s / PERF.emits or 0, PERF.build_max,
-      PERF.emits > 0 and PERF.write_s / PERF.emits or 0, PERF.write_max, OUT_FILE))
-    PERF.reads, PERF.emits, PERF.build_s, PERF.build_max, PERF.write_s, PERF.write_max, PERF.t0 = 0, 0, 0, 0, 0, 0, os.clock()
+      PERF.writes > 0 and PERF.write_s / PERF.writes or 0, PERF.write_max, OUT_FILE))
+    PERF.reads, PERF.emits, PERF.writes, PERF.build_s, PERF.build_max, PERF.write_s, PERF.write_max, PERF.t0 = 0, 0, 0, 0, 0, 0, 0, os.clock()
   end
   if DET.running then
     if detectStep(profile) then detectFinish(profile) end
@@ -753,13 +802,11 @@ local function stepOnce(frame)
       if readMon(profile, 0) then
         if count and count >= 1 and count <= 6 then profile.team_size = count end
         if CONFIG.perf then
-          local t1 = os.clock(); local json = buildJson(profile)
-          local t2 = os.clock(); emit(json)
-          local t3 = os.clock()
+          local t1 = os.clock(); local json = buildJson(profile); local t2 = os.clock()
           PERF.emits = PERF.emits + 1
-          local b = (t2 - t1) * 1000; local w = (t3 - t2) * 1000
+          local b = (t2 - t1) * 1000
           PERF.build_s = PERF.build_s + b; if b > PERF.build_max then PERF.build_max = b end
-          PERF.write_s = PERF.write_s + w; if w > PERF.write_max then PERF.write_max = w end
+          emit(json)          -- misst die Schreibdauer selbst (nur bei echter Änderung)
         else
           emit(buildJson(profile))
         end

@@ -236,6 +236,11 @@ export default function SetupPage() {
                 </div>
               )}
               {(!bizhawkFound || !romFound) && !connectErr && <p className="text-slate-500 text-xs sm:ml-1">Erst BizHawk + ROM oben einrichten.</p>}
+              <p className="basis-full text-slate-500 text-xs mt-1">
+                💡 Ruckelt BizHawk im Sekundentakt? Füge den Ordner
+                <code className="mx-1 px-1 py-0.5 rounded bg-[#16161f] border border-[#2e2e42] text-slate-300">%LOCALAPPDATA%\SoulLink Companion</code>
+                als Ausnahme in Windows Defender (bzw. deinem Antivirus) hinzu.
+              </p>
             </StepCard>
           </div>
 

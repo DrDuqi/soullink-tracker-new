@@ -22,7 +22,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 import { createServer } from 'node:http'
-import { readFileSync, writeFileSync, statSync, existsSync, readdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, statSync, existsSync, readdirSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -36,11 +36,17 @@ const PORT = Number(process.env.SOULLINK_COMPANION_PORT || process.env.SYNC_PORT
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = process.env.SOULLINK_ROOT || join(HERE, '..', '..')
 
-// Which team file to read. Defaults to the Lua's output next to the script; once
-// a launch happens we point it at dirname(lua)/soullink_team.json (robust even if
-// the user keeps the .lua elsewhere). Env override still wins.
-let currentTeamFile = process.env.SOULLINK_TEAM_FILE
-  || join(ROOT, 'emulator', 'bizhawk', 'soullink_team.json')
+// The team file lives in a dedicated LOCAL AppData folder — never Desktop /
+// Downloads / a cloud-synced or project folder. That keeps frequent writes away
+// from Windows Search indexing, iCloud/OneDrive hooks and most AV real-time
+// scanning (one folder the user can exclude in Defender). The Lua is told this
+// path via the SOULLINK_TEAM_FILE env var on launch, so both sides always agree.
+const APPDATA_DIR = join(process.env.LOCALAPPDATA || process.env.APPDATA || HERE, 'SoulLink Companion')
+try { mkdirSync(APPDATA_DIR, { recursive: true }) } catch { /* ignore */ }
+const TEAM_FILE = join(APPDATA_DIR, 'soullink_team.json')
+
+// Which team file to read. Env override wins; otherwise the AppData file above.
+let currentTeamFile = process.env.SOULLINK_TEAM_FILE || TEAM_FILE
 
 // ── persistent config (BizHawk/ROM paths the user picked once) ───────────────
 // The Companion — not the browser — is the machine-bound part, so it remembers the
@@ -134,12 +140,12 @@ function bizhawkFolderInfo(exeDir) {
 
 // Spawn and OBSERVE for `ms`: capture stdout/stderr/error/exit so a crash is
 // visible instead of a silent "launched". alive=true only if still running.
-function tryLaunch(exe, args, cwd, ms) {
+function tryLaunch(exe, args, cwd, ms, env) {
   return new Promise((resolve) => {
     let stdout = '', stderr = '', errEvent = null, exited = false
     let code = null, signal = null
     let child
-    try { child = spawn(exe, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] }) }
+    try { child = spawn(exe, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: env || process.env }) }
     catch (e) { resolve({ alive: false, code: null, signal: null, stdout: '', stderr: '', errEvent: null, spawnThrew: String(e?.message || e) }); return }
     child.stdout?.on('data', (d) => { if (stdout.length < 4000) stdout += d.toString() })
     child.stderr?.on('data', (d) => { if (stderr.length < 4000) stderr += d.toString() })
@@ -227,6 +233,20 @@ function findFileByName(root, name) {
     if (complete) return complete
   }
   return matches[0]
+}
+
+// ── liveness: is BizHawk running? (cached, throttled) ────────────────────────
+// Freshness must NOT depend on how often the Lua writes the file — the Lua now
+// only writes on real change, so an idle game would otherwise look "stale". While
+// EmuHawk is alive and we have a team, we report the data as fresh; the staleness
+// (file mtime) only matters once BizHawk is gone.
+let bizhawkAlive = false
+let lastAliveCheck = 0
+function refreshBizhawkAlive() {
+  const now = Date.now()
+  if (now - lastAliveCheck < 3000) return            // throttle the tasklist spawn
+  lastAliveCheck = now
+  isBizhawkRunning().then((v) => { bizhawkAlive = v }).catch(() => {})
 }
 
 // ── sync file reading (newer of file vs. last POST) ──────────────────────────
@@ -357,8 +377,10 @@ function handleRequest(req, res) {
       // Paths are valid → remember them for next time (any browser, no wizard).
       saveConfig({ bizhawk, rom, syncFolder: dirname(lua) })
 
-      // Read this Lua's team output from now on (robust if it lives elsewhere).
-      currentTeamFile = join(dirname(lua), 'soullink_team.json')
+      // The Lua writes to the AppData team file (passed via env below) → read it.
+      currentTeamFile = TEAM_FILE
+      console.log('[launch] Team-Datei:', TEAM_FILE)
+      console.log('[launch] Tipp: Falls BizHawk ruckelt, diesen Ordner in Windows Defender ausschliessen:', APPDATA_DIR)
 
       const running = await isBizhawkRunning()
       if (running && !restart) { console.log('[launch] bereits offen, kein Neustart.'); sendJson(res, { ok: true, already: true, lua: true }); return }
@@ -368,16 +390,18 @@ function handleRequest(req, res) {
       const folder = bizhawkFolderInfo(cwd)
       if (!folder.complete) console.log('[launch] ⚠ Ordner ohne BizHawk-DLLs — evtl. falsche/lose EmuHawk.exe.')
 
+      // Tell the Lua where to write (AppData) so both sides always agree.
+      const launchEnv = { ...process.env, SOULLINK_TEAM_FILE: TEAM_FILE }
       const variants = [
         { label: 'rom --lua', args: [rom, '--lua=' + lua] },
         { label: '--lua rom', args: ['--lua=' + lua, rom] },
       ]
       let last = null
       for (const v of variants) {
-        const r = await tryLaunch(bizhawk, v.args, cwd, 2500)
+        const r = await tryLaunch(bizhawk, v.args, cwd, 2500, launchEnv)
         last = r
         console.log(`[launch] "${v.label}" alive=${r.alive} exit=${r.code} (${hex32(r.code)}) pid=${r.pid ?? '-'}`)
-        if (r.alive) { sendJson(res, { ok: true, launched: true, lua: true, restarted: running && restart, variant: v.label }); return }
+        if (r.alive) { bizhawkAlive = true; lastAliveCheck = Date.now(); sendJson(res, { ok: true, launched: true, lua: true, restarted: running && restart, variant: v.label }); return }
       }
 
       const code = last?.code ?? null
@@ -405,6 +429,9 @@ function handleRequest(req, res) {
       const fileEntry = readTeamFile()
       let last = lastPost
       if (fileEntry && (!last || fileEntry.at > last.at)) last = { data: fileEntry.data, at: fileEntry.at }
+      // Keep "connected" alive while EmuHawk runs, regardless of write frequency.
+      refreshBizhawkAlive()
+      if (last && bizhawkAlive) last = { data: last.data, at: Date.now() }
       sendJson(res, { ok: true, last })
       return
     }
