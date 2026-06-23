@@ -4,6 +4,7 @@ import { Dices, Play, Loader2, Check, AlertTriangle, Settings, PartyPopper } fro
 import { useProfiles } from '../../hooks/useProfiles'
 import { useEmulatorSync } from '../../hooks/useEmulatorSync'
 import { getPlatform } from '../../platform'
+import type { Preset } from '../../lib/presets'
 
 // The single-player end-to-end flow: pick a profile (with its ROM/BizHawk/preset),
 // generate a seed, then one click → randomize → launch BizHawk → wait for live-sync.
@@ -25,19 +26,33 @@ export default function NewRunPage() {
   const platform = getPlatform()
   const { active, loading } = useProfiles()
   const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1_000_000_000))
+  const [presets, setPresets] = useState<Preset[]>([])
+  const [presetId, setPresetId] = useState<string>('')
   const [step, setStep] = useState<Step>('idle')
   const [err, setErr] = useState<string | null>(null)
   const sync = useEmulatorSync(step === 'waiting' || step === 'running')
 
   useEffect(() => { if (step === 'waiting' && sync.phase === 'connected') setStep('running') }, [sync.phase, step])
 
-  const ready = !!(active && active.paths.originalRom && active.paths.bizhawk && active.paths.preset)
+  // Load presets for the profile's edition; default to the profile's last preset or
+  // the first available (SoulLink Standard) so beginners just click "Run starten".
+  useEffect(() => {
+    let cancel = false
+    platform.listPresets(active?.edition || undefined).then((list) => {
+      if (cancel || !list) return
+      setPresets(list)
+      setPresetId((cur) => cur || active?.presetId || list[0]?.id || '')
+    })
+    return () => { cancel = true }
+  }, [platform, active?.edition, active?.presetId])
+
+  const ready = !!(active && active.paths.originalRom && active.paths.bizhawk && presetId)
   const busy = step === 'randomizing' || step === 'launching' || step === 'waiting'
 
   async function start() {
     if (!active) return
     setErr(null); setStep('randomizing')
-    const r = await platform.prepareRun({ profileId: active.id, seed })
+    const r = await platform.prepareRun({ profileId: active.id, presetId, seed })
     if (!r.ok) { setErr(ERR[r.error || ''] || r.error || 'Fehler'); setStep('error'); return }
     setStep('launching')
     const lr = await platform.launch({ bizhawkPath: r.bizhawk || '', romPath: r.outputRom || '', luaPath: '', syncFolder: '' }, false)
@@ -78,6 +93,16 @@ export default function NewRunPage() {
               {active!.edition && <span className="text-[11px] font-bold text-slate-300 bg-white/5 border border-[#2e2e42] rounded-full px-2 py-0.5">{active!.edition}</span>}
               {active!.players.map((p, i) => <span key={i} className="text-[11px] font-bold text-slate-400">{p}{i < active!.players.length - 1 ? ' ·' : ''}</span>)}
             </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
+            <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">Preset (Regeln)</label>
+            <select value={presetId} onChange={(e) => setPresetId(e.target.value)} disabled={busy}
+              className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3.5 py-2.5 text-sm text-white">
+              {presets.length === 0 && <option value="">Kein Preset verfügbar</option>}
+              {presets.map((p) => <option key={p.id} value={p.id}>{p.name}{p.builtin ? '' : ' (eigenes)'}</option>)}
+            </select>
+            <p className="text-slate-500 text-[11px] mt-2">Bestimmt die Randomizer-Regeln. Eigene Presets erstellst du über „Profile → Preset bearbeiten".</p>
           </div>
 
           <div className="mt-4 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">

@@ -12,10 +12,12 @@
 import type { CompanionConfig, RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult } from '../lib/companion'
 import type { EmulatorSettings, LaunchResult } from '../lib/emulatorSettings'
 import type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult } from '../lib/profiles'
+import type { Preset, ImportPresetInput } from '../lib/presets'
 
 export type { CompanionConfig, EmulatorSettings, LaunchResult }
 export type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult }
 export type { RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult }
+export type { Preset, ImportPresetInput }
 
 export type PlatformKind = 'web' | 'companion'
 export type PickKind = 'biz' | 'rom' | 'preset'
@@ -67,4 +69,10 @@ export interface PlatformBridge {
   randomize(input: RandomizeInput): Promise<RandomizeResult>
   /** Prepare a new SoulLink: randomize the profile's ROM into a managed file. */
   prepareRun(input: PrepareRunInput): Promise<PrepareRunResult>
+
+  // ── presets (rules; separate from the seed) ────────────────────────────────
+  listPresets(edition?: string): Promise<Preset[] | null>
+  importPreset(input: ImportPresetInput): Promise<Preset | null>
+  renamePreset(id: string, name: string): Promise<boolean>
+  deletePreset(id: string): Promise<boolean>
 }

@@ -83,7 +83,7 @@ export async function setActiveProfileHttp(id: string): Promise<boolean> {
 }
 
 // ── run preparation (Phase 3): randomize a profile's ROM for a new SoulLink ────
-export interface PrepareRunInput { profileId: string; seed?: number | string | null; settingsString?: string }
+export interface PrepareRunInput { profileId: string; presetId?: string; seed?: number | string | null; settingsString?: string }
 export interface PrepareRunResult {
   ok: boolean
   outputRom?: string

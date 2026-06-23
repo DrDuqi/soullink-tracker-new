@@ -7,6 +7,7 @@
 import { USES_COMPANION, companionHealth, companionConfig, saveCompanionConfig, pickCompanionFile, validateRomHttp, randomizerStatusHttp, randomizeHttp } from '../lib/companion'
 import { findFile, launchEmulator } from '../lib/emulatorSettings'
 import { fetchProfiles, createProfileHttp, updateProfileHttp, deleteProfileHttp, duplicateProfileHttp, setActiveProfileHttp, prepareRunHttp } from '../lib/profiles'
+import { fetchPresets, importPresetHttp, renamePresetHttp, deletePresetHttp } from '../lib/presets'
 import type { PlatformBridge } from './types'
 
 export const webBridge: PlatformBridge = {
@@ -28,4 +29,8 @@ export const webBridge: PlatformBridge = {
   randomizerStatus: () => randomizerStatusHttp(),
   randomize: (input) => randomizeHttp(input),
   prepareRun: (input) => prepareRunHttp(input),
+  listPresets: (edition) => fetchPresets(edition),
+  importPreset: (input) => importPresetHttp(input),
+  renamePreset: (id, name) => renamePresetHttp(id, name),
+  deletePreset: (id) => deletePresetHttp(id),
 }
