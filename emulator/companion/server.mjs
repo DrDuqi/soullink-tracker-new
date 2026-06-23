@@ -692,36 +692,49 @@ function handleRequest(req, res) {
       if (!paths.originalRom || !existsSync(paths.originalRom)) { sendJson(res, { ok: false, error: 'original_rom_missing' }, 400); return }
       if (!paths.bizhawk || !existsSync(paths.bizhawk)) { sendJson(res, { ok: false, error: 'bizhawk_missing' }, 400); return }
       // Preset (rules) is chosen per run: explicit presetId → profile's preset →
-      // profile's legacy preset file. Strictly separate from the seed below.
-      const settingsString = b.settingsString ? String(b.settingsString) : null
-      const presetId = b.presetId || profile.presetId || null
-      const settingsFile = (presetId && getPresetFile(presetId)) || paths.preset || null
-      if (!settingsString && (!settingsFile || !existsSync(settingsFile))) { sendJson(res, { ok: false, error: 'preset_missing' }, 400); return }
-
+      const runId = b.runId ? String(b.runId) : null
       const seed = (b.seed === undefined || b.seed === null || b.seed === '') ? Math.floor(Math.random() * 1_000_000_000) : b.seed
       const safe = (s) => String(s ?? '').replace(/[^\w-]+/g, '')
       const players = Array.isArray(profile.players) ? profile.players.map(safe).filter(Boolean) : []
       // The ROM basename MUST be globally unique → BizHawk keys the savegame
       // (NDS/SaveRAM/<basename>.SaveRAM) by it, so each run gets its own save and a
       // re-open loads exactly that save. The run id fragment guarantees uniqueness.
-      const runId = b.runId ? String(b.runId) : null
       const tag = runId ? '_' + runId.slice(0, 8) : ''
       const outName = `${safe(profile.edition || 'ROM') || 'ROM'}_${players.join('-') || 'Solo'}_Seed_${seed}${tag}.nds`
-      // Per-run folder when we have a run id, else the shared Randomized folder.
       const outDir = runId ? runFolder(runId) : join(dirname(CONFIG_FILE), 'ROMs', 'Randomized')
       try { mkdirSync(outDir, { recursive: true }) } catch { /* ignore */ }
       const outputRom = join(outDir, outName)
 
+      // Preset (rules), strictly separate from the seed. Sources, in order:
+      //   presetData (base64 .rnqs shared via the run → JOINER) → presetId (creator's
+      //   local preset) → the profile's legacy preset file.
+      const settingsString = b.settingsString ? String(b.settingsString) : null
+      const presetId = b.presetData ? null : (b.presetId || profile.presetId || null)
+      let settingsFile = null
+      if (b.presetData) {
+        settingsFile = join(outDir, 'shared-preset.rnqs')
+        try { writeFileSync(settingsFile, Buffer.from(String(b.presetData), 'base64')) } catch { settingsFile = null }
+      } else {
+        settingsFile = (presetId && getPresetFile(presetId)) || paths.preset || null
+      }
+      if (!settingsString && (!settingsFile || !existsSync(settingsFile))) { sendJson(res, { ok: false, error: 'preset_missing' }, 400); return }
+
       console.log('[run] prepare:', profile.name, '· run', runId || '(local)', '· seed', seed, '→', outputRom)
       const r = await randomize({ inputRom: paths.originalRom, outputRom, settingsFile, settingsString, seed })
       if (!r.ok) { sendJson(res, { ok: false, error: r.error || 'randomize_failed', log: r.log }, 500); return }
+      // The shareable recipe so the partner can reproduce identically (or know the
+      // rules): the preset bytes + the base ROM id (gameCode-revision).
+      let presetData = null
+      try { if (settingsFile && existsSync(settingsFile)) presetData = readFileSync(settingsFile).toString('base64') } catch { /* ignore */ }
+      let baseRom = null
+      try { const v = validateRom(paths.originalRom); if (v?.gameCode) baseRom = `${v.gameCode}-${v.revision ?? 0}` } catch { /* ignore */ }
       try { recordRun(profile.id, { seed, romPath: outputRom, presetId, runId }) } catch { /* non-fatal */ }
-      // Register the run locally so "Run öffnen / Weiterspielen" later relaunches the
-      // exact ROM (⇒ same savegame). saveName = the BizHawk SaveRAM key for backups.
+      // Register the run locally so "Weiterspielen" later relaunches the exact ROM
+      // (⇒ same savegame). saveName = the BizHawk SaveRAM key for backups.
       if (runId) {
         try { recordLocalRun(runId, { romPath: outputRom, bizhawk: paths.bizhawk, seed, presetId, edition: profile.edition || null, profileId: profile.id, saveName: outName.replace(/\.nds$/i, '') + '.SaveRAM' }) } catch { /* non-fatal */ }
       }
-      sendJson(res, { ok: true, runId, outputRom, seed, presetId, edition: profile.edition || null, bizhawk: paths.bizhawk, players: profile.players || [] })
+      sendJson(res, { ok: true, runId, outputRom, seed, presetId, presetData, baseRom, edition: profile.edition || null, bizhawk: paths.bizhawk, players: profile.players || [] })
     })
     return
   }
