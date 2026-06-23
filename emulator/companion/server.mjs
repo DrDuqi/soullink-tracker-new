@@ -28,6 +28,7 @@ import { homedir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawn, exec } from 'node:child_process'
 import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile } from './profiles.mjs'
+import { initRandomizer, randomizerStatus, randomize } from './randomizer.mjs'
 
 // Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
 // (which CI bumps from the release tag) to startCompanion; CLI falls back to the
@@ -64,6 +65,18 @@ let nativePick = null
 const CONFIG_FILE = process.env.SOULLINK_COMPANION_CONFIG || join(HERE, 'companion-config.json')
 // Profiles live next to the config, in the same per-machine folder.
 initProfiles(join(dirname(CONFIG_FILE), 'profiles.json'))
+// Randomizer (FVX): bundled in the installer (resources/randomizer), else a
+// user-picked path (config.fvxDir), else auto-detected under the usual folders.
+initRandomizer({
+  bundledDir: join(HERE, '..', 'randomizer'),
+  roots: (() => {
+    let home = null; try { home = homedir() } catch { /* none */ }
+    const r = [ROOT, dirname(ROOT)]
+    if (home) r.push(join(home, 'Downloads'), join(home, 'Desktop'), join(home, 'Documents'))
+    return r
+  })(),
+  getConfigDir: () => { try { return loadConfig().fvxDir || null } catch { return null } },
+})
 function loadConfig() {
   try { const j = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')); return (j && typeof j === 'object') ? j : {} }
   catch { return {} }
@@ -575,6 +588,33 @@ function handleRequest(req, res) {
   if (path === '/api/profiles/active' && req.method === 'POST') {
     try { sendJson(res, { ok: setActiveProfile(url.searchParams.get('id')) }) }
     catch { sendJson(res, { ok: false }, 500) }
+    return
+  }
+
+  // ── randomizer (FVX): status + run ──────────────────────────────────────────
+  if (path === '/api/randomizer/detect') {
+    try { sendJson(res, { ok: true, ...randomizerStatus() }) } catch { sendJson(res, { ok: false }, 500) }
+    return
+  }
+  if (path === '/api/randomize') {
+    if (req.method !== 'POST') { sendJson(res, { ok: false }, 405); return }
+    let body = ''
+    req.on('data', (c) => { body += c; if (body.length > 1_000_000) req.destroy() })
+    req.on('end', async () => {
+      let p = {}
+      try { p = JSON.parse(body || '{}') } catch { /* invalid → empty */ }
+      const clean = (s) => (s == null ? null : String(s).trim().replace(/^"+|"+$/g, '').trim() || null)
+      console.log('[randomize] start:', clean(p.inputRom), '→', clean(p.outputRom), '· seed:', p.seed)
+      const r = await randomize({
+        inputRom: clean(p.inputRom),
+        outputRom: clean(p.outputRom),
+        settingsFile: clean(p.settingsFile),
+        settingsString: p.settingsString ? String(p.settingsString) : null,
+        seed: p.seed,
+      })
+      console.log('[randomize] result:', r.ok ? 'OK → ' + r.outputRom : 'FEHLER ' + r.error)
+      sendJson(res, r, r.ok ? 200 : 500)
+    })
     return
   }
 
