@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dices, Play, Loader2, Check, AlertTriangle, Settings, PartyPopper } from 'lucide-react'
+import { Dices, Play, Loader2, Check, AlertTriangle, Settings } from 'lucide-react'
 import { useProfiles } from '../../hooks/useProfiles'
-import { useEmulatorSync } from '../../hooks/useEmulatorSync'
 import { getPlatform } from '../../platform'
+import { useAuth } from '../../contexts/AuthContext'
+import { createRun } from '../../lib/createRun'
+import { useRunStore } from '../../store/runStore'
 import type { Preset } from '../../lib/presets'
 
-// The single-player end-to-end flow: pick a profile (with its ROM/BizHawk/preset),
-// generate a seed, then one click → randomize → launch BizHawk → wait for live-sync.
-// Everything except the seed is automatic, which is the whole point of Phase 3.
-type Step = 'idle' | 'randomizing' | 'launching' | 'waiting' | 'running' | 'error'
+// The end-to-end flow that closes the loop: create a real Supabase run → randomize
+// the profile's ROM into a per-run file (own savegame) → launch BizHawk → open the
+// existing RunPage. Everything except the seed is automatic.
+type Step = 'idle' | 'creating' | 'randomizing' | 'launching' | 'error'
 
 const ERR: Record<string, string> = {
   profile_not_found: 'Profil nicht gefunden.',
@@ -24,15 +26,14 @@ const ERR: Record<string, string> = {
 export default function NewRunPage() {
   const navigate = useNavigate()
   const platform = getPlatform()
+  const { user, profile } = useAuth()
   const { active, loading } = useProfiles()
+  const setCurrentRun = useRunStore((s) => s.setCurrentRun)
   const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1_000_000_000))
   const [presets, setPresets] = useState<Preset[]>([])
   const [presetId, setPresetId] = useState<string>('')
   const [step, setStep] = useState<Step>('idle')
   const [err, setErr] = useState<string | null>(null)
-  const sync = useEmulatorSync(step === 'waiting' || step === 'running')
-
-  useEffect(() => { if (step === 'waiting' && sync.phase === 'connected') setStep('running') }, [sync.phase, step])
 
   // Load presets for the profile's edition; default to the profile's last preset or
   // the first available (SoulLink Standard) so beginners just click "Run starten".
@@ -47,17 +48,37 @@ export default function NewRunPage() {
   }, [platform, active?.edition, active?.presetId])
 
   const ready = !!(active && active.paths.originalRom && active.paths.bizhawk && presetId)
-  const busy = step === 'randomizing' || step === 'launching' || step === 'waiting'
+  const busy = step === 'creating' || step === 'randomizing' || step === 'launching'
 
   async function start() {
-    if (!active) return
-    setErr(null); setStep('randomizing')
-    const r = await platform.prepareRun({ profileId: active.id, presetId, seed })
+    if (!active || !user) return
+    setErr(null)
+    // 1) Create the real Supabase run (so it persists + appears in the dashboard).
+    setStep('creating')
+    let run, player
+    try {
+      const created = await createRun({
+        name: active.name,
+        game: active.edition || 'platinum',
+        ownerUserId: user.id,
+        username: profile?.username || profile?.display_name || active.players[0] || 'Spieler',
+      })
+      run = created.run; player = created.player
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Run konnte nicht erstellt werden.'); setStep('error'); return }
+
+    // 2) Randomize this run's ROM into its own per-run file (own savegame).
+    setStep('randomizing')
+    const r = await platform.prepareRun({ runId: run.id, profileId: active.id, presetId, seed })
     if (!r.ok) { setErr(ERR[r.error || ''] || r.error || 'Fehler'); setStep('error'); return }
+
+    // 3) Launch BizHawk with the randomized ROM + live-sync.
     setStep('launching')
     const lr = await platform.launch({ bizhawkPath: r.bizhawk || '', romPath: r.outputRom || '', luaPath: '', syncFolder: '' }, false)
     if (!lr.ok) { setErr('BizHawk-Start fehlgeschlagen' + (lr.error ? ` (${lr.error})` : '')); setStep('error'); return }
-    setStep('waiting')
+
+    // 4) Open the existing RunPage; the live-sync feeds it in the background.
+    setCurrentRun(run, [player], player.id)
+    navigate(`/run/${run.id}`)
   }
 
   if (loading) return <div className="p-10 text-slate-500 text-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Wird geladen…</div>
@@ -76,13 +97,6 @@ export default function NewRunPage() {
           <button onClick={() => navigate('/profiles')} className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
             <Settings className="w-4 h-4" /> Profil einrichten
           </button>
-        </div>
-      ) : step === 'running' ? (
-        <div className="mt-7 rounded-2xl border border-green-700/40 bg-green-950/20 p-8 text-center">
-          <PartyPopper className="w-12 h-12 text-pk-yellow mx-auto mb-3" />
-          <h2 className="text-white font-black text-2xl">Läuft! Viel Spaß</h2>
-          <p className="text-slate-300 mt-1.5">BizHawk ist gestartet und der Live-Sync ist verbunden. Dein Team erscheint automatisch.</p>
-          <p className="text-slate-500 text-xs mt-3">Seed: <span className="font-mono text-slate-300">{seed}</span></p>
         </div>
       ) : (
         <>
@@ -119,17 +133,17 @@ export default function NewRunPage() {
 
           <button onClick={start} disabled={busy} className="mt-5 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-white disabled:opacity-60" style={{ background: '#CC0000' }}>
             {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-            {step === 'randomizing' ? 'Randomisiere … (kann ~1 Min dauern)'
+            {step === 'creating' ? 'Run wird erstellt …'
+              : step === 'randomizing' ? 'Randomisiere … (kann ~1 Min dauern)'
               : step === 'launching' ? 'BizHawk wird gestartet …'
-              : step === 'waiting' ? 'Warte auf Live-Sync …'
               : 'SoulLink erstellen & starten'}
           </button>
 
           {busy && (
             <div className="mt-4 space-y-1.5">
-              <StepLine done={step !== 'randomizing'} active={step === 'randomizing'} label="ROM randomisieren" />
-              <StepLine done={step === 'waiting'} active={step === 'launching'} label="BizHawk starten" />
-              <StepLine done={false} active={step === 'waiting'} label="Live-Sync verbinden" />
+              <StepLine done={step === 'randomizing' || step === 'launching'} active={step === 'creating'} label="Run erstellen" />
+              <StepLine done={step === 'launching'} active={step === 'randomizing'} label="ROM randomisieren" />
+              <StepLine done={false} active={step === 'launching'} label="BizHawk starten & öffnen" />
             </div>
           )}
           {err && <p className="mt-4 text-red-300 text-sm flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {err}</p>}

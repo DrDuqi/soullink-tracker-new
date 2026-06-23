@@ -83,9 +83,10 @@ export async function setActiveProfileHttp(id: string): Promise<boolean> {
 }
 
 // ── run preparation (Phase 3): randomize a profile's ROM for a new SoulLink ────
-export interface PrepareRunInput { profileId: string; presetId?: string; seed?: number | string | null; settingsString?: string }
+export interface PrepareRunInput { profileId: string; runId?: string; presetId?: string; seed?: number | string | null; settingsString?: string }
 export interface PrepareRunResult {
   ok: boolean
+  runId?: string | null
   outputRom?: string
   seed?: number
   edition?: string | null
@@ -93,6 +94,14 @@ export interface PrepareRunResult {
   players?: string[]
   error?: string
   log?: string
+}
+
+/** The local launch data for a run prepared on this PC (ROM/seed/preset/save). */
+export interface LocalRun { runId: string; romPath: string; bizhawk?: string; seed?: number; presetId?: string; edition?: string | null; saveName?: string }
+export async function getLocalRunHttp(runId: string): Promise<LocalRun | null> {
+  if (!USES_COMPANION) return null
+  try { const d = await reqJson(`/api/run/local?runId=${encodeURIComponent(runId)}`); return d?.found ? (d.run as LocalRun) : null }
+  catch { return null }
 }
 
 /** Randomize the profile's original ROM (preset + seed) into a managed file.

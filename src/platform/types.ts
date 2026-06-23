@@ -11,11 +11,11 @@
 
 import type { CompanionConfig, RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult } from '../lib/companion'
 import type { EmulatorSettings, LaunchResult } from '../lib/emulatorSettings'
-import type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult } from '../lib/profiles'
+import type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult, LocalRun } from '../lib/profiles'
 import type { Preset, ImportPresetInput } from '../lib/presets'
 
 export type { CompanionConfig, EmulatorSettings, LaunchResult }
-export type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult }
+export type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult, LocalRun }
 export type { RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult }
 export type { Preset, ImportPresetInput }
 
@@ -67,8 +67,10 @@ export interface PlatformBridge {
   randomizerStatus(): Promise<RandomizerStatus | null>
   /** Run FVX to produce a randomized ROM (long-running). */
   randomize(input: RandomizeInput): Promise<RandomizeResult>
-  /** Prepare a new SoulLink: randomize the profile's ROM into a managed file. */
+  /** Prepare a new SoulLink: randomize the profile's ROM into a per-run file. */
   prepareRun(input: PrepareRunInput): Promise<PrepareRunResult>
+  /** The local launch data for a run prepared on this PC (null if not set up here). */
+  getLocalRun(runId: string): Promise<LocalRun | null>
 
   // ── presets (rules; separate from the seed) ────────────────────────────────
   listPresets(edition?: string): Promise<Preset[] | null>
