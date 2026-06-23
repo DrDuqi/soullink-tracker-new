@@ -33,7 +33,7 @@ export async function companionHealth(signal?: AbortSignal): Promise<boolean> {
 // change), so the website can pull them instead of re-running the wizard.
 export interface CompanionConfig {
   config: { bizhawk: string | null; rom: string | null; lua: string | null; syncFolder: string | null }
-  detected: { bizhawk: string | null; roms: { name: string; path: string }[]; lua: string | null; syncFolder: string }
+  detected: { bizhawk: string | null; bizhawkCandidates?: string[]; roms: { name: string; path: string }[]; lua: string | null; syncFolder: string }
   ready: boolean   // companion already knows BizHawk + ROM + Lua → wizard can be skipped
 }
 

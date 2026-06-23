@@ -13,9 +13,12 @@ import { DOWNLOADS } from '../lib/downloads'
 import AtmosphereBackground from '../components/AtmosphereBackground'
 import CompanionVersion from '../components/CompanionVersion'
 
-// One guided step. Green when done, otherwise shows its action(s) + a support hint.
-function StepCard({ n, title, desc, done, optional, children }: {
-  n: number; title: string; desc: string; done: boolean; optional?: boolean; children?: React.ReactNode
+// One guided step. Green when done. While open it shows its action(s); once done
+// it shows an optional confirmation (doneHint) instead — so the user always sees a
+// clear "erledigt + was wurde eingerichtet" rather than an empty card.
+function StepCard({ n, title, desc, done, optional, children, doneHint }: {
+  n: number; title: string; desc: string; done: boolean; optional?: boolean
+  children?: React.ReactNode; doneHint?: React.ReactNode
 }) {
   return (
     <div className="rounded-2xl border p-5 transition-colors" style={{ background: '#16161f', borderColor: done ? 'rgba(74,222,128,0.4)' : '#2e2e42' }}>
@@ -33,10 +36,19 @@ function StepCard({ n, title, desc, done, optional, children }: {
           </div>
           <p className="text-slate-400 text-sm mt-1 leading-relaxed">{desc}</p>
           {!done && <div className="mt-3.5 flex flex-col sm:flex-row sm:items-center gap-2.5">{children}</div>}
+          {done && doneHint && <div className="mt-3">{doneHint}</div>}
         </div>
       </div>
     </div>
   )
+}
+
+// Show only the last two path segments (e.g. "Tools › BizHawk") so the user can
+// tell installs apart WITHOUT being confronted with a full Windows path.
+function prettyFolder(p: string | null | undefined): string {
+  if (!p) return ''
+  const parts = p.replace(/[\\/]+$/, '').split(/[\\/]+/).filter(Boolean)
+  return parts.slice(-3, -1).join(' › ') || parts[0] || ''
 }
 
 const btnRed = 'flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-sm text-white transition-transform active:scale-[0.98]'
@@ -52,14 +64,15 @@ export default function SetupPage() {
   const companion = useCompanion(true)
   const running = companion.status === 'connected'
   const [cfg, setCfg] = useState<{ bizhawk: string | null; rom: string | null; lua: string | null } | null>(null)
+  const [bizCandidates, setBizCandidates] = useState<string[]>([])
   const sync = useEmulatorSync(running)
   const liveSync = sync.phase === 'connected'
 
-  const refetchCfg = async () => { const c = await companionConfig(); if (c) setCfg(c.config) }
+  const refetchCfg = async () => { const c = await companionConfig(); if (c) { setCfg(c.config); setBizCandidates(c.detected?.bizhawkCandidates ?? []) } }
   useEffect(() => {
-    if (!running) { setCfg(null); return }
+    if (!running) { setCfg(null); setBizCandidates([]); return }
     let cancel = false
-    const tick = () => { companionConfig().then((c) => { if (!cancel && c) setCfg(c.config) }) }
+    const tick = () => { companionConfig().then((c) => { if (!cancel && c) { setCfg(c.config); setBizCandidates(c.detected?.bizhawkCandidates ?? []) } }) }
     tick(); const id = setInterval(tick, 2500)
     return () => { cancel = true; clearInterval(id) }
   }, [running])
@@ -199,18 +212,51 @@ export default function SetupPage() {
               <div className="basis-full mt-1"><CompanionVersion /></div>
             </StepCard>
 
-            {/* 2 · BizHawk */}
-            <StepCard n={2} done={bizhawkFound} title="BizHawk herunterladen"
-              desc="Der Emulator, in dem deine ROM läuft. Lade ihn herunter, entpacke ihn – danach wählst du ihn einmal aus.">
-              <a href={DOWNLOADS.bizhawk} target="_blank" rel="noreferrer" className={btnRed} style={{ background: '#CC0000' }}>
-                <Download className="w-4 h-4" /> BizHawk herunterladen
-              </a>
-              <button onClick={() => pickFile('biz')} disabled={!running || resolving === 'biz'} className={btnGhost + ' disabled:opacity-40'}>
-                {resolving === 'biz' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gamepad2 className="w-4 h-4" />} BizHawk auswählen
-              </button>
-              {!running && <p className="text-slate-500 text-xs sm:ml-1">Starte zuerst den Companion (Schritt 1).</p>}
-              {running && !bizhawkFound && !pickErr && <p className="text-slate-400 text-xs basis-full">Wir konnten BizHawk noch nicht automatisch finden. Klicke einfach auf <b>„BizHawk auswählen"</b> und wähle deine <b>EmuHawk.exe</b> aus.</p>}
-              {pickErr?.k === 'biz' && <p className="text-yellow-400/90 text-xs basis-full">{pickErr.msg}</p>}
+            {/* 2 · Emulator (BizHawk) */}
+            <StepCard n={2} done={bizhawkFound} title="Emulator einrichten"
+              desc="BizHawk ist der Emulator, in dem deine Pokémon-Edition läuft. Du wählst ihn nur einmal aus – danach merkt sich SoulLink alles."
+              doneHint={
+                <div className="rounded-xl border border-green-700/40 bg-green-950/20 p-3">
+                  <p className="text-green-300 text-sm font-bold flex items-center gap-1.5"><Check className="w-4 h-4" /> Emulator gefunden</p>
+                  <p className="text-slate-400 text-xs mt-0.5">BizHawk (EmuHawk.exe) ist eingerichtet{cfg?.bizhawk ? <> – gefunden in <b className="text-slate-300">{prettyFolder(cfg.bizhawk)}</b></> : ''}. Pfad gespeichert.</p>
+                  <details className="mt-2 group">
+                    <summary className="text-[11px] text-slate-500 hover:text-slate-300 cursor-pointer select-none">Erweiterte Optionen</summary>
+                    <div className="mt-2 space-y-2">
+                      <div className="text-[11px] text-slate-500 break-all font-mono bg-[#111116] border border-[#2e2e42] rounded-lg px-2.5 py-1.5">{cfg?.bizhawk}</div>
+                      <button onClick={() => pickFile('biz')} disabled={resolving === 'biz'} className="text-[11px] font-bold text-slate-300 hover:text-white underline underline-offset-2 disabled:opacity-40">Anderen Emulator wählen</button>
+                    </div>
+                  </details>
+                </div>
+              }>
+              {!running ? (
+                <p className="text-slate-500 text-xs sm:ml-1">Starte zuerst den Companion (Schritt 1) – dann suchen wir BizHawk automatisch.</p>
+              ) : bizCandidates.length > 1 ? (
+                <>
+                  <p className="basis-full text-white font-bold text-sm">Wir haben mehrere BizHawk-Installationen gefunden.</p>
+                  <p className="basis-full text-slate-400 text-xs -mt-1">Bitte wähle die richtige aus:</p>
+                  <div className="basis-full flex flex-col gap-2 mt-1">
+                    {bizCandidates.map((p) => (
+                      <button key={p} onClick={() => applyPicked(p, 'biz')} className="flex items-center gap-2.5 text-left rounded-xl border border-[#3a3a4e] hover:border-pk-red/60 hover:bg-white/5 px-3.5 py-2.5 transition-colors">
+                        <Gamepad2 className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span className="text-sm font-bold text-slate-200">{prettyFolder(p) || 'BizHawk'}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => pickFile('biz')} disabled={resolving === 'biz'} className="basis-full text-[11px] font-bold text-slate-500 hover:text-slate-300 underline underline-offset-2 mt-1">Keine davon – Datei selbst auswählen</button>
+                </>
+              ) : (
+                <>
+                  <p className="basis-full text-white font-bold text-sm">Wir konnten deinen Emulator noch nicht finden.</p>
+                  <p className="basis-full text-slate-400 text-xs -mt-1">SoulLink benötigt BizHawk, um Pokémon starten zu können. Wenn du BizHawk schon installiert hast, wähle bitte die Datei <b className="text-slate-300">EmuHawk.exe</b> aus.</p>
+                  <a href={DOWNLOADS.bizhawk} target="_blank" rel="noreferrer" className={btnRed} style={{ background: '#CC0000' }}>
+                    <Download className="w-4 h-4" /> BizHawk herunterladen
+                  </a>
+                  <button onClick={() => pickFile('biz')} disabled={resolving === 'biz'} className={btnGhost + ' disabled:opacity-40'}>
+                    {resolving === 'biz' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gamepad2 className="w-4 h-4" />} Vorhandenen Emulator auswählen
+                  </button>
+                  {pickErr?.k === 'biz' && <p className="text-yellow-400/90 text-xs basis-full">{pickErr.msg}</p>}
+                </>
+              )}
             </StepCard>
 
             {/* 3 · Randomizer (optional) */}
@@ -226,7 +272,20 @@ export default function SetupPage() {
 
             {/* 4 · ROM */}
             <StepCard n={4} done={romFound} title="Eigene Pokémon-ROM auswählen"
-              desc="Wähle die ROM, die du tatsächlich spielst (z. B. deine Randomizer-Version).">
+              desc="Wähle die ROM, die du tatsächlich spielst (z. B. deine Randomizer-Version)."
+              doneHint={
+                <div className="rounded-xl border border-green-700/40 bg-green-950/20 p-3">
+                  <p className="text-green-300 text-sm font-bold flex items-center gap-1.5"><Check className="w-4 h-4" /> ROM eingerichtet</p>
+                  <p className="text-slate-400 text-xs mt-0.5">Deine ROM ist ausgewählt und gespeichert{cfg?.rom ? <> – <b className="text-slate-300">{cfg.rom.split(/[\\/]/).pop()}</b></> : ''}.</p>
+                  <details className="mt-2">
+                    <summary className="text-[11px] text-slate-500 hover:text-slate-300 cursor-pointer select-none">Erweiterte Optionen</summary>
+                    <div className="mt-2 space-y-2">
+                      <div className="text-[11px] text-slate-500 break-all font-mono bg-[#111116] border border-[#2e2e42] rounded-lg px-2.5 py-1.5">{cfg?.rom}</div>
+                      <button onClick={() => pickFile('rom')} disabled={resolving === 'rom'} className="text-[11px] font-bold text-slate-300 hover:text-white underline underline-offset-2 disabled:opacity-40">Andere ROM wählen</button>
+                    </div>
+                  </details>
+                </div>
+              }>
               <div className="basis-full rounded-xl border border-amber-700/40 bg-amber-950/15 p-3 flex items-start gap-2 mb-1">
                 <FileWarning className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <p className="text-amber-200/90 text-xs leading-relaxed">
@@ -264,18 +323,18 @@ export default function SetupPage() {
             </StepCard>
           </div>
 
-          {/* Live system status — what the website currently detects */}
+          {/* Einrichtungs-Status — auf einen Blick: was ist fertig, was fehlt noch */}
           <div className="rounded-2xl border border-[#2e2e42] bg-[#1c1c26] p-5 mt-6">
             <div className="flex items-center gap-2 mb-3.5">
               <Zap className="w-4 h-4 text-pk-yellow" />
-              <h3 className="text-slate-200 text-xs font-black uppercase tracking-widest">Live-Status</h3>
+              <h3 className="text-slate-200 text-xs font-black uppercase tracking-widest">Einrichtungs-Status</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <StatusRow ok={running} label="Companion läuft" hint="Companion über das Startmenü starten" />
-              <StatusRow ok={bizhawkFound} label="BizHawk gefunden" hint="BizHawk herunterladen & auswählen" />
-              <StatusRow ok={romFound} label="ROM gefunden" hint="Eigene ROM auswählen" />
-              <StatusRow ok={luaFound} label="Sync-Script (Lua) gefunden" hint="Companion neu starten" />
-              <StatusRow ok={liveSync} label="Live-Sync aktiv" hint="Lua-Sync verbinden klicken" />
+              <StatusRow ok={running} label="Companion" hint="Companion über das Startmenü starten" />
+              <StatusRow ok={bizhawkFound} label="Emulator" hint="BizHawk herunterladen & auswählen" />
+              <StatusRow ok={romFound} label="Eigene ROM" hint="ROM auswählen" />
+              <StatusRow ok={luaFound} label="Sync-Bereit" hint="Companion neu starten" />
+              <StatusRow ok={liveSync} label="Live-Sync aktiv" hint="Live-Sync verbinden klicken" />
             </div>
           </div>
         </main>

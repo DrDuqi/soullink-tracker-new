@@ -302,11 +302,13 @@ function detectEmulatorPaths(root) {
   try { home = homedir() } catch { /* none */ }
   const slDirs = home ? [join(home, 'Desktop', 'SoulLink'), join(home, 'SoulLink')] : []
 
-  // ── BizHawk: collect ALL EmuHawk.exe candidates (repo, parent, SoulLink/BizHawk,
-  //    Desktop, Downloads) so we can auto-pick when there is exactly one and tell
-  //    the user when there are several.
+  // ── BizHawk: collect ALL EmuHawk.exe candidates so we can auto-pick when there
+  //    is exactly one and let the user choose when there are several. We scan the
+  //    common spots a non-technical user would have it: repo/parent, SoulLink
+  //    folders, Desktop/Downloads/Documents, and the usual install roots.
   const bizRoots = [root, parent, ...slDirs.map((p) => join(p, 'BizHawk')), ...slDirs]
-  if (home) bizRoots.push(join(home, 'Desktop'), join(home, 'Downloads'))
+  if (home) bizRoots.push(join(home, 'Desktop'), join(home, 'Downloads'), join(home, 'Documents'))
+  bizRoots.push('C:\\BizHawk', 'C:\\Tools', 'C:\\Program Files', 'C:\\Program Files (x86)')
   const bizSet = new Set(); const bizhawkCandidates = []
   const addBiz = (p) => { try { if (p && existsSync(p) && !bizSet.has(p)) { bizSet.add(p); bizhawkCandidates.push(p) } } catch { /* ignore */ } }
   for (const base of bizRoots) {
