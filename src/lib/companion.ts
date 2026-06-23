@@ -10,10 +10,21 @@
 // code drives both transports.
 
 export const COMPANION_PORT = 8787
-export const EMU_BASE = import.meta.env.DEV ? '' : `http://127.0.0.1:${COMPANION_PORT}`
 
-/** True when the app talks to a local Companion (prod) rather than the dev server. */
-export const USES_COMPANION = !import.meta.env.DEV
+/** Running INSIDE the Companion's own window? The preload exposes this flag before
+ *  any app code runs. There the app is served same-origin BY the Companion, so API
+ *  calls are relative and a local Companion is always present. */
+export const IN_COMPANION_WINDOW =
+  typeof window !== 'undefined' &&
+  (window as unknown as { soullinkNative?: { kind?: string } }).soullinkNative?.kind === 'companion'
+
+// Same-origin in dev (Vite plugin) and in the Companion window; only the public
+// website (Vercel) talks cross-origin to a separately-running local Companion.
+export const EMU_BASE = (import.meta.env.DEV || IN_COMPANION_WINDOW) ? '' : `http://127.0.0.1:${COMPANION_PORT}`
+
+/** True when a local Companion backs the app (its own window, or the website with a
+ *  running Companion). false only in the Vite dev server, where no install is needed. */
+export const USES_COMPANION = IN_COMPANION_WINDOW || !import.meta.env.DEV
 
 /** Quick reachability probe for the Companion's health endpoint.
  *  In dev the Vite plugin is the backend, so this is treated as always reachable. */

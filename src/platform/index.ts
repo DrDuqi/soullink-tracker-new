@@ -13,12 +13,18 @@ export * from './types'
 
 let cached: PlatformBridge | null = null
 
+/** The native bridge the Companion's preload injects (window.soullinkNative). */
+function nativeBridge(): { kind?: string } | null {
+  if (typeof window === 'undefined') return null
+  return (window as unknown as { soullinkNative?: { kind?: string } }).soullinkNative ?? null
+}
+
 export function getPlatform(): PlatformBridge {
   if (cached) return cached
-  // Future (Companion window): if a native bridge was injected by the preload,
-  // use it instead — same interface, IPC transport.
-  //   const native = (window as unknown as { soullinkNative?: unknown }).soullinkNative
-  //   if (native) return (cached = makeCompanionBridge(native))
-  cached = webBridge
+  // Inside the Companion window the app is served same-origin, so the WebBridge's
+  // HTTP transport already works — we only flip `kind` to 'companion' so the UI
+  // shows the desktop shell instead of the website landing. (No IPC needed.)
+  if (nativeBridge()?.kind === 'companion') cached = { ...webBridge, kind: 'companion' }
+  else cached = webBridge
   return cached
 }
