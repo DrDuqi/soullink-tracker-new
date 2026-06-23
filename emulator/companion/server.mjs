@@ -23,7 +23,7 @@
 
 import { createServer } from 'node:http'
 import { readFileSync, writeFileSync, statSync, existsSync, readdirSync, mkdirSync, renameSync, unlinkSync, copyFileSync, rmSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join, dirname, resolve, extname, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawn, exec } from 'node:child_process'
@@ -437,6 +437,57 @@ const sendJson = (res, obj, status = 200) => {
   res.end(JSON.stringify(obj))
 }
 
+// ── static web app (same-origin) ─────────────────────────────────────────────
+// The Companion serves the BUILT React app at `/`, so the native window can load
+// http://127.0.0.1:<port>/ — same origin as /api, which removes the cross-origin
+// HTTPS→localhost problem entirely (no CORS/PNA, WebBridge just works). Bundled to
+// resources/web in the installer; in dev it's the repo's dist/. Vercel still hosts
+// the public landing/spectator site from the same source.
+const WEB_ROOT = (() => {
+  const cands = [process.env.SOULLINK_WEB_ROOT, join(HERE, '..', 'web'), join(ROOT, 'dist')]
+  for (const c of cands) { try { if (c && existsSync(join(c, 'index.html'))) return resolve(c) } catch { /* ignore */ } }
+  return null
+})()
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.map': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
+  '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json',
+}
+function serveStatic(req, res, pathname) {
+  if (!WEB_ROOT) { res.statusCode = 404; res.end('Web build not bundled'); return }
+  let rel = '/index.html'
+  try { rel = decodeURIComponent(pathname) || '/' } catch { /* malformed → index */ }
+  if (rel === '/' || rel === '') rel = '/index.html'
+  const filePath = resolve(WEB_ROOT, '.' + rel)
+  // Path-traversal guard: the resolved file must stay inside WEB_ROOT.
+  if (filePath !== WEB_ROOT && !filePath.startsWith(WEB_ROOT + sep)) { res.statusCode = 403; res.end(); return }
+  try {
+    if (statSync(filePath).isFile()) {
+      res.statusCode = 200
+      res.setHeader('content-type', MIME[extname(filePath).toLowerCase()] || 'application/octet-stream')
+      // Hashed Vite assets are immutable; index.html must always re-check.
+      res.setHeader('cache-control', /[\\/]index\.html$/.test(filePath) ? 'no-cache' : 'public, max-age=31536000, immutable')
+      res.end(readFileSync(filePath))
+      return
+    }
+  } catch { /* not found → SPA fallback */ }
+  // History fallback: an unknown route without a file extension (e.g. /setup,
+  // /profiles) → index.html so client-side routing (BrowserRouter) takes over.
+  if (!extname(rel)) {
+    try {
+      res.statusCode = 200
+      res.setHeader('content-type', 'text/html; charset=utf-8')
+      res.setHeader('cache-control', 'no-cache')
+      res.end(readFileSync(join(WEB_ROOT, 'index.html')))
+      return
+    } catch { /* ignore */ }
+  }
+  res.statusCode = 404
+  res.end()
+}
+
 function handleRequest(req, res) {
   setCors(req, res)
   if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return }
@@ -659,6 +710,10 @@ function handleRequest(req, res) {
     sendJson(res, { ok: false }, 405)
     return
   }
+
+  // Not an API route → serve the bundled React app (same-origin) so the Companion
+  // window can load http://127.0.0.1:<port>/ . API paths keep returning JSON 404s.
+  if (req.method === 'GET' && !path.startsWith('/api/')) { serveStatic(req, res, path); return }
 
   res.statusCode = 404
   res.end()

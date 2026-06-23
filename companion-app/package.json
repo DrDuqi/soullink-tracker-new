@@ -26,7 +26,8 @@
     "files": ["main.cjs", "assets/**"],
     "extraResources": [
       { "from": "../emulator/companion", "to": "companion", "filter": ["*.mjs"] },
-      { "from": "../emulator/bizhawk/soullink_sync.lua", "to": "companion/soullink_sync.lua" }
+      { "from": "../emulator/bizhawk/soullink_sync.lua", "to": "companion/soullink_sync.lua" },
+      { "from": "../dist", "to": "web" }
     ],
     "win": {
       "target": ["nsis"],
