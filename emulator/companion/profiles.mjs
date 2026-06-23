@@ -148,14 +148,15 @@ export function getProfile(id) {
 
 // Record a started run on the profile: remember the seed + randomized ROM and
 // prepend a capped history entry. Used by the "Neuer SoulLink" flow.
-export function recordRun(id, { seed = null, romPath = null, runId = null, code = null } = {}) {
+export function recordRun(id, { seed = null, romPath = null, presetId = null, runId = null, code = null } = {}) {
   const s = load()
   const p = s.profiles.find((x) => x.id === id)
   if (!p) return null
   p.lastSeed = seed
   p.lastRandomizedRom = romPath
+  if (presetId) p.presetId = presetId   // remember the chosen preset for next time
   if (!Array.isArray(p.runHistory)) p.runHistory = []
-  p.runHistory.unshift({ seed, romPath, runId, code, date: new Date().toISOString() })
+  p.runHistory.unshift({ seed, romPath, presetId, runId, code, date: new Date().toISOString() })
   p.runHistory = p.runHistory.slice(0, 50)
   p.updatedAt = new Date().toISOString()
   save(s)

@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "presets": [
+    { "id": "builtin-platinum-standard", "name": "SoulLink Standard", "edition": "platinum", "file": "platinum/soullink-standard.rnqs", "description": "Ausgewogener SoulLink-Modus für Pokémon Platin." }
+  ]
+}

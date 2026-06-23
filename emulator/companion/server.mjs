@@ -30,6 +30,7 @@ import { spawn, exec } from 'node:child_process'
 import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile, getProfile, recordRun } from './profiles.mjs'
 import { initRandomizer, randomizerStatus, randomize } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
+import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset } from './presets.mjs'
 
 // Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
 // (which CI bumps from the release tag) to startCompanion; CLI falls back to the
@@ -77,6 +78,12 @@ initRandomizer({
     return r
   })(),
   getConfigDir: () => { try { return loadConfig().fvxDir || null } catch { return null } },
+})
+// Presets: built-in (bundled resources/presets, per edition) + custom (managed
+// Presets/ folder, created via the FVX editor). Preset = rules; seed stays separate.
+initPresets({
+  builtinCandidates: [process.env.SOULLINK_PRESETS_DIR, join(HERE, '..', 'presets'), join(ROOT, 'presets')],
+  customDir: join(dirname(CONFIG_FILE), 'Presets'),
 })
 function loadConfig() {
   try { const j = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')); return (j && typeof j === 'object') ? j : {} }
@@ -626,6 +633,40 @@ function handleRequest(req, res) {
     return
   }
 
+  // ── presets: built-in + custom rule sets (separate from the seed) ───────────
+  if (path === '/api/presets') {
+    if (req.method === 'GET') {
+      try { sendJson(res, { ok: true, presets: listPresets(url.searchParams.get('edition') || undefined) }) }
+      catch { sendJson(res, { ok: false }, 500) }
+      return
+    }
+    if (req.method === 'PATCH') {
+      let body = ''
+      req.on('data', (c) => { body += c; if (body.length > 100_000) req.destroy() })
+      req.on('end', () => { let b = {}; try { b = JSON.parse(body || '{}') } catch { /* */ }
+        sendJson(res, { ok: renamePreset(url.searchParams.get('id'), b.name) }) })
+      return
+    }
+    if (req.method === 'DELETE') {
+      try { sendJson(res, { ok: deletePreset(url.searchParams.get('id')) }) } catch { sendJson(res, { ok: false }, 500) }
+      return
+    }
+    sendJson(res, { ok: false }, 405)
+    return
+  }
+  // import a picked .rnqs (FVX editor output / shared file) as a custom preset
+  if (path === '/api/presets/import' && req.method === 'POST') {
+    let body = ''
+    req.on('data', (c) => { body += c; if (body.length > 100_000) req.destroy() })
+    req.on('end', () => {
+      let b = {}; try { b = JSON.parse(body || '{}') } catch { /* */ }
+      const clean = (s) => (s == null ? null : String(s).trim().replace(/^"+|"+$/g, '').trim() || null)
+      const p = importPreset({ name: b.name, edition: b.edition || null, sourceFile: clean(b.sourceFile) })
+      sendJson(res, p ? { ok: true, preset: p } : { ok: false, error: 'import_failed' }, p ? 200 : 400)
+    })
+    return
+  }
+
   // ── run: prepare a SoulLink from a profile — randomize into a managed file ───
   // POST { profileId, seed?, settingsString? } → randomizes the profile's original
   // ROM with its preset + seed into …/ROMs/Randomized/<edition>_<players>_Seed_<n>.nds
@@ -642,8 +683,12 @@ function handleRequest(req, res) {
       const paths = profile.paths || {}
       if (!paths.originalRom || !existsSync(paths.originalRom)) { sendJson(res, { ok: false, error: 'original_rom_missing' }, 400); return }
       if (!paths.bizhawk || !existsSync(paths.bizhawk)) { sendJson(res, { ok: false, error: 'bizhawk_missing' }, 400); return }
+      // Preset (rules) is chosen per run: explicit presetId → profile's preset →
+      // profile's legacy preset file. Strictly separate from the seed below.
       const settingsString = b.settingsString ? String(b.settingsString) : null
-      if (!settingsString && (!paths.preset || !existsSync(paths.preset))) { sendJson(res, { ok: false, error: 'preset_missing' }, 400); return }
+      const presetId = b.presetId || profile.presetId || null
+      const settingsFile = (presetId && getPresetFile(presetId)) || paths.preset || null
+      if (!settingsString && (!settingsFile || !existsSync(settingsFile))) { sendJson(res, { ok: false, error: 'preset_missing' }, 400); return }
 
       const seed = (b.seed === undefined || b.seed === null || b.seed === '') ? Math.floor(Math.random() * 1_000_000_000) : b.seed
       const safe = (s) => String(s ?? '').replace(/[^\w-]+/g, '')
@@ -654,10 +699,10 @@ function handleRequest(req, res) {
       const outputRom = join(outDir, outName)
 
       console.log('[run] prepare:', profile.name, '· seed', seed, '→', outputRom)
-      const r = await randomize({ inputRom: paths.originalRom, outputRom, settingsFile: paths.preset, settingsString, seed })
+      const r = await randomize({ inputRom: paths.originalRom, outputRom, settingsFile, settingsString, seed })
       if (!r.ok) { sendJson(res, { ok: false, error: r.error || 'randomize_failed', log: r.log }, 500); return }
-      try { recordRun(profile.id, { seed, romPath: outputRom }) } catch { /* non-fatal */ }
-      sendJson(res, { ok: true, outputRom, seed, edition: profile.edition || null, bizhawk: paths.bizhawk, players: profile.players || [] })
+      try { recordRun(profile.id, { seed, romPath: outputRom, presetId }) } catch { /* non-fatal */ }
+      sendJson(res, { ok: true, outputRom, seed, presetId, edition: profile.edition || null, bizhawk: paths.bizhawk, players: profile.players || [] })
     })
     return
   }
