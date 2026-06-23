@@ -6,6 +6,7 @@
 
 import { USES_COMPANION, companionHealth, companionConfig, saveCompanionConfig, pickCompanionFile } from '../lib/companion'
 import { findFile, launchEmulator } from '../lib/emulatorSettings'
+import { fetchProfiles, createProfileHttp, updateProfileHttp, deleteProfileHttp, duplicateProfileHttp, setActiveProfileHttp } from '../lib/profiles'
 import type { PlatformBridge } from './types'
 
 export const webBridge: PlatformBridge = {
@@ -17,4 +18,10 @@ export const webBridge: PlatformBridge = {
   pickFile: (kind) => pickCompanionFile(kind),
   resolveFileByName: (name) => findFile(name),
   launch: (settings, restart) => launchEmulator(settings, restart),
+  listProfiles: () => fetchProfiles(),
+  createProfile: (input) => createProfileHttp(input),
+  updateProfile: (id, patch) => updateProfileHttp(id, patch),
+  deleteProfile: (id) => deleteProfileHttp(id),
+  duplicateProfile: (id) => duplicateProfileHttp(id),
+  setActiveProfile: (id) => setActiveProfileHttp(id),
 }

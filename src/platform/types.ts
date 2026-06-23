@@ -11,8 +11,10 @@
 
 import type { CompanionConfig } from '../lib/companion'
 import type { EmulatorSettings, LaunchResult } from '../lib/emulatorSettings'
+import type { Profile, ProfileList, ProfilePatch, NewProfileInput } from '../lib/profiles'
 
 export type { CompanionConfig, EmulatorSettings, LaunchResult }
+export type { Profile, ProfileList, ProfilePatch, NewProfileInput }
 
 export type PlatformKind = 'web' | 'companion'
 export type PickKind = 'biz' | 'rom'
@@ -45,4 +47,13 @@ export interface PlatformBridge {
   resolveFileByName(name: string): Promise<string | null>
   /** Start the emulator with the saved ROM + sync script. */
   launch(settings: EmulatorSettings, restart?: boolean): Promise<LaunchResult>
+
+  // ── profiles (local per-machine game profiles) ─────────────────────────────
+  /** All profiles + which one is active. null when no Companion is present. */
+  listProfiles(): Promise<ProfileList | null>
+  createProfile(input: NewProfileInput): Promise<Profile | null>
+  updateProfile(id: string, patch: ProfilePatch): Promise<Profile | null>
+  deleteProfile(id: string): Promise<boolean>
+  duplicateProfile(id: string): Promise<Profile | null>
+  setActiveProfile(id: string): Promise<boolean>
 }
