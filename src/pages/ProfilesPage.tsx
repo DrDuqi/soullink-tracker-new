@@ -7,6 +7,7 @@ import { useCompanion } from '../hooks/useCompanion'
 import AtmosphereBackground from '../components/AtmosphereBackground'
 import CompanionVersion from '../components/CompanionVersion'
 import { DOWNLOADS } from '../lib/downloads'
+import { IN_COMPANION_WINDOW } from '../lib/companion'
 
 const btnRed = 'flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white transition-transform active:scale-[0.98] disabled:opacity-40'
 const btnGhost = 'flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl font-bold text-xs text-slate-200 border border-[#3a3a4e] hover:bg-white/5 transition-colors disabled:opacity-40'
@@ -52,20 +53,23 @@ export default function ProfilesPage() {
 
   return (
     <>
-      <AtmosphereBackground />
+      {!IN_COMPANION_WINDOW && <AtmosphereBackground />}
       <div className="relative z-10 min-h-screen flex flex-col">
-        <header className="sticky top-0 z-40 border-b border-white/5 backdrop-blur-2xl" style={{ background: 'rgba(17,17,22,0.92)' }}>
-          <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center gap-3">
-            <button onClick={() => navigate('/')} className="text-slate-500 hover:text-white p-1.5 hover:bg-white/5 rounded-xl transition-colors"><ArrowLeft className="w-5 h-5" /></button>
-            <Users className="w-5 h-5 text-pk-red hidden sm:block" />
-            <div>
-              <h1 className="text-white font-black text-base leading-tight">SoulLink-Profile</h1>
-              <p className="text-slate-500 text-xs">Pro Mitspieler ein Profil – Pfade & Einstellungen automatisch parat</p>
+        {!IN_COMPANION_WINDOW && (
+          <header className="sticky top-0 z-40 border-b border-white/5 backdrop-blur-2xl" style={{ background: 'rgba(17,17,22,0.92)' }}>
+            <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center gap-3">
+              <button onClick={() => navigate('/')} className="text-slate-500 hover:text-white p-1.5 hover:bg-white/5 rounded-xl transition-colors"><ArrowLeft className="w-5 h-5" /></button>
+              <Users className="w-5 h-5 text-pk-red hidden sm:block" />
+              <div>
+                <h1 className="text-white font-black text-base leading-tight">SoulLink-Profile</h1>
+                <p className="text-slate-500 text-xs">Pro Mitspieler ein Profil – Pfade & Einstellungen automatisch parat</p>
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         <main className="max-w-3xl mx-auto w-full px-4 py-8 space-y-6">
+          {IN_COMPANION_WINDOW && <h1 className="text-white font-black text-2xl">Profile</h1>}
           {!available ? (
             <div className="rounded-2xl border border-[#2e2e42] bg-[#16161f] p-6 text-center">
               <p className="text-white font-black text-lg mb-1">Profile brauchen den SoulLink Companion</p>

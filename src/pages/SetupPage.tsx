@@ -158,20 +158,23 @@ export default function SetupPage() {
   const doneCount = required.filter(Boolean).length
   const allDone = required.every(Boolean)
 
+  const embedded = platform.kind === 'companion'   // inside the desktop shell → no own chrome
   return (
     <>
-      <AtmosphereBackground />
+      {!embedded && <AtmosphereBackground />}
       <div className="relative z-10 min-h-screen flex flex-col">
-        <header className="sticky top-0 z-40 border-b border-white/5 backdrop-blur-2xl" style={{ background: 'rgba(17,17,22,0.92)' }}>
-          <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center gap-3">
-            <button onClick={() => navigate('/')} className="text-slate-500 hover:text-white p-1.5 hover:bg-white/5 rounded-xl transition-colors"><ArrowLeft className="w-5 h-5" /></button>
-            <Cpu className="w-5 h-5 text-pk-red hidden sm:block" />
-            <div>
-              <h1 className="text-white font-black text-base leading-tight">Erste Einrichtung</h1>
-              <p className="text-slate-500 text-xs">In ~5 Minuten spielbereit</p>
+        {!embedded && (
+          <header className="sticky top-0 z-40 border-b border-white/5 backdrop-blur-2xl" style={{ background: 'rgba(17,17,22,0.92)' }}>
+            <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center gap-3">
+              <button onClick={() => navigate('/')} className="text-slate-500 hover:text-white p-1.5 hover:bg-white/5 rounded-xl transition-colors"><ArrowLeft className="w-5 h-5" /></button>
+              <Cpu className="w-5 h-5 text-pk-red hidden sm:block" />
+              <div>
+                <h1 className="text-white font-black text-base leading-tight">Erste Einrichtung</h1>
+                <p className="text-slate-500 text-xs">In ~5 Minuten spielbereit</p>
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         <main className="max-w-3xl mx-auto w-full px-4 py-8">
           {/* hidden, robust file inputs */}

@@ -5,6 +5,7 @@ import ToastContainer from './components/Toast'
 import ErrorBoundary from './components/ErrorBoundary'
 import { AuthProvider } from './contexts/AuthContext'
 import { useApplySettings } from './store/settingsStore'
+import { IN_COMPANION_WINDOW } from './lib/companion'
 import './index.css'
 
 // Route-level code splitting: the landing page no longer ships the heavy
@@ -13,6 +14,9 @@ const HomePage = lazy(() => import('./pages/HomePage'))
 const RunPage = lazy(() => import('./pages/RunPage'))
 const SetupPage = lazy(() => import('./pages/SetupPage'))
 const ProfilesPage = lazy(() => import('./pages/ProfilesPage'))
+// Companion desktop shell (only loaded inside the native window).
+const AppShell = lazy(() => import('./shell/AppShell'))
+const CompanionDashboard = lazy(() => import('./pages/companion/DashboardPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
@@ -34,14 +38,28 @@ export default function App() {
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
             <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/setup" element={<SetupPage />} />
-                <Route path="/profiles" element={<ProfilesPage />} />
-                <Route path="/run/:runId" element={<RunPage />} />
-                {/* Unknown paths fall back to the landing page instead of a blank screen. */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+              {IN_COMPANION_WINDOW ? (
+                // Native window: the desktop shell wraps every page (persistent
+                // sidebar + account bar). No landing / marketing here.
+                <Routes>
+                  <Route element={<AppShell />}>
+                    <Route path="/" element={<CompanionDashboard />} />
+                    <Route path="/setup" element={<SetupPage />} />
+                    <Route path="/profiles" element={<ProfilesPage />} />
+                    <Route path="/run/:runId" element={<RunPage />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Route>
+                </Routes>
+              ) : (
+                // Public website: landing + run views, unchanged.
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/setup" element={<SetupPage />} />
+                  <Route path="/profiles" element={<ProfilesPage />} />
+                  <Route path="/run/:runId" element={<RunPage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              )}
             </Suspense>
             <ToastContainer />
           </BrowserRouter>
