@@ -640,11 +640,14 @@ function handleRequest(req, res) {
   // Fixes the browser picker, which can never reveal the real filesystem path.
   if (path === '/api/companion/pick') {
     if (typeof nativePick !== 'function') { sendJson(res, { ok: false, error: 'no_dialog' }); return }
-    const kind = url.searchParams.get('kind') === 'biz' ? 'biz' : 'rom'
+    const kp = url.searchParams.get('kind')
+    const kind = (kp === 'biz' || kp === 'preset') ? kp : 'rom'
     Promise.resolve(nativePick({ kind, defaultPath: pickDefaultDir(kind) }))
       .then((picked) => {
         if (!picked) { sendJson(res, { ok: false, error: 'cancelled' }); return }
-        saveConfig(kind === 'biz' ? { bizhawk: picked } : { rom: picked })   // persist → auto-loads next time
+        // biz/rom feed the legacy single-config setup; preset is per-profile only.
+        if (kind === 'biz') saveConfig({ bizhawk: picked })
+        else if (kind === 'rom') saveConfig({ rom: picked })
         console.log('[pick] %s = %s', kind, picked)
         sendJson(res, { ok: true, path: picked })
       })

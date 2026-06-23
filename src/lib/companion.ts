@@ -64,7 +64,7 @@ export async function companionConfig(signal?: AbortSignal): Promise<CompanionCo
 /** Open the Companion's NATIVE file dialog (Electron) and return the absolute path.
  *  `{ error: 'no_dialog' }` means the running Companion can't show a dialog (CLI/dev)
  *  → caller falls back to the browser picker; `'cancelled'` means the user closed it. */
-export async function pickCompanionFile(kind: 'biz' | 'rom'): Promise<{ path?: string; error?: string }> {
+export async function pickCompanionFile(kind: 'biz' | 'rom' | 'preset'): Promise<{ path?: string; error?: string }> {
   if (!USES_COMPANION) return { error: 'no_dialog' }
   try {
     const r = await fetch(`${EMU_BASE}/api/companion/pick?kind=${kind}`, { cache: 'no-store' })
@@ -89,4 +89,54 @@ export async function saveCompanionConfig(patch: { bizhawk?: string; rom?: strin
   } catch {
     return false
   }
+}
+
+// ── ROM validation + randomizer (FVX) — the Phase-3 auto-setup capabilities ───
+export interface RomInfo {
+  valid: boolean
+  recognized?: boolean
+  supported?: boolean        // live-sync can read this generation
+  game?: string
+  edition?: string
+  region?: string
+  revision?: number
+  gameCode?: string
+  gen?: number
+  logoOk?: boolean
+  code?: string              // failure code (archive / wrong_platform / not_nds / …)
+  message: string
+}
+
+/** Read a picked file's NDS header → edition/region/revision (or a friendly reject). */
+export async function validateRomHttp(path: string): Promise<RomInfo | null> {
+  if (!USES_COMPANION) return null
+  try {
+    const r = await fetch(`${EMU_BASE}/api/rom/validate?path=${encodeURIComponent(path)}`, { cache: 'no-store' })
+    const j = await r.json().catch(() => null)
+    return j?.ok ? (j as RomInfo) : null
+  } catch { return null }
+}
+
+export interface RandomizerStatus { found: boolean; source?: string; version?: string; dir?: string }
+
+/** Is FVX available (bundled / configured / detected)? */
+export async function randomizerStatusHttp(): Promise<RandomizerStatus | null> {
+  if (!USES_COMPANION) return null
+  try {
+    const r = await fetch(`${EMU_BASE}/api/randomizer/detect`, { cache: 'no-store' })
+    const j = await r.json().catch(() => null)
+    return j?.ok ? (j as RandomizerStatus) : null
+  } catch { return null }
+}
+
+export interface RandomizeInput { inputRom: string; outputRom: string; settingsFile?: string; settingsString?: string; seed?: number | string | null }
+export interface RandomizeResult { ok: boolean; outputRom?: string; version?: string; error?: string; code?: number; log?: string }
+
+/** Run FVX (long-running: ~30-60 s). Resolves when the output ROM is produced. */
+export async function randomizeHttp(input: RandomizeInput): Promise<RandomizeResult> {
+  if (!USES_COMPANION) return { ok: false, error: 'no_companion' }
+  try {
+    const r = await fetch(`${EMU_BASE}/api/randomize`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) })
+    return (await r.json()) as RandomizeResult
+  } catch { return { ok: false, error: 'unreachable' } }
 }

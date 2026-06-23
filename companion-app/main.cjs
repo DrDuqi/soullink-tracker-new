@@ -139,8 +139,10 @@ async function pickFile({ kind, defaultPath }) {
   pickInFlight = true
   const filters = kind === 'biz'
     ? [{ name: 'BizHawk (EmuHawk.exe)', extensions: ['exe'] }, { name: 'Alle Dateien', extensions: ['*'] }]
-    : [{ name: 'Pokémon-ROM', extensions: ['nds', 'gba', 'gbc', 'gb'] }, { name: 'Alle Dateien', extensions: ['*'] }]
-  const title = kind === 'biz' ? 'EmuHawk.exe auswählen' : 'Pokémon-ROM auswählen'
+    : kind === 'preset'
+      ? [{ name: 'Randomizer-Preset', extensions: ['rnqs'] }, { name: 'Alle Dateien', extensions: ['*'] }]
+      : [{ name: 'Pokémon-ROM', extensions: ['nds', 'gba', 'gbc', 'gb'] }, { name: 'Alle Dateien', extensions: ['*'] }]
+  const title = kind === 'biz' ? 'EmuHawk.exe auswählen' : kind === 'preset' ? 'Randomizer-Preset (.rnqs) auswählen' : 'Pokémon-ROM auswählen'
   let anchor = null
   try {
     anchor = new BrowserWindow({
