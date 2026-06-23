@@ -20,18 +20,16 @@ export default function DashboardPage() {
       <p className="text-slate-400 mt-1.5">Starte einen SoulLink oder richte deine Tools ein.</p>
 
       {/* primary goal */}
-      <div className="mt-7 rounded-2xl border border-pk-red/30 bg-gradient-to-r from-pk-red/10 to-transparent p-6 flex items-center gap-5">
+      <button onClick={() => navigate('/new')} className="mt-7 w-full text-left rounded-2xl border border-pk-red/30 bg-gradient-to-r from-pk-red/10 to-transparent p-6 flex items-center gap-5 hover:border-pk-red/60 transition-colors">
         <div className="w-12 h-12 rounded-2xl bg-pk-red/20 border border-pk-red/40 flex items-center justify-center shrink-0">
           <Plus className="w-6 h-6 text-pk-red" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h2 className="text-white font-black text-lg">Neuer SoulLink</h2>
-            <span className="text-[9px] font-black uppercase tracking-wide text-slate-400 bg-white/5 px-1.5 py-0.5 rounded">Bald</span>
-          </div>
-          <p className="text-slate-400 text-sm mt-0.5">Profil wählen, Seed erzeugen, automatisch randomisieren und starten — kommt in Kürze.</p>
+          <h2 className="text-white font-black text-lg">Neuer SoulLink</h2>
+          <p className="text-slate-400 text-sm mt-0.5">Seed erzeugen, automatisch randomisieren und BizHawk starten.</p>
         </div>
-      </div>
+        <ArrowRight className="w-5 h-5 text-pk-red shrink-0" />
+      </button>
 
       {/* quick actions into what exists today */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">

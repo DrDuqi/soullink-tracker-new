@@ -27,7 +27,7 @@ import { join, dirname, resolve, extname, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawn, exec } from 'node:child_process'
-import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile } from './profiles.mjs'
+import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile, getProfile, recordRun } from './profiles.mjs'
 import { initRandomizer, randomizerStatus, randomize } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
 
@@ -622,6 +622,42 @@ function handleRequest(req, res) {
       })
       console.log('[randomize] result:', r.ok ? 'OK → ' + r.outputRom : 'FEHLER ' + r.error)
       sendJson(res, r, r.ok ? 200 : 500)
+    })
+    return
+  }
+
+  // ── run: prepare a SoulLink from a profile — randomize into a managed file ───
+  // POST { profileId, seed?, settingsString? } → randomizes the profile's original
+  // ROM with its preset + seed into …/ROMs/Randomized/<edition>_<players>_Seed_<n>.nds
+  // and records it on the profile. The client then launches BizHawk with outputRom.
+  if (path === '/api/run/prepare') {
+    if (req.method !== 'POST') { sendJson(res, { ok: false }, 405); return }
+    let body = ''
+    req.on('data', (c) => { body += c; if (body.length > 1_000_000) req.destroy() })
+    req.on('end', async () => {
+      let b = {}
+      try { b = JSON.parse(body || '{}') } catch { /* invalid → empty */ }
+      const profile = getProfile(b.profileId)
+      if (!profile) { sendJson(res, { ok: false, error: 'profile_not_found' }, 404); return }
+      const paths = profile.paths || {}
+      if (!paths.originalRom || !existsSync(paths.originalRom)) { sendJson(res, { ok: false, error: 'original_rom_missing' }, 400); return }
+      if (!paths.bizhawk || !existsSync(paths.bizhawk)) { sendJson(res, { ok: false, error: 'bizhawk_missing' }, 400); return }
+      const settingsString = b.settingsString ? String(b.settingsString) : null
+      if (!settingsString && (!paths.preset || !existsSync(paths.preset))) { sendJson(res, { ok: false, error: 'preset_missing' }, 400); return }
+
+      const seed = (b.seed === undefined || b.seed === null || b.seed === '') ? Math.floor(Math.random() * 1_000_000_000) : b.seed
+      const safe = (s) => String(s ?? '').replace(/[^\w-]+/g, '')
+      const players = Array.isArray(profile.players) ? profile.players.map(safe).filter(Boolean) : []
+      const outName = `${safe(profile.edition || 'ROM') || 'ROM'}_${players.join('-') || 'Solo'}_Seed_${seed}.nds`
+      const outDir = join(dirname(CONFIG_FILE), 'ROMs', 'Randomized')
+      try { mkdirSync(outDir, { recursive: true }) } catch { /* ignore */ }
+      const outputRom = join(outDir, outName)
+
+      console.log('[run] prepare:', profile.name, '· seed', seed, '→', outputRom)
+      const r = await randomize({ inputRom: paths.originalRom, outputRom, settingsFile: paths.preset, settingsString, seed })
+      if (!r.ok) { sendJson(res, { ok: false, error: r.error || 'randomize_failed', log: r.log }, 500); return }
+      try { recordRun(profile.id, { seed, romPath: outputRom }) } catch { /* non-fatal */ }
+      sendJson(res, { ok: true, outputRom, seed, edition: profile.edition || null, bizhawk: paths.bizhawk, players: profile.players || [] })
     })
     return
   }

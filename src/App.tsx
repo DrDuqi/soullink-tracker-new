@@ -17,6 +17,7 @@ const ProfilesPage = lazy(() => import('./pages/ProfilesPage'))
 // Companion desktop shell (only loaded inside the native window).
 const AppShell = lazy(() => import('./shell/AppShell'))
 const CompanionDashboard = lazy(() => import('./pages/companion/DashboardPage'))
+const NewRunPage = lazy(() => import('./pages/companion/NewRunPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
@@ -44,6 +45,7 @@ export default function App() {
                 <Routes>
                   <Route element={<AppShell />}>
                     <Route path="/" element={<CompanionDashboard />} />
+                    <Route path="/new" element={<NewRunPage />} />
                     <Route path="/setup" element={<SetupPage />} />
                     <Route path="/profiles" element={<ProfilesPage />} />
                     <Route path="/run/:runId" element={<RunPage />} />

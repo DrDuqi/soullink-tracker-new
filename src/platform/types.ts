@@ -11,10 +11,10 @@
 
 import type { CompanionConfig, RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult } from '../lib/companion'
 import type { EmulatorSettings, LaunchResult } from '../lib/emulatorSettings'
-import type { Profile, ProfileList, ProfilePatch, NewProfileInput } from '../lib/profiles'
+import type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult } from '../lib/profiles'
 
 export type { CompanionConfig, EmulatorSettings, LaunchResult }
-export type { Profile, ProfileList, ProfilePatch, NewProfileInput }
+export type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult }
 export type { RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult }
 
 export type PlatformKind = 'web' | 'companion'
@@ -65,4 +65,6 @@ export interface PlatformBridge {
   randomizerStatus(): Promise<RandomizerStatus | null>
   /** Run FVX to produce a randomized ROM (long-running). */
   randomize(input: RandomizeInput): Promise<RandomizeResult>
+  /** Prepare a new SoulLink: randomize the profile's ROM into a managed file. */
+  prepareRun(input: PrepareRunInput): Promise<PrepareRunResult>
 }

@@ -81,3 +81,24 @@ export async function setActiveProfileHttp(id: string): Promise<boolean> {
   try { const d = await reqJson(`/api/profiles/active?id=${encodeURIComponent(id)}`, jsonInit('POST')); return !!d?.ok }
   catch { return false }
 }
+
+// ── run preparation (Phase 3): randomize a profile's ROM for a new SoulLink ────
+export interface PrepareRunInput { profileId: string; seed?: number | string | null; settingsString?: string }
+export interface PrepareRunResult {
+  ok: boolean
+  outputRom?: string
+  seed?: number
+  edition?: string | null
+  bizhawk?: string
+  players?: string[]
+  error?: string
+  log?: string
+}
+
+/** Randomize the profile's original ROM (preset + seed) into a managed file.
+ *  Long-running (~30-60 s). The caller then launches BizHawk with outputRom. */
+export async function prepareRunHttp(input: PrepareRunInput): Promise<PrepareRunResult> {
+  if (!USES_COMPANION) return { ok: false, error: 'no_companion' }
+  try { return (await reqJson('/api/run/prepare', jsonInit('POST', input))) as PrepareRunResult }
+  catch { return { ok: false, error: 'unreachable' } }
+}
