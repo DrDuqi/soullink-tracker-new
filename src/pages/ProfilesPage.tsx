@@ -63,18 +63,18 @@ export default function ProfilesPage() {
               <button onClick={() => navigate('/')} className="text-slate-500 hover:text-white p-1.5 hover:bg-white/5 rounded-xl transition-colors"><ArrowLeft className="w-5 h-5" /></button>
               <Users className="w-5 h-5 text-pk-red hidden sm:block" />
               <div>
-                <h1 className="text-white font-black text-base leading-tight">SoulLink-Profile</h1>
-                <p className="text-slate-500 text-xs">Pro Mitspieler ein Profil – Pfade & Einstellungen automatisch parat</p>
+                <h1 className="text-white font-black text-base leading-tight">Mein Setup</h1>
+                <p className="text-slate-500 text-xs">Original-ROM, Emulator & Standard-Spielregeln – einmal einrichten</p>
               </div>
             </div>
           </header>
         )}
 
         <main className="max-w-3xl mx-auto w-full px-4 py-8 space-y-6">
-          {IN_COMPANION_WINDOW && <h1 className="text-white font-black text-2xl">Profile</h1>}
+          {IN_COMPANION_WINDOW && <h1 className="text-white font-black text-2xl">Mein Setup</h1>}
           {!available ? (
             <div className="rounded-2xl border border-[#2e2e42] bg-[#16161f] p-6 text-center">
-              <p className="text-white font-black text-lg mb-1">Profile brauchen den SoulLink Companion</p>
+              <p className="text-white font-black text-lg mb-1">Dein Setup braucht den SoulLink Companion</p>
               <p className="text-slate-400 text-sm mb-4">
                 {companion.usesCompanion
                   ? 'Starte den Companion (Symbol unten rechts im System-Tray), dann erscheinen deine Profile hier automatisch.'
