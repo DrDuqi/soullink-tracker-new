@@ -8,7 +8,7 @@
 // by dynamically importing emulator/companion/server.mjs (bundled as a resource),
 // so there is one implementation and no drift.
 
-const { app, Tray, Menu, shell, nativeImage, Notification, dialog, BrowserWindow } = require('electron')
+const { app, Tray, Menu, shell, nativeImage, Notification, dialog, BrowserWindow, ipcMain } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
@@ -16,6 +16,9 @@ const { pathToFileURL } = require('node:url')
 const WEBSITE = 'https://soullink-tracker-new.vercel.app'
 
 let tray = null
+let win = null                  // the main app window (created after the server is up)
+let quitting = false            // true → a window 'close' really quits (else hide to tray)
+let companionPort = 8787        // actual port the server bound (for the window URL)
 let serverState = 'starting'   // 'starting' | 'running' | 'shared' | 'error'
 let serverMod = null           // the imported server.mjs (exposes dev helpers)
 let pickInFlight = false        // guard: only one native file dialog at a time
@@ -63,7 +66,9 @@ function autoStartEnabled() {
   try { return app.getLoginItemSettings().openAtLogin } catch { return false }
 }
 function setAutoStart(enabled) {
-  try { app.setLoginItemSettings({ openAtLogin: enabled, openAsHidden: true }) } catch { /* ignore */ }
+  // args:['--hidden'] → a login-start runs silently in the tray (no window popping
+  // up on every boot); the user opens the window themselves when they want it.
+  try { app.setLoginItemSettings({ openAtLogin: enabled, openAsHidden: true, args: ['--hidden'] }) } catch { /* ignore */ }
   refreshTray()
 }
 
@@ -104,13 +109,14 @@ function refreshTray() {
   if (!tray) return
   tray.setToolTip('SoulLink Companion — ' + statusLabel())
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: statusLabel(), enabled: false },
+    { label: 'SoulLink öffnen', click: () => showWindow() },
     { type: 'separator' },
-    { label: 'Website öffnen', click: () => shell.openExternal(WEBSITE) },
+    { label: statusLabel(), enabled: false },
+    { label: 'Landing-Website öffnen', click: () => shell.openExternal(WEBSITE) },
     { label: 'Mit Windows starten', type: 'checkbox', checked: autoStartEnabled(), click: (mi) => setAutoStart(mi.checked) },
     ...devMenu(),
     { type: 'separator' },
-    { label: 'Beenden', click: () => app.quit() },
+    { label: 'Beenden', click: () => { quitting = true; app.quit() } },
   ]))
 }
 
@@ -155,6 +161,38 @@ async function pickFile({ kind, defaultPath }) {
   }
 }
 
+// The main app window. Loads the React app the Companion itself serves on
+// 127.0.0.1 (same origin as /api → no CORS, the WebBridge just works). Closing
+// hides to the tray (Discord-style); the app only quits via the tray's "Beenden".
+function appUrl() { return `http://127.0.0.1:${companionPort}/` }
+function createWindow(show) {
+  if (win && !win.isDestroyed()) { if (show) { win.show(); win.focus() } return win }
+  win = new BrowserWindow({
+    width: 1120, height: 740, minWidth: 900, minHeight: 600,
+    show: false, backgroundColor: '#0e0e13', title: 'SoulLink Companion',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true, nodeIntegration: false, sandbox: true,
+    },
+  })
+  const url = appUrl()
+  slog(`Fenster lädt ${url}`)
+  win.loadURL(url).catch((e) => slogErr('Fenster-Load', e))
+  win.once('ready-to-show', () => { if (show) { win.show(); win.focus() } slog('✓ Fenster bereit') })
+  // External links open in the system browser; the app window stays on the app.
+  win.webContents.setWindowOpenHandler(({ url: u }) => { if (u) shell.openExternal(u); return { action: 'deny' } })
+  win.webContents.on('will-navigate', (e, u) => { if (u && !u.startsWith(`http://127.0.0.1:${companionPort}`)) { e.preventDefault(); shell.openExternal(u) } })
+  win.on('close', (e) => { if (!quitting) { e.preventDefault(); win.hide() } })
+  return win
+}
+function showWindow() {
+  if (serverState === 'error') { notify('SoulLink Companion', 'Server nicht gestartet — siehe startup.log.'); return }
+  createWindow(true)
+}
+ipcMain.on('win:minimize', () => { if (win && !win.isDestroyed()) win.minimize() })
+ipcMain.on('win:close', () => { if (win && !win.isDestroyed()) win.close() })
+
 async function startServer() {
   const userData = app.getPath('userData')
   slog(`userData = ${userData}`)
@@ -171,9 +209,10 @@ async function startServer() {
     serverMod = await import(pathToFileURL(serverPath).href)
     slog('✓ server.mjs importiert')
     slog('Schritt: startCompanion() …')
-    await serverMod.startCompanion({ quiet: true, pickFile, version: app.getVersion(), log: slog })
+    const server = await serverMod.startCompanion({ quiet: true, pickFile, version: app.getVersion(), log: slog })
     serverState = 'running'
-    slog('✓ HTTP-Server gestartet (startCompanion ok)')
+    try { const a = server && server.address(); if (a && typeof a === 'object' && a.port) companionPort = a.port } catch { /* keep default */ }
+    slog(`✓ HTTP-Server gestartet (Port ${companionPort})`)
   } catch (e) {
     if (e && e.code === 'EADDRINUSE') {
       // Port already served (e.g. `npm run companion` is open) — that's fine, the
@@ -199,8 +238,9 @@ function checkForUpdates() {
   } catch { /* updater unavailable in dev → ignore */ }
 }
 
-app.on('window-all-closed', () => { /* no windows → stay alive in the tray */ })
-app.on('second-instance', () => notify('SoulLink Companion', 'Läuft bereits im System-Tray.'))
+app.on('window-all-closed', () => { /* close-to-tray → stay alive in the tray */ })
+// A second launch reveals the existing window instead of starting another instance.
+app.on('second-instance', () => showWindow())
 
 app.whenReady().then(async () => {
   try { fs.writeFileSync(startupLogPath(), '') } catch { /* ignore */ }   // fresh log each launch
@@ -208,9 +248,12 @@ app.whenReady().then(async () => {
   slog(`node=${process.version} · electron=${process.versions.electron}`)
   slog(`serverPath = ${serverPath} (existiert: ${fs.existsSync(serverPath)})`)
   slog(`profiles.mjs daneben (existiert: ${fs.existsSync(path.join(path.dirname(serverPath), 'profiles.mjs'))})`)
-  try { tray = new Tray(trayImage()); refreshTray(); slog('✓ Tray erstellt') }
+  try { tray = new Tray(trayImage()); refreshTray(); tray.on('double-click', () => showWindow()); slog('✓ Tray erstellt') }
   catch (e) { slogErr('Tray', e) }
   await startServer()
+  // Open the window — unless launched hidden at login (then it waits in the tray).
+  const startHidden = process.argv.includes('--hidden')
+  if (serverState !== 'error') { try { createWindow(!startHidden); slog(`✓ Fenster erstellt (sichtbar=${!startHidden})`) } catch (e) { slogErr('Fenster', e) } }
   try { checkForUpdates(); slog('✓ Update-Check angestoßen') } catch (e) { slogErr('Update-Check', e) }
   slog(`✓ App bereit (Status=${serverState})`)
 })

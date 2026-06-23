@@ -23,7 +23,7 @@
     "appId": "app.soullink.companion",
     "productName": "SoulLink Companion",
     "directories": { "output": "dist" },
-    "files": ["main.cjs", "assets/**"],
+    "files": ["main.cjs", "preload.cjs", "assets/**"],
     "extraResources": [
       { "from": "../emulator/companion", "to": "companion", "filter": ["*.mjs"] },
       { "from": "../emulator/bizhawk/soullink_sync.lua", "to": "companion/soullink_sync.lua" },
