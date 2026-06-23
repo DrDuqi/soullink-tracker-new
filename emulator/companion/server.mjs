@@ -29,6 +29,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawn, exec } from 'node:child_process'
 import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile } from './profiles.mjs'
 import { initRandomizer, randomizerStatus, randomize } from './randomizer.mjs'
+import { validateRom } from './roms.mjs'
 
 // Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
 // (which CI bumps from the release tag) to startCompanion; CLI falls back to the
@@ -587,6 +588,13 @@ function handleRequest(req, res) {
   }
   if (path === '/api/profiles/active' && req.method === 'POST') {
     try { sendJson(res, { ok: setActiveProfile(url.searchParams.get('id')) }) }
+    catch { sendJson(res, { ok: false }, 500) }
+    return
+  }
+
+  // ── rom: validate a picked file (.nds header → edition/region/revision) ─────
+  if (path === '/api/rom/validate') {
+    try { sendJson(res, { ok: true, ...validateRom(url.searchParams.get('path')) }) }
     catch { sendJson(res, { ok: false }, 500) }
     return
   }
