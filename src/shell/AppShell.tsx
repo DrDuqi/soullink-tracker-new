@@ -1,34 +1,34 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
+import TitleBar from './TitleBar'
 import CompanionAuth from './CompanionAuth'
-import UserMenu from '../components/UserMenu'
 import { useAuth } from '../contexts/AuthContext'
 
-// The Companion desktop shell: a persistent left Sidebar + a top account bar + a
-// large work area (Outlet) that swaps content without remounting the navigation —
-// like Steam / Discord / VS Code. Renders ONLY inside the Companion window. When
-// the user isn't signed in (the 127.0.0.1 origin has no session), the work area
-// shows the clean login instead of the routed page.
+// The Companion desktop shell: a custom title bar on top, then a persistent left
+// Sidebar + a large work area (Outlet) that swaps content without remounting the
+// navigation — like Steam / Discord / VS Code. Renders ONLY inside the Companion
+// window. Signed out (the 127.0.0.1 origin has no website session) → the clean
+// login fills the work area and the sidebar is hidden (nothing to navigate yet).
 export default function AppShell() {
   const { user, loading } = useAuth()
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#0b0b10' }}>
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 shrink-0 flex items-center justify-end px-5 border-b border-[#1f1f2b]">
-          {user && <UserMenu />}
-        </header>
-        <main className="flex-1 overflow-y-auto min-h-0">
-          {loading ? (
-            <div className="h-full flex items-center justify-center text-slate-500 text-sm">Wird geladen…</div>
-          ) : user ? (
+    <div className="flex flex-col h-screen overflow-hidden" style={{ background: '#0b0b10' }}>
+      <TitleBar />
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">Wird geladen…</div>
+      ) : user ? (
+        <div className="flex flex-1 min-h-0">
+          <Sidebar />
+          <main className="flex-1 overflow-y-auto min-h-0">
             <Outlet />
-          ) : (
-            <CompanionAuth />
-          )}
-        </main>
-      </div>
+          </main>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0">
+          <CompanionAuth />
+        </div>
+      )}
     </div>
   )
 }

@@ -169,7 +169,7 @@ function createWindow(show) {
   if (win && !win.isDestroyed()) { if (show) { win.show(); win.focus() } return win }
   win = new BrowserWindow({
     width: 1120, height: 740, minWidth: 900, minHeight: 600,
-    show: false, backgroundColor: '#0e0e13', title: 'SoulLink Companion',
+    show: false, frame: false, backgroundColor: '#0b0b10', title: 'SoulLink Companion',
     icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -180,6 +180,9 @@ function createWindow(show) {
   slog(`Fenster lädt ${url}`)
   win.loadURL(url).catch((e) => slogErr('Fenster-Load', e))
   win.once('ready-to-show', () => { if (show) { win.show(); win.focus() } slog('✓ Fenster bereit') })
+  // Tell the custom title bar when the maximize state changes (icon swap).
+  win.on('maximize', () => { try { win.webContents.send('win:maximize-changed', true) } catch { /* ignore */ } })
+  win.on('unmaximize', () => { try { win.webContents.send('win:maximize-changed', false) } catch { /* ignore */ } })
   // External links open in the system browser; the app window stays on the app.
   win.webContents.setWindowOpenHandler(({ url: u }) => { if (u) shell.openExternal(u); return { action: 'deny' } })
   win.webContents.on('will-navigate', (e, u) => { if (u && !u.startsWith(`http://127.0.0.1:${companionPort}`)) { e.preventDefault(); shell.openExternal(u) } })
@@ -191,7 +194,9 @@ function showWindow() {
   createWindow(true)
 }
 ipcMain.on('win:minimize', () => { if (win && !win.isDestroyed()) win.minimize() })
+ipcMain.on('win:toggle-maximize', () => { if (win && !win.isDestroyed()) { win.isMaximized() ? win.unmaximize() : win.maximize() } })
 ipcMain.on('win:close', () => { if (win && !win.isDestroyed()) win.close() })
+ipcMain.handle('win:is-maximized', () => !!(win && !win.isDestroyed() && win.isMaximized()))
 
 async function startServer() {
   const userData = app.getPath('userData')

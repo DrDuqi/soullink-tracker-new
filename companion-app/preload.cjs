@@ -10,7 +10,16 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('soullinkNative', {
   kind: 'companion',
-  // Thin, explicit IPC surface (room to grow: window controls, native menus, …).
+  // Window controls for the custom (frameless) title bar.
   minimize: () => ipcRenderer.send('win:minimize'),
+  toggleMaximize: () => ipcRenderer.send('win:toggle-maximize'),
   close: () => ipcRenderer.send('win:close'),
+  isMaximized: () => ipcRenderer.invoke('win:is-maximized'),
+  // Subscribe to maximize/restore so the title bar can swap its icon. Returns an
+  // unsubscribe function.
+  onMaximizeChange: (cb) => {
+    const handler = (_e, value) => cb(!!value)
+    ipcRenderer.on('win:maximize-changed', handler)
+    return () => ipcRenderer.removeListener('win:maximize-changed', handler)
+  },
 })
