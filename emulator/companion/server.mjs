@@ -31,6 +31,7 @@ import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile
 import { initRandomizer, randomizerStatus, randomize, openRandomizer } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
 import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset } from './presets.mjs'
+import { initRuns, runFolder, recordLocalRun, getLocalRun } from './runs.mjs'
 
 // Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
 // (which CI bumps from the release tag) to startCompanion; CLI falls back to the
@@ -85,6 +86,9 @@ initPresets({
   builtinCandidates: [process.env.SOULLINK_PRESETS_DIR, join(HERE, '..', 'presets'), join(ROOT, 'presets')],
   customDir: join(dirname(CONFIG_FILE), 'Presets'),
 })
+// Local run registry: maps Supabase run ids → local ROM/seed/preset (+ savegame via
+// the unique ROM name). Stored per-machine next to the config.
+initRuns({ file: join(dirname(CONFIG_FILE), 'runs.json'), runsDir: join(dirname(CONFIG_FILE), 'Runs') })
 function loadConfig() {
   try { const j = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')); return (j && typeof j === 'object') ? j : {} }
   catch { return {} }
@@ -697,17 +701,35 @@ function handleRequest(req, res) {
       const seed = (b.seed === undefined || b.seed === null || b.seed === '') ? Math.floor(Math.random() * 1_000_000_000) : b.seed
       const safe = (s) => String(s ?? '').replace(/[^\w-]+/g, '')
       const players = Array.isArray(profile.players) ? profile.players.map(safe).filter(Boolean) : []
-      const outName = `${safe(profile.edition || 'ROM') || 'ROM'}_${players.join('-') || 'Solo'}_Seed_${seed}.nds`
-      const outDir = join(dirname(CONFIG_FILE), 'ROMs', 'Randomized')
+      // The ROM basename MUST be globally unique → BizHawk keys the savegame
+      // (NDS/SaveRAM/<basename>.SaveRAM) by it, so each run gets its own save and a
+      // re-open loads exactly that save. The run id fragment guarantees uniqueness.
+      const runId = b.runId ? String(b.runId) : null
+      const tag = runId ? '_' + runId.slice(0, 8) : ''
+      const outName = `${safe(profile.edition || 'ROM') || 'ROM'}_${players.join('-') || 'Solo'}_Seed_${seed}${tag}.nds`
+      // Per-run folder when we have a run id, else the shared Randomized folder.
+      const outDir = runId ? runFolder(runId) : join(dirname(CONFIG_FILE), 'ROMs', 'Randomized')
       try { mkdirSync(outDir, { recursive: true }) } catch { /* ignore */ }
       const outputRom = join(outDir, outName)
 
-      console.log('[run] prepare:', profile.name, '· seed', seed, '→', outputRom)
+      console.log('[run] prepare:', profile.name, '· run', runId || '(local)', '· seed', seed, '→', outputRom)
       const r = await randomize({ inputRom: paths.originalRom, outputRom, settingsFile, settingsString, seed })
       if (!r.ok) { sendJson(res, { ok: false, error: r.error || 'randomize_failed', log: r.log }, 500); return }
-      try { recordRun(profile.id, { seed, romPath: outputRom, presetId }) } catch { /* non-fatal */ }
-      sendJson(res, { ok: true, outputRom, seed, presetId, edition: profile.edition || null, bizhawk: paths.bizhawk, players: profile.players || [] })
+      try { recordRun(profile.id, { seed, romPath: outputRom, presetId, runId }) } catch { /* non-fatal */ }
+      // Register the run locally so "Run öffnen / Weiterspielen" later relaunches the
+      // exact ROM (⇒ same savegame). saveName = the BizHawk SaveRAM key for backups.
+      if (runId) {
+        try { recordLocalRun(runId, { romPath: outputRom, bizhawk: paths.bizhawk, seed, presetId, edition: profile.edition || null, profileId: profile.id, saveName: outName.replace(/\.nds$/i, '') + '.SaveRAM' }) } catch { /* non-fatal */ }
+      }
+      sendJson(res, { ok: true, runId, outputRom, seed, presetId, edition: profile.edition || null, bizhawk: paths.bizhawk, players: profile.players || [] })
     })
+    return
+  }
+  // run/local: is this run set up on THIS PC? → its ROM/seed/preset for relaunch.
+  if (path === '/api/run/local') {
+    const lr = getLocalRun(url.searchParams.get('runId'))
+    const exists = !!(lr && lr.romPath && existsSync(lr.romPath))
+    sendJson(res, { ok: true, found: exists, run: exists ? lr : null })
     return
   }
 
