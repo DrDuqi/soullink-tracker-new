@@ -4,6 +4,7 @@ import { ChevronDown, User as UserIcon, Settings, LogOut, ScrollText, MessageCir
 import { useAuth } from '../contexts/AuthContext'
 import { useT } from '../lib/i18n'
 import { LINKS } from '../lib/appInfo'
+import { IN_COMPANION_WINDOW } from '../lib/companion'
 import ProfileModal from './ProfileModal'
 import SettingsModal from './SettingsModal'
 import ChangelogModal from './ChangelogModal'
@@ -68,7 +69,7 @@ export default function UserMenu() {
             <div className="py-1.5">
               <button role="menuitem" onClick={() => { setOpen(false); setShowProfile(true) }} className={item}><UserIcon className="w-4 h-4" /> {t('menu.profile')}</button>
               <button role="menuitem" onClick={() => { setOpen(false); setShowSettings(true) }} className={item}><Settings className="w-4 h-4" /> {t('menu.settings')}</button>
-              <button role="menuitem" onClick={() => { setOpen(false); navigate('/profiles') }} className={item}><Users className="w-4 h-4" /> Mein Setup</button>
+              <button role="menuitem" onClick={() => { setOpen(false); navigate(IN_COMPANION_WINDOW ? '/mysetup' : '/profiles') }} className={item}><Users className="w-4 h-4" /> Mein Setup</button>
               <button role="menuitem" onClick={() => { setOpen(false); setShowChangelog(true) }} className={item}><ScrollText className="w-4 h-4" /> {t('menu.changelog')}</button>
               <button role="menuitem" onClick={() => openLink(LINKS.discord)} disabled={!LINKS.discord} className={`${item} disabled:hover:bg-transparent disabled:cursor-default`}>
                 <MessageCircle className="w-4 h-4" /> {t('menu.discord')}

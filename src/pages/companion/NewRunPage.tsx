@@ -41,6 +41,7 @@ export default function NewRunPage() {
   const [presets, setPresets] = useState<Preset[]>([])
   const [presetId, setPresetId] = useState<string>('')
   const [sameWorld, setSameWorld] = useState(false)   // off = own world per player (linked by route)
+  const [partnerName, setPartnerName] = useState('')
   const [step, setStep] = useState<Step>('idle')
   const [err, setErr] = useState<string | null>(null)
 
@@ -65,12 +66,14 @@ export default function NewRunPage() {
     // 1) Create the real Supabase run (so it persists + appears in the dashboard).
     setStep('creating')
     let run, player
+    const myName = profile?.username || profile?.display_name || 'Ich'
+    const runName = partnerName.trim() ? `${myName} & ${partnerName.trim()}` : `${myName}s SoulLink`
     try {
       const created = await createRun({
-        name: active.name,
+        name: runName,
         game: active.edition || 'platinum',
         ownerUserId: user.id,
-        username: profile?.username || profile?.display_name || active.players[0] || 'Spieler',
+        username: profile?.username || profile?.display_name || 'Spieler',
       })
       run = created.run; player = created.player
     } catch (e) { setErr(e instanceof Error ? e.message : 'Run konnte nicht erstellt werden.'); setStep('error'); return }
@@ -107,13 +110,20 @@ export default function NewRunPage() {
           <p className="text-slate-300 text-sm mt-2">
             Richte einmal deine <b className="text-white">Original-ROM</b> und den Emulator ein — danach übernimmt SoulLink alles automatisch.
           </p>
-          <button onClick={() => navigate('/settings')} className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
+          <button onClick={() => navigate('/mysetup')} className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
             <Settings className="w-4 h-4" /> Jetzt einrichten
           </button>
         </div>
       ) : (
         <>
           <div className="mt-7 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
+            <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">Mit wem spielst du?</label>
+            <input value={partnerName} disabled={busy} onChange={(e) => setPartnerName(e.target.value)} placeholder="Name deines Freundes (oder leer = allein)"
+              className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3.5 py-2.5 text-sm text-white" />
+            <p className="text-slate-500 text-[11px] mt-2">Nach dem Start teilst du den Einladungs-Code — dein Freund tritt damit bei und randomisiert seine eigene ROM.</p>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
             <div className="text-slate-400 text-xs font-black uppercase tracking-widest mb-2">Edition</div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-white font-black text-lg">{active!.edition ? editionLabel(active!.edition) : 'Pokémon'}</span>

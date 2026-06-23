@@ -5,9 +5,9 @@ import { Cpu, Gamepad2, Dices, ChevronRight } from 'lucide-react'
 // navigation. The player only comes here to set things up once (or tweak later);
 // the everyday app is the Dashboard + the Run.
 const SECTIONS = [
-  { icon: Gamepad2, title: 'Original-ROM', desc: 'Deine originale Pokémon-ROM — einmal auswählen, danach übernimmt SoulLink alles.', to: '/profiles' },
-  { icon: Cpu, title: 'Emulator', desc: 'BizHawk einrichten — meist nur einmal nötig.', to: '/setup' },
+  { icon: Gamepad2, title: 'Mein Setup', desc: 'Original-ROM und Emulator — einmal auswählen, danach übernimmt SoulLink alles.', to: '/mysetup' },
   { icon: Dices, title: 'Spielregeln', desc: 'Wie randomisiert wird (Pokémon, Trainer, Items …) — eingebaute und eigene Regeln.', to: '/presets' },
+  { icon: Cpu, title: 'Emulator (erweitert)', desc: 'BizHawk automatisch finden, herunterladen oder im Detail einrichten.', to: '/setup' },
 ]
 
 export default function SettingsPage() {

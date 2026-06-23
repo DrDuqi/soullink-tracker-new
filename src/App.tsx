@@ -21,6 +21,7 @@ const NewRunPage = lazy(() => import('./pages/companion/NewRunPage'))
 const JoinRunPage = lazy(() => import('./pages/companion/JoinRunPage'))
 const PresetsPage = lazy(() => import('./pages/companion/PresetsPage'))
 const CompanionSettings = lazy(() => import('./pages/companion/SettingsPage'))
+const MeinSetupPage = lazy(() => import('./pages/companion/MeinSetupPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
@@ -51,6 +52,7 @@ export default function App() {
                     <Route path="/new" element={<NewRunPage />} />
                     <Route path="/join" element={<JoinRunPage />} />
                     <Route path="/settings" element={<CompanionSettings />} />
+                    <Route path="/mysetup" element={<MeinSetupPage />} />
                     <Route path="/presets" element={<PresetsPage />} />
                     <Route path="/setup" element={<SetupPage />} />
                     <Route path="/profiles" element={<ProfilesPage />} />
