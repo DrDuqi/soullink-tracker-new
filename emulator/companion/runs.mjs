@@ -10,8 +10,8 @@
 // The run's IDENTITY + team live in Supabase; this registry is purely the local
 // "how to launch this run + which savegame". Per-machine, atomic, schema-versioned.
 
-import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, rmSync, unlinkSync } from 'node:fs'
+import { join, dirname } from 'node:path'
 
 let FILE = null
 let RUNS_DIR = null
@@ -47,3 +47,37 @@ export function recordLocalRun(runId, data) {
 }
 export function getLocalRun(runId) { return load().runs[String(runId)] || null }
 export function listLocalRuns() { return load().runs }
+
+// Write a self-describing metadata.json into the run folder, so the folder survives
+// even if the central registry is lost (and is human-readable).
+export function writeRunMetadata(runId, meta) {
+  try {
+    const dir = runFolder(runId)
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'metadata.json'), JSON.stringify({ runId, ...meta }, null, 2))
+  } catch { /* non-fatal */ }
+}
+
+// The BizHawk savegame for a run (keyed by ROM basename) + its backup.
+function savePathsFor(rec) {
+  if (!rec?.bizhawk || !rec?.saveName) return []
+  const dir = join(dirname(rec.bizhawk), 'NDS', 'SaveRAM')
+  return [join(dir, rec.saveName), join(dir, rec.saveName + '.bak')]
+}
+
+export function archiveLocalRun(runId, archived = true) {
+  const s = load(); const r = s.runs[String(runId)]
+  if (!r) return false
+  r.archived = !!archived; r.updatedAt = new Date().toISOString()
+  save(s); return true
+}
+
+// Fully remove a run's LOCAL files: its folder (ROM + metadata) AND its savegame
+// (+ .bak) in BizHawk's SaveRAM. The shared Supabase run is deleted by the client.
+export function deleteLocalRun(runId) {
+  const s = load(); const r = s.runs[String(runId)]
+  try { rmSync(runFolder(runId), { recursive: true, force: true }) } catch { /* ignore */ }
+  if (r) for (const p of savePathsFor(r)) { try { if (existsSync(p)) unlinkSync(p) } catch { /* ignore */ } }
+  if (r) { delete s.runs[String(runId)]; save(s) }
+  return true
+}

@@ -31,7 +31,7 @@ import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile
 import { initRandomizer, randomizerStatus, randomize, openRandomizer } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
 import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset } from './presets.mjs'
-import { initRuns, runFolder, recordLocalRun, getLocalRun } from './runs.mjs'
+import { initRuns, runFolder, recordLocalRun, getLocalRun, writeRunMetadata, archiveLocalRun, deleteLocalRun } from './runs.mjs'
 
 // Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
 // (which CI bumps from the release tag) to startCompanion; CLI falls back to the
@@ -732,7 +732,10 @@ function handleRequest(req, res) {
       // Register the run locally so "Weiterspielen" later relaunches the exact ROM
       // (⇒ same savegame). saveName = the BizHawk SaveRAM key for backups.
       if (runId) {
-        try { recordLocalRun(runId, { romPath: outputRom, bizhawk: paths.bizhawk, seed, presetId, edition: profile.edition || null, profileId: profile.id, saveName: outName.replace(/\.nds$/i, '') + '.SaveRAM' }) } catch { /* non-fatal */ }
+        const saveName = outName.replace(/\.nds$/i, '') + '.SaveRAM'
+        try { recordLocalRun(runId, { romPath: outputRom, bizhawk: paths.bizhawk, seed, presetId, edition: profile.edition || null, profileId: profile.id, saveName }) } catch { /* non-fatal */ }
+        // Self-describing folder (survives loss of the central registry).
+        try { writeRunMetadata(runId, { name: b.runName || null, romFile: outName, seed, presetId, edition: profile.edition || null, baseRom, saveName, players: profile.players || [], createdAt: new Date().toISOString() }) } catch { /* non-fatal */ }
       }
       sendJson(res, { ok: true, runId, outputRom, seed, presetId, presetData, baseRom, edition: profile.edition || null, bizhawk: paths.bizhawk, players: profile.players || [] })
     })
@@ -743,6 +746,19 @@ function handleRequest(req, res) {
     const lr = getLocalRun(url.searchParams.get('runId'))
     const exists = !!(lr && lr.romPath && existsSync(lr.romPath))
     sendJson(res, { ok: true, found: exists, run: exists ? lr : null })
+    return
+  }
+  // run/archive: hide/show a run locally (keeps the files). POST ?runId=&archived=
+  if (path === '/api/run/archive' && req.method === 'POST') {
+    const archived = url.searchParams.get('archived') !== '0'
+    sendJson(res, { ok: archiveLocalRun(url.searchParams.get('runId'), archived) })
+    return
+  }
+  // run/delete: remove the run's LOCAL files (folder + ROM + savegame). The shared
+  // Supabase run is deleted by the client. POST ?runId=
+  if (path === '/api/run/delete' && req.method === 'POST') {
+    try { sendJson(res, { ok: deleteLocalRun(url.searchParams.get('runId')) }) }
+    catch { sendJson(res, { ok: false }, 500) }
     return
   }
 
