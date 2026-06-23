@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, ArrowRight, Loader2, Swords, Users, Clock, Play } from 'lucide-react'
+import { Plus, ArrowRight, Loader2, Swords, Users, Clock, Play, LogIn, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMyRuns, type RunVM } from '../../hooks/useMyRuns'
 import { useRunStore } from '../../store/runStore'
 import { getPlatform } from '../../platform'
+import { fetchRunRecipe } from '../../lib/runRecipe'
 import type { LocalRun } from '../../lib/profiles'
 
 // The Companion home — "Weiterspielen", not "was möchtest du konfigurieren?".
@@ -47,6 +48,27 @@ export default function DashboardPage() {
     openRun(vm)
   }
 
+  // New attempt (lost the SoulLink): keep run + rules, NEW seed → new ROM + savegame.
+  // No randomizer reconfiguring. Uses the run's shared preset so it stays consistent.
+  async function newAttempt(vm: RunVM) {
+    if (!localRun) return
+    if (!confirm('Neuen Versuch starten? Es wird eine neue ROM mit neuem Seed (gleiche Regeln) erstellt — dein bisheriger Spielstand dieses Runs bleibt als Datei erhalten, aber du startest frisch.')) return
+    setLaunching(true)
+    const recipe = await fetchRunRecipe(vm.run.id)
+    const r = await platform.prepareRun({
+      runId: vm.run.id, profileId: localRun.profileId || '',
+      presetData: recipe?.preset_data ?? undefined,
+      presetId: recipe?.preset_data ? undefined : localRun.presetId,
+      seed: Math.floor(Math.random() * 1_000_000_000),
+    })
+    if (r.ok) {
+      setLocalRun((cur) => (cur ? { ...cur, romPath: r.outputRom || cur.romPath, seed: r.seed } : cur))
+      await platform.launch({ bizhawkPath: r.bizhawk || '', romPath: r.outputRom || '', luaPath: '', syncFolder: '' }, false)
+    }
+    setLaunching(false)
+    openRun(vm)
+  }
+
   return (
     <div className="max-w-4xl mx-auto px-8 py-10">
       <div className="flex items-end justify-between gap-4 flex-wrap">
@@ -54,9 +76,14 @@ export default function DashboardPage() {
           <div className="text-slate-400 text-sm">Willkommen zurück, {name}</div>
           <h1 className="text-white font-black text-3xl tracking-tight mt-0.5">Weiterspielen</h1>
         </div>
-        <button onClick={() => navigate('/new')} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5">
-          <Plus className="w-4 h-4" /> Neuer SoulLink
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigate('/join')} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5">
+            <LogIn className="w-4 h-4" /> Beitreten
+          </button>
+          <button onClick={() => navigate('/new')} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
+            <Plus className="w-4 h-4" /> Neuer SoulLink
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -91,6 +118,11 @@ export default function DashboardPage() {
               {localRun && (
                 <button onClick={() => openRun(active)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5">
                   Nur Tracker <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+              {localRun && (
+                <button onClick={() => newAttempt(active)} disabled={launching} title="Gleiche Regeln, neuer Seed + neuer Spielstand" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-400 hover:text-white border border-[#3a3a4e] hover:bg-white/5 disabled:opacity-40">
+                  <RefreshCw className="w-4 h-4" /> Neuer Versuch
                 </button>
               )}
             </div>

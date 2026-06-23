@@ -18,6 +18,7 @@ const ProfilesPage = lazy(() => import('./pages/ProfilesPage'))
 const AppShell = lazy(() => import('./shell/AppShell'))
 const CompanionDashboard = lazy(() => import('./pages/companion/DashboardPage'))
 const NewRunPage = lazy(() => import('./pages/companion/NewRunPage'))
+const JoinRunPage = lazy(() => import('./pages/companion/JoinRunPage'))
 const PresetsPage = lazy(() => import('./pages/companion/PresetsPage'))
 const CompanionSettings = lazy(() => import('./pages/companion/SettingsPage'))
 
@@ -48,6 +49,7 @@ export default function App() {
                   <Route element={<AppShell />}>
                     <Route path="/" element={<CompanionDashboard />} />
                     <Route path="/new" element={<NewRunPage />} />
+                    <Route path="/join" element={<JoinRunPage />} />
                     <Route path="/settings" element={<CompanionSettings />} />
                     <Route path="/presets" element={<PresetsPage />} />
                     <Route path="/setup" element={<SetupPage />} />

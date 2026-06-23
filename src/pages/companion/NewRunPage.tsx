@@ -5,6 +5,7 @@ import { useProfiles } from '../../hooks/useProfiles'
 import { getPlatform } from '../../platform'
 import { useAuth } from '../../contexts/AuthContext'
 import { createRun } from '../../lib/createRun'
+import { saveRunRecipe } from '../../lib/runRecipe'
 import { useRunStore } from '../../store/runStore'
 import type { Preset } from '../../lib/presets'
 
@@ -32,6 +33,7 @@ export default function NewRunPage() {
   const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1_000_000_000))
   const [presets, setPresets] = useState<Preset[]>([])
   const [presetId, setPresetId] = useState<string>('')
+  const [sameWorld, setSameWorld] = useState(false)   // off = own world per player (linked by route)
   const [step, setStep] = useState<Step>('idle')
   const [err, setErr] = useState<string | null>(null)
 
@@ -70,6 +72,10 @@ export default function NewRunPage() {
     setStep('randomizing')
     const r = await platform.prepareRun({ runId: run.id, profileId: active.id, presetId, seed })
     if (!r.ok) { setErr(ERR[r.error || ''] || r.error || 'Fehler'); setStep('error'); return }
+
+    // Store the shared recipe on the run so a partner reproduces the rules (and the
+    // world too, if "Gleiche Welt" is on → shared seed). Non-fatal if it fails.
+    try { await saveRunRecipe(run.id, { presetData: r.presetData, edition: r.edition, baseRom: r.baseRom, worldSeed: sameWorld ? r.seed : null }) } catch { /* ignore */ }
 
     // 3) Launch BizHawk with the randomized ROM + live-sync.
     setStep('launching')
@@ -128,7 +134,14 @@ export default function NewRunPage() {
                 <Dices className="w-4 h-4" /> Würfeln
               </button>
             </div>
-            <p className="text-slate-500 text-[11px] mt-2">Gleicher Seed + gleiches Preset = gleiches Spiel. (Für Mitspieler später teilbar.)</p>
+            <p className="text-slate-500 text-[11px] mt-2">Gleiches Preset + gleicher Seed = exakt gleiche Welt.</p>
+            <label className="flex items-start gap-2.5 mt-3 cursor-pointer">
+              <input type="checkbox" checked={sameWorld} disabled={busy} onChange={(e) => setSameWorld(e.target.checked)} className="mt-0.5 accent-pk-red" />
+              <span className="text-xs text-slate-300">
+                <b className="text-white">Gleiche Welt für beide Spieler</b> (gemeinsamer Seed)
+                <span className="block text-slate-500 text-[11px]">Aus = jeder spielt seine eigene zufällige Welt, verbunden über die Routen (Standard-SoulLink). Setzt bei „Ein" voraus, dass beide dieselbe ROM-Version haben.</span>
+              </span>
+            </label>
           </div>
 
           <button onClick={start} disabled={busy} className="mt-5 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-white disabled:opacity-60" style={{ background: '#CC0000' }}>
