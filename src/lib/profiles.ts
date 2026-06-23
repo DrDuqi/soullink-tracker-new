@@ -8,7 +8,8 @@ import { EMU_BASE, USES_COMPANION } from './companion'
 export interface ProfilePaths {
   originalRom: string | null
   bizhawk: string | null
-  randomizer: string | null
+  randomizer: string | null   // FVX dir override (usually auto-detected/bundled)
+  preset: string | null       // .rnqs randomizer settings for this pairing
   outputDir: string | null
 }
 
@@ -30,8 +31,9 @@ export interface Profile {
 
 export interface ProfileList { activeProfileId: string | null; profiles: Profile[] }
 
-/** Fields a caller may change. id/createdAt/updatedAt are server-owned. */
-export type ProfilePatch = Partial<Omit<Profile, 'id' | 'createdAt' | 'updatedAt'>>
+/** Fields a caller may change. id/createdAt/updatedAt are server-owned. `paths` is
+ *  a partial — the server deep-merges it, so callers set one path at a time. */
+export type ProfilePatch = Partial<Omit<Profile, 'id' | 'createdAt' | 'updatedAt' | 'paths'>> & { paths?: Partial<ProfilePaths> }
 export interface NewProfileInput { name: string; players?: string[]; edition?: string }
 
 async function reqJson(path: string, init?: RequestInit): Promise<any> {

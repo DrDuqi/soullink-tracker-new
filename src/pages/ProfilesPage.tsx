@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Check, Trash2, Copy, Pencil, Users, X, Loader2, Download, UserPlus } from 'lucide-react'
+import { ArrowLeft, Plus, Check, Trash2, Copy, Pencil, Users, X, Loader2, Download, UserPlus, FolderCog } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useProfiles } from '../hooks/useProfiles'
 import { useCompanion } from '../hooks/useCompanion'
 import AtmosphereBackground from '../components/AtmosphereBackground'
 import CompanionVersion from '../components/CompanionVersion'
 import { DOWNLOADS } from '../lib/downloads'
-import { IN_COMPANION_WINDOW } from '../lib/companion'
+import { IN_COMPANION_WINDOW, type RomInfo } from '../lib/companion'
+import { getPlatform } from '../platform'
+import type { Profile, ProfilePatch } from '../lib/profiles'
 
 const btnRed = 'flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white transition-transform active:scale-[0.98] disabled:opacity-40'
 const btnGhost = 'flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl font-bold text-xs text-slate-200 border border-[#3a3a4e] hover:bg-white/5 transition-colors disabled:opacity-40'
@@ -141,6 +143,8 @@ export default function ProfilesPage() {
                             <button onClick={() => setConfirmDelete(p.id)} disabled={busy} className={btnGhost + ' text-slate-400 hover:text-red-300'}><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
                           )}
                         </div>
+
+                        <ProfilePathsEditor profile={p} onSet={(patch) => update(p.id, patch)} />
                       </div>
                     )
                   })}
@@ -177,5 +181,71 @@ export default function ProfilesPage() {
         </main>
       </div>
     </>
+  )
+}
+
+// Per-profile "Spiel-Dateien": set the original ROM (validated → edition saved),
+// BizHawk and the randomizer preset via native pickers. Paths are stored in the
+// profile so the upcoming "Neuer SoulLink" run flow has everything it needs.
+function ProfilePathsEditor({ profile, onSet }: { profile: Profile; onSet: (patch: ProfilePatch) => Promise<unknown> }) {
+  const platform = getPlatform()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [romInfo, setRomInfo] = useState<RomInfo | null>(null)
+
+  async function pickRom() {
+    setBusy('rom'); setRomInfo(null)
+    const r = await platform.pickFile('rom')
+    if (r.path) {
+      const info = await platform.validateRom(r.path)
+      setRomInfo(info)
+      if (info?.valid) await onSet({ paths: { originalRom: r.path }, ...(info.edition ? { edition: info.edition } : {}) })
+    }
+    setBusy(null)
+  }
+  async function pick(kind: 'biz' | 'preset', key: 'bizhawk' | 'preset') {
+    setBusy(kind)
+    const r = await platform.pickFile(kind)
+    if (r.path) await onSet({ paths: { [key]: r.path } })
+    setBusy(null)
+  }
+
+  const { originalRom, bizhawk, preset } = profile.paths
+  const complete = !!(originalRom && bizhawk)
+
+  return (
+    <div className="mt-3 border-t border-[#2e2e42] pt-3">
+      <button onClick={() => setOpen((v) => !v)} className="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1.5">
+        <FolderCog className="w-3.5 h-3.5" /> Spiel-Dateien
+        {complete ? <Check className="w-3.5 h-3.5 text-green-400" /> : <span className="text-amber-400 font-bold">· unvollständig</span>}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-2.5">
+          <PathRow label="Original-ROM" value={originalRom} busy={busy === 'rom'} onPick={pickRom}
+            hint={romInfo?.message} hintOk={romInfo?.valid} />
+          <PathRow label="BizHawk (Emulator)" value={bizhawk} busy={busy === 'biz'} onPick={() => pick('biz', 'bizhawk')} />
+          <PathRow label="Randomizer-Preset" optional value={preset} busy={busy === 'preset'} onPick={() => pick('preset', 'preset')} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PathRow({ label, value, busy, onPick, hint, hintOk, optional }: {
+  label: string; value: string | null; busy: boolean; onPick: () => void
+  hint?: string; hintOk?: boolean; optional?: boolean
+}) {
+  const name = value ? value.split(/[\\/]/).pop() : null
+  return (
+    <div>
+      <div className="flex items-center gap-2.5">
+        <div className="w-36 shrink-0 text-xs font-bold text-slate-400">{label}{optional && <span className="text-slate-600 font-normal"> (optional)</span>}</div>
+        <div className="flex-1 min-w-0 text-xs text-slate-300 truncate">{name || <span className="text-slate-600">nicht gesetzt</span>}</div>
+        <button onClick={onPick} disabled={busy} className="text-[11px] font-bold text-slate-300 hover:text-white border border-[#3a3a4e] rounded-lg px-2.5 py-1 hover:bg-white/5 disabled:opacity-40 shrink-0">
+          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : (value ? 'Ändern' : 'Auswählen')}
+        </button>
+      </div>
+      {hint && <p className={`text-[11px] mt-1 ${hintOk ? 'text-green-400' : 'text-amber-400'}`}>{hint}</p>}
+    </div>
   )
 }

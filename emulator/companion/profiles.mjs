@@ -74,7 +74,7 @@ function blankProfile(input) {
     name: cleanName(input?.name, 'Neues Profil'),
     players: cleanPlayers(input?.players),
     edition: input?.edition ? String(input.edition) : null,
-    paths: { originalRom: null, bizhawk: null, randomizer: null, outputDir: null },
+    paths: { originalRom: null, bizhawk: null, randomizer: null, preset: null, outputDir: null },
     presetId: null,
     lastSeed: null,
     lastRandomizedRom: null,
