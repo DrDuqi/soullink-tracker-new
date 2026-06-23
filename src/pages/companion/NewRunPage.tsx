@@ -14,13 +14,20 @@ import type { Preset } from '../../lib/presets'
 // existing RunPage. Everything except the seed is automatic.
 type Step = 'idle' | 'creating' | 'randomizing' | 'launching' | 'error'
 
+const EDITIONS: Record<string, string> = {
+  platinum: 'Pokémon Platin', diamond: 'Pokémon Diamant', pearl: 'Pokémon Perl',
+  heartgold: 'Pokémon HeartGold', soulsilver: 'Pokémon SoulSilver',
+  black: 'Pokémon Schwarz', white: 'Pokémon Weiß', black2: 'Pokémon Schwarz 2', white2: 'Pokémon Weiß 2',
+}
+function editionLabel(e: string): string { return EDITIONS[e] || e }
+
 const ERR: Record<string, string> = {
-  profile_not_found: 'Profil nicht gefunden.',
-  original_rom_missing: 'Die Original-ROM des Profils fehlt oder wurde verschoben.',
-  bizhawk_missing: 'BizHawk fehlt im Profil.',
-  preset_missing: 'Das Randomizer-Preset fehlt im Profil.',
+  profile_not_found: 'Einrichtung nicht gefunden.',
+  original_rom_missing: 'Deine Original-ROM fehlt oder wurde verschoben — in den Einstellungen erneut auswählen.',
+  bizhawk_missing: 'Der Emulator (BizHawk) ist noch nicht eingerichtet — in den Einstellungen festlegen.',
+  preset_missing: 'Es sind noch keine Spielregeln gesetzt.',
   randomize_failed: 'Die Randomisierung ist fehlgeschlagen.',
-  fvx_not_found: 'Der Randomizer (FVX) wurde nicht gefunden.',
+  fvx_not_found: 'Der Randomizer wurde noch nicht eingerichtet.',
   unreachable: 'Companion nicht erreichbar.',
 }
 
@@ -96,33 +103,34 @@ export default function NewRunPage() {
 
       {!ready ? (
         <div className="mt-7 rounded-2xl border border-amber-700/40 bg-amber-950/15 p-6">
-          <div className="flex items-center gap-2 text-amber-300 font-black"><AlertTriangle className="w-5 h-5" /> Profil noch nicht vollständig</div>
+          <div className="flex items-center gap-2 text-amber-300 font-black"><AlertTriangle className="w-5 h-5" /> Fast bereit</div>
           <p className="text-slate-300 text-sm mt-2">
-            {active ? <>Für <b className="text-white">{active.name}</b> fehlen noch Original-ROM, BizHawk oder Preset.</> : 'Lege zuerst ein Profil an und hinterlege die Spiel-Dateien.'}
+            Richte einmal deine <b className="text-white">Original-ROM</b> und den Emulator ein — danach übernimmt SoulLink alles automatisch.
           </p>
-          <button onClick={() => navigate('/profiles')} className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
-            <Settings className="w-4 h-4" /> Profil einrichten
+          <button onClick={() => navigate('/settings')} className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
+            <Settings className="w-4 h-4" /> Jetzt einrichten
           </button>
         </div>
       ) : (
         <>
           <div className="mt-7 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
-            <div className="text-slate-400 text-xs font-black uppercase tracking-widest mb-2">Profil</div>
+            <div className="text-slate-400 text-xs font-black uppercase tracking-widest mb-2">Edition</div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-white font-black text-lg">{active!.name}</span>
-              {active!.edition && <span className="text-[11px] font-bold text-slate-300 bg-white/5 border border-[#2e2e42] rounded-full px-2 py-0.5">{active!.edition}</span>}
-              {active!.players.map((p, i) => <span key={i} className="text-[11px] font-bold text-slate-400">{p}{i < active!.players.length - 1 ? ' ·' : ''}</span>)}
+              <span className="text-white font-black text-lg">{active!.edition ? editionLabel(active!.edition) : 'Pokémon'}</span>
             </div>
           </div>
 
           <div className="mt-4 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
-            <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">Preset (Regeln)</label>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <label className="text-slate-400 text-xs font-black uppercase tracking-widest">Spielregeln</label>
+              <button onClick={() => navigate('/presets')} className="text-[11px] font-bold text-slate-400 hover:text-white underline underline-offset-2">Regeln bearbeiten</button>
+            </div>
             <select value={presetId} onChange={(e) => setPresetId(e.target.value)} disabled={busy}
               className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3.5 py-2.5 text-sm text-white">
-              {presets.length === 0 && <option value="">Kein Preset verfügbar</option>}
-              {presets.map((p) => <option key={p.id} value={p.id}>{p.name}{p.builtin ? '' : ' (eigenes)'}</option>)}
+              {presets.length === 0 && <option value="">Keine Regeln verfügbar</option>}
+              {presets.map((p) => <option key={p.id} value={p.id}>{p.name}{p.builtin ? '' : ' (eigene)'}</option>)}
             </select>
-            <p className="text-slate-500 text-[11px] mt-2">Bestimmt die Randomizer-Regeln. Eigene Presets erstellst du über „Profile → Preset bearbeiten".</p>
+            <p className="text-slate-500 text-[11px] mt-2">Bestimmt, wie randomisiert wird (Pokémon, Trainer, Items …).</p>
           </div>
 
           <div className="mt-4 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
@@ -134,7 +142,7 @@ export default function NewRunPage() {
                 <Dices className="w-4 h-4" /> Würfeln
               </button>
             </div>
-            <p className="text-slate-500 text-[11px] mt-2">Gleiches Preset + gleicher Seed = exakt gleiche Welt.</p>
+            <p className="text-slate-500 text-[11px] mt-2">Gleiche Regeln + gleicher Seed = exakt gleiche Welt.</p>
             <label className="flex items-start gap-2.5 mt-3 cursor-pointer">
               <input type="checkbox" checked={sameWorld} disabled={busy} onChange={(e) => setSameWorld(e.target.checked)} className="mt-0.5 accent-pk-red" />
               <span className="text-xs text-slate-300">

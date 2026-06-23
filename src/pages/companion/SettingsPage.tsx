@@ -1,13 +1,13 @@
 import { useNavigate } from 'react-router-dom'
-import { Cpu, Users, Dices, ChevronRight } from 'lucide-react'
+import { Cpu, Gamepad2, Dices, ChevronRight } from 'lucide-react'
 
 // Einstellungen = the home for the technical tools, demoted out of the daily
 // navigation. The player only comes here to set things up once (or tweak later);
 // the everyday app is the Dashboard + the Run.
 const SECTIONS = [
+  { icon: Gamepad2, title: 'Original-ROM', desc: 'Deine originale Pokémon-ROM — einmal auswählen, danach übernimmt SoulLink alles.', to: '/profiles' },
   { icon: Cpu, title: 'Emulator', desc: 'BizHawk einrichten — meist nur einmal nötig.', to: '/setup' },
-  { icon: Users, title: 'Profile', desc: 'Spieler, Original-ROM, Standard-Preset pro Pairing.', to: '/profiles' },
-  { icon: Dices, title: 'Randomizer & Presets', desc: 'Eingebaute und eigene Preset-Regeln verwalten.', to: '/presets' },
+  { icon: Dices, title: 'Spielregeln', desc: 'Wie randomisiert wird (Pokémon, Trainer, Items …) — eingebaute und eigene Regeln.', to: '/presets' },
 ]
 
 export default function SettingsPage() {

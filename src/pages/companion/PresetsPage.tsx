@@ -28,16 +28,16 @@ export default function PresetsPage() {
     setNotice(null)
     const r = await platform.openRandomizer()
     setNotice(r.ok
-      ? 'FVX wird geöffnet. Lade dort deine ROM, stelle die Regeln ein und klicke „Save Settings". Importiere die gespeicherte .rnqs danach hier.'
-      : (r.error === 'fvx_not_found' ? 'Der Randomizer (FVX) wurde nicht gefunden.' : 'FVX konnte nicht geöffnet werden.'))
+      ? 'Der Regel-Editor wird geöffnet. Lade dort deine ROM, stelle die Regeln ein und klicke „Save Settings". Importiere die gespeicherte Datei danach hier mit „Regeln importieren".'
+      : (r.error === 'fvx_not_found' ? 'Der Regel-Editor wurde noch nicht eingerichtet.' : 'Der Editor konnte nicht geöffnet werden.'))
   }
   async function importPreset() {
     setBusy(true); setNotice(null)
     const picked = await platform.pickFile('preset')
     if (picked.path) {
-      const base = picked.path.split(/[\\/]/).pop()?.replace(/\.rnqs$/i, '') || 'Eigenes Preset'
+      const base = picked.path.split(/[\\/]/).pop()?.replace(/\.rnqs$/i, '') || 'Eigene Regeln'
       const p = await platform.importPreset({ name: base, sourceFile: picked.path })
-      setNotice(p ? `Preset „${p.name}" importiert.` : 'Import fehlgeschlagen.')
+      setNotice(p ? `Regeln „${p.name}" importiert.` : 'Import fehlgeschlagen.')
       await reload()
     }
     setBusy(false)
@@ -51,24 +51,24 @@ export default function PresetsPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-8 py-10">
-      <h1 className="text-white font-black text-3xl tracking-tight">Presets</h1>
-      <p className="text-slate-400 mt-1.5">Regeln für die Randomisierung. Das Preset bestimmt <i>wie</i>, der Seed <i>was</i> randomisiert wird.</p>
+      <h1 className="text-white font-black text-3xl tracking-tight">Spielregeln</h1>
+      <p className="text-slate-400 mt-1.5">Deine Regeln bestimmen, <i>wie</i> randomisiert wird (z. B. Pokémon, Trainer, Items zufällig). Der Seed bestimmt das konkrete Ergebnis.</p>
 
       <div className="flex items-center gap-2.5 mt-5">
         <button onClick={openEditor} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
-          <Plus className="w-4 h-4" /> Neues Preset in FVX erstellen
+          <Plus className="w-4 h-4" /> Eigene Regeln erstellen
         </button>
         <button onClick={importPreset} disabled={busy} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5 disabled:opacity-40">
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Preset importieren (.rnqs)
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Regeln importieren
         </button>
       </div>
       {notice && <p className="mt-3 text-sm text-slate-300 bg-[#16161f] border border-[#2e2e42] rounded-xl px-3.5 py-2.5 flex items-start gap-2"><ExternalLink className="w-4 h-4 text-pk-red shrink-0 mt-0.5" /> {notice}</p>}
 
       <div className="mt-6 space-y-2.5">
         {loading ? (
-          <div className="flex items-center gap-2 text-slate-400 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Presets werden geladen…</div>
+          <div className="flex items-center gap-2 text-slate-400 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Spielregeln werden geladen…</div>
         ) : presets.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#2e2e42] bg-[#16161f] p-6 text-center text-slate-400 text-sm">Noch keine Presets gefunden.</div>
+          <div className="rounded-2xl border border-dashed border-[#2e2e42] bg-[#16161f] p-6 text-center text-slate-400 text-sm">Noch keine Regeln vorhanden.</div>
         ) : presets.map((p) => (
           <div key={p.id} className="rounded-2xl border border-[#2e2e42] bg-[#16161f] p-4 flex items-center gap-3">
             <Dices className="w-5 h-5 text-slate-400 shrink-0" />
