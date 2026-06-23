@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, ArrowRight, Loader2, Swords, Users, Clock, Play, LogIn, RefreshCw, MoreVertical, Pencil, Archive, Trash2, Copy } from 'lucide-react'
+import { Plus, ArrowRight, Loader2, Swords, Users, Clock, Play, LogIn, RefreshCw, MoreVertical, Pencil, Archive, Trash2, Copy, Skull, Trophy } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProfiles } from '../../hooks/useProfiles'
 import { useMyRuns, type RunVM } from '../../hooks/useMyRuns'
 import { useRunStore } from '../../store/runStore'
 import { getPlatform } from '../../platform'
 import { fetchRunRecipe, saveRunRecipe } from '../../lib/runRecipe'
-import { renameRun, deleteRunRemote } from '../../lib/runActions'
+import { renameRun, deleteRunRemote, setRunStatus, newAttemptRemote, loadRun } from '../../lib/runActions'
 import { createRun } from '../../lib/createRun'
 import type { LocalRun } from '../../lib/profiles'
 
@@ -32,7 +32,10 @@ export default function DashboardPage() {
   useEffect(() => { reloadLocals() }, [reloadLocals, runs])
 
   const visible = runs.filter((vm) => !locals[vm.run.id]?.archived)
-  const [hero, ...rest] = visible
+  const isFinished = (vm: RunVM) => vm.run.status === 'won' || vm.run.status === 'lost'
+  const activeRuns = visible.filter((vm) => !isFinished(vm))
+  const pastRuns = visible.filter(isFinished)
+  const [hero, ...rest] = activeRuns
 
   function openRun(vm: RunVM) {
     const mine = vm.players.find((p) => p.auth_user_id === user?.id)
@@ -56,15 +59,33 @@ export default function DashboardPage() {
     setBusyId(null); await reloadLocals(); openRun(vm)
   }
 
-  // New attempt: same run + rules, NEW seed → new ROM + savegame.
+  // End the SHARED run (either member can). Moves it to "Vergangene Runs".
+  async function markStatus(vm: RunVM, status: 'won' | 'lost') {
+    setMenuFor(null)
+    if (!confirm(status === 'won' ? `„${vm.run.name}" als gewonnen abschließen? 🏆` : `„${vm.run.name}" als verloren abschließen? 💀`)) return
+    setBusyId(vm.run.id)
+    try { await setRunStatus(vm.run.id, status); await refetch() } catch (e) { alert(e instanceof Error ? e.message : 'Status konnte nicht gesetzt werden') }
+    setBusyId(null)
+  }
+
+  // New attempt: a NEW SHARED run for the SAME members + rules (RPC clones it for
+  // both players), then set it up locally (new seed → new ROM + savegame) and open it.
   async function newAttempt(vm: RunVM) {
-    const lr = locals[vm.run.id]; if (!lr) return
-    if (!confirm('Neuen Versuch starten? Neue ROM + neuer Seed (gleiche Regeln), frischer Spielstand.')) return
+    if (!user) return
+    if (!confirm('Neuen Versuch starten? Es entsteht ein NEUER gemeinsamer Run (gleiche Mitspieler, gleiches Preset) mit neuem Seed + neuer ROM + frischem Spielstand. Der alte Run bleibt erhalten.')) return
     setBusyId(vm.run.id); setMenuFor(null)
-    const recipe = await fetchRunRecipe(vm.run.id)
-    const r = await platform.prepareRun({ runId: vm.run.id, profileId: lr.profileId || active?.id || '', presetData: recipe?.preset_data ?? undefined, presetId: recipe?.preset_data ? undefined : lr.presetId, seed: Math.floor(Math.random() * 1_000_000_000) })
-    if (r.ok) await platform.launch({ bizhawkPath: r.bizhawk || '', romPath: r.outputRom || '', luaPath: '', syncFolder: '' }, false)
-    setBusyId(null); await reloadLocals(); openRun(vm)
+    let newId: string
+    try { newId = await newAttemptRemote(vm.run.id) } catch (e) { setBusyId(null); alert(e instanceof Error ? e.message : 'Neuer Versuch fehlgeschlagen'); return }
+    // Reproduce the new run locally with this player's ROM + the shared recipe.
+    const recipe = await fetchRunRecipe(newId)
+    if (recipe?.preset_data && active?.paths.originalRom && active?.paths.bizhawk) {
+      const r = await platform.prepareRun({ runId: newId, profileId: active.id, presetData: recipe.preset_data, seed: recipe.world_seed ?? undefined })
+      if (r.ok) await platform.launch({ bizhawkPath: r.bizhawk || '', romPath: r.outputRom || '', luaPath: '', syncFolder: '' }, false)
+    }
+    await refetch(); await reloadLocals()
+    setBusyId(null)
+    try { const { run, players, myPlayerId } = await loadRun(newId, user.id); setCurrentRun(run, players, myPlayerId); navigate(`/run/${newId}`) }
+    catch { /* dashboard already refreshed */ }
   }
 
   async function doRename(vm: RunVM) {
@@ -136,14 +157,25 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <RunMenu open={menuFor === hero.run.id} onToggle={() => setMenuFor(menuFor === hero.run.id ? null : hero.run.id)}
-                  isLocal={!!locals[hero.run.id]} onAttempt={() => newAttempt(hero)} onRename={() => doRename(hero)} onArchive={() => doArchive(hero)} onDelete={() => doDelete(hero)} onDuplicate={() => doDuplicate(hero)} onTracker={() => { setMenuFor(null); openRun(hero) }} />
+                  onAttempt={() => newAttempt(hero)} onWon={() => markStatus(hero, 'won')} onLost={() => markStatus(hero, 'lost')}
+                  onRename={() => doRename(hero)} onArchive={() => doArchive(hero)} onDelete={() => doDelete(hero)} onDuplicate={() => doDuplicate(hero)} onTracker={() => { setMenuFor(null); openRun(hero) }} />
               </div>
               <div className="flex items-center gap-2.5 mt-4 flex-wrap">
                 <button onClick={() => playRun(hero)} disabled={busyId === hero.run.id} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-white disabled:opacity-60" style={{ background: '#CC0000' }}>
                   {busyId === hero.run.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} {locals[hero.run.id] ? 'Weiterspielen' : 'Spielen'}
                 </button>
                 <button onClick={() => openRun(hero)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5">Nur Tracker <ArrowRight className="w-4 h-4" /></button>
+                <div className="flex-1" />
+                <button onClick={() => markStatus(hero, 'won')} disabled={busyId === hero.run.id} title="Run gewonnen" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs text-green-300 border border-green-700/40 hover:bg-green-500/10 disabled:opacity-40"><Trophy className="w-4 h-4" /> Gewonnen</button>
+                <button onClick={() => markStatus(hero, 'lost')} disabled={busyId === hero.run.id} title="Run verloren" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs text-slate-400 border border-[#3a3a4e] hover:text-red-300 hover:bg-red-500/10 disabled:opacity-40"><Skull className="w-4 h-4" /> Verloren</button>
               </div>
+            </div>
+          )}
+
+          {activeRuns.length === 0 && pastRuns.length > 0 && (
+            <div className="mt-7 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-6 text-center">
+              <p className="text-white font-black">Kein aktiver SoulLink</p>
+              <p className="text-slate-400 text-sm mt-1">Starte unten bei einem vergangenen Run „Neuer Versuch" — oder lege einen neuen an.</p>
             </div>
           )}
 
@@ -161,9 +193,41 @@ export default function DashboardPage() {
                       </span>
                     </button>
                     <RunMenu open={menuFor === vm.run.id} onToggle={() => setMenuFor(menuFor === vm.run.id ? null : vm.run.id)}
-                      isLocal={!!locals[vm.run.id]} onAttempt={() => newAttempt(vm)} onRename={() => doRename(vm)} onArchive={() => doArchive(vm)} onDelete={() => doDelete(vm)} onDuplicate={() => doDuplicate(vm)} onTracker={() => { setMenuFor(null); openRun(vm) }} />
+                      onAttempt={() => newAttempt(vm)} onWon={() => markStatus(vm, 'won')} onLost={() => markStatus(vm, 'lost')}
+                      onRename={() => doRename(vm)} onArchive={() => doArchive(vm)} onDelete={() => doDelete(vm)} onDuplicate={() => doDuplicate(vm)} onTracker={() => { setMenuFor(null); openRun(vm) }} />
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {pastRuns.length > 0 && (
+            <div className="mt-7">
+              <h3 className="text-slate-200 text-xs font-black uppercase tracking-widest mb-2.5">Vergangene Runs</h3>
+              <div className="space-y-2">
+                {pastRuns.map((vm) => {
+                  const won = vm.run.status === 'won'
+                  return (
+                    <div key={vm.run.id} className="rounded-xl border border-[#2e2e42] bg-[#14141c] p-4 flex items-center gap-3 relative">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide rounded px-1.5 py-0.5 ${won ? 'text-green-300 bg-green-500/10' : 'text-red-300 bg-red-500/10'}`}>
+                            {won ? <Trophy className="w-3 h-3" /> : <Skull className="w-3 h-3" />} {won ? 'Gewonnen' : 'Verloren'}
+                          </span>
+                          <span className="text-slate-300 font-bold truncate">{vm.run.name}</span>
+                          {vm.run.attempt_number && vm.run.attempt_number > 1 && <span className="text-slate-600 text-xs">#{vm.run.attempt_number}</span>}
+                        </div>
+                        <div className="text-slate-500 text-xs mt-0.5">{vm.players.map((p) => p.name).join(' & ')} · {relTime(vm.lastActivity)}</div>
+                      </div>
+                      <button onClick={() => newAttempt(vm)} disabled={busyId === vm.run.id} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl font-bold text-xs text-white disabled:opacity-50 shrink-0" style={{ background: '#CC0000' }}>
+                        {busyId === vm.run.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Neuer Versuch
+                      </button>
+                      <RunMenu open={menuFor === vm.run.id} onToggle={() => setMenuFor(menuFor === vm.run.id ? null : vm.run.id)}
+                        finished onAttempt={() => newAttempt(vm)} onWon={() => markStatus(vm, 'won')} onLost={() => markStatus(vm, 'lost')}
+                        onRename={() => doRename(vm)} onArchive={() => doArchive(vm)} onDelete={() => doDelete(vm)} onDuplicate={() => doDuplicate(vm)} onTracker={() => { setMenuFor(null); openRun(vm) }} />
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -173,9 +237,9 @@ export default function DashboardPage() {
   )
 }
 
-function RunMenu({ open, onToggle, isLocal, onAttempt, onRename, onArchive, onDelete, onDuplicate, onTracker }: {
-  open: boolean; onToggle: () => void; isLocal: boolean
-  onAttempt: () => void; onRename: () => void; onArchive: () => void; onDelete: () => void; onDuplicate: () => void; onTracker: () => void
+function RunMenu({ open, onToggle, finished, onAttempt, onWon, onLost, onRename, onArchive, onDelete, onDuplicate, onTracker }: {
+  open: boolean; onToggle: () => void; finished?: boolean
+  onAttempt: () => void; onWon: () => void; onLost: () => void; onRename: () => void; onArchive: () => void; onDelete: () => void; onDuplicate: () => void; onTracker: () => void
 }) {
   const item = 'w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/5 text-left'
   return (
@@ -184,7 +248,9 @@ function RunMenu({ open, onToggle, isLocal, onAttempt, onRename, onArchive, onDe
       {open && (
         <div className="absolute right-0 top-full mt-1 z-20 w-52 bg-[#1c1c26] border border-[#2e2e42] rounded-xl shadow-2xl overflow-hidden py-1">
           <button onClick={onTracker} className={item}><ArrowRight className="w-4 h-4" /> Nur Tracker öffnen</button>
-          {isLocal && <button onClick={onAttempt} className={item}><RefreshCw className="w-4 h-4" /> Neuer Versuch</button>}
+          <button onClick={onAttempt} className={item}><RefreshCw className="w-4 h-4" /> Neuer Versuch</button>
+          {!finished && <button onClick={onWon} className={item}><Trophy className="w-4 h-4 text-green-400" /> Als gewonnen</button>}
+          {!finished && <button onClick={onLost} className={item}><Skull className="w-4 h-4" /> Als verloren</button>}
           <button onClick={onRename} className={item}><Pencil className="w-4 h-4" /> Umbenennen</button>
           <button onClick={onDuplicate} className={item}><Copy className="w-4 h-4" /> Duplizieren</button>
           <button onClick={onArchive} className={item}><Archive className="w-4 h-4" /> Archivieren</button>

@@ -20,6 +20,9 @@ export interface Run {
   share_code: string
   owner_user_id?: string | null
   max_players?: number | null   // 2 or 3 (default 2; column added in migration v13)
+  status?: string | null        // 'active' | 'won' | 'lost' (v16)
+  parent_run_id?: string | null // the attempt this one came from (v16)
+  attempt_number?: number | null// SoulLink #N (v16)
 }
 
 export interface Player {
