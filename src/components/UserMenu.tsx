@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, User as UserIcon, Settings, LogOut, ScrollText, MessageCircle } from 'lucide-react'
+import { ChevronDown, User as UserIcon, Settings, LogOut, ScrollText, MessageCircle, Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useT } from '../lib/i18n'
 import { LINKS } from '../lib/appInfo'
@@ -68,6 +68,7 @@ export default function UserMenu() {
             <div className="py-1.5">
               <button role="menuitem" onClick={() => { setOpen(false); setShowProfile(true) }} className={item}><UserIcon className="w-4 h-4" /> {t('menu.profile')}</button>
               <button role="menuitem" onClick={() => { setOpen(false); setShowSettings(true) }} className={item}><Settings className="w-4 h-4" /> {t('menu.settings')}</button>
+              <button role="menuitem" onClick={() => { setOpen(false); navigate('/profiles') }} className={item}><Users className="w-4 h-4" /> SoulLink-Profile</button>
               <button role="menuitem" onClick={() => { setOpen(false); setShowChangelog(true) }} className={item}><ScrollText className="w-4 h-4" /> {t('menu.changelog')}</button>
               <button role="menuitem" onClick={() => openLink(LINKS.discord)} disabled={!LINKS.discord} className={`${item} disabled:hover:bg-transparent disabled:cursor-default`}>
                 <MessageCircle className="w-4 h-4" /> {t('menu.discord')}
