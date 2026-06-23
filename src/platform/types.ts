@@ -71,6 +71,12 @@ export interface PlatformBridge {
   prepareRun(input: PrepareRunInput): Promise<PrepareRunResult>
   /** The local launch data for a run prepared on this PC (null if not set up here). */
   getLocalRun(runId: string): Promise<LocalRun | null>
+  /** All runs set up on this PC (keyed by runId). */
+  listLocalRuns(): Promise<Record<string, LocalRun>>
+  /** Hide/show a run locally (keeps files). */
+  archiveRun(runId: string, archived: boolean): Promise<boolean>
+  /** Remove a run's LOCAL files (folder + ROM + savegame). */
+  deleteRun(runId: string): Promise<boolean>
 
   // ── presets (rules; separate from the seed) ────────────────────────────────
   listPresets(edition?: string): Promise<Preset[] | null>

@@ -99,11 +99,27 @@ export interface PrepareRunResult {
 }
 
 /** The local launch data for a run prepared on this PC (ROM/seed/preset/save). */
-export interface LocalRun { runId: string; romPath: string; bizhawk?: string; seed?: number; presetId?: string; profileId?: string; edition?: string | null; saveName?: string }
+export interface LocalRun { runId: string; romPath: string; bizhawk?: string; seed?: number; presetId?: string; profileId?: string; edition?: string | null; saveName?: string; archived?: boolean }
 export async function getLocalRunHttp(runId: string): Promise<LocalRun | null> {
   if (!USES_COMPANION) return null
   try { const d = await reqJson(`/api/run/local?runId=${encodeURIComponent(runId)}`); return d?.found ? (d.run as LocalRun) : null }
   catch { return null }
+}
+/** All runs set up on this PC (keyed by runId) — for the dashboard. */
+export async function listLocalRunsHttp(): Promise<Record<string, LocalRun>> {
+  if (!USES_COMPANION) return {}
+  try { const d = await reqJson('/api/run/locals'); return d?.ok ? (d.runs as Record<string, LocalRun>) : {} }
+  catch { return {} }
+}
+export async function archiveRunHttp(runId: string, archived: boolean): Promise<boolean> {
+  if (!USES_COMPANION) return false
+  try { const d = await reqJson(`/api/run/archive?runId=${encodeURIComponent(runId)}&archived=${archived ? 1 : 0}`, jsonInit('POST')); return !!d?.ok }
+  catch { return false }
+}
+export async function deleteRunHttp(runId: string): Promise<boolean> {
+  if (!USES_COMPANION) return false
+  try { const d = await reqJson(`/api/run/delete?runId=${encodeURIComponent(runId)}`, jsonInit('POST')); return !!d?.ok }
+  catch { return false }
 }
 
 /** Randomize the profile's original ROM (preset + seed) into a managed file.

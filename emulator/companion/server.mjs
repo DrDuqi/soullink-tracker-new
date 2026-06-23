@@ -31,7 +31,7 @@ import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile
 import { initRandomizer, randomizerStatus, randomize, openRandomizer } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
 import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset } from './presets.mjs'
-import { initRuns, runFolder, recordLocalRun, getLocalRun, writeRunMetadata, archiveLocalRun, deleteLocalRun } from './runs.mjs'
+import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun } from './runs.mjs'
 
 // Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
 // (which CI bumps from the release tag) to startCompanion; CLI falls back to the
@@ -746,6 +746,12 @@ function handleRequest(req, res) {
     const lr = getLocalRun(url.searchParams.get('runId'))
     const exists = !!(lr && lr.romPath && existsSync(lr.romPath))
     sendJson(res, { ok: true, found: exists, run: exists ? lr : null })
+    return
+  }
+  // run/locals: the whole local registry (for the dashboard: archived flag, seed,
+  // which runs are set up on this PC).
+  if (path === '/api/run/locals') {
+    try { sendJson(res, { ok: true, runs: listLocalRuns() }) } catch { sendJson(res, { ok: false }, 500) }
     return
   }
   // run/archive: hide/show a run locally (keeps the files). POST ?runId=&archived=
