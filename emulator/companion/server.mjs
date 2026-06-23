@@ -28,7 +28,7 @@ import { homedir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawn, exec } from 'node:child_process'
 import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile, getProfile, recordRun } from './profiles.mjs'
-import { initRandomizer, randomizerStatus, randomize } from './randomizer.mjs'
+import { initRandomizer, randomizerStatus, randomize, openRandomizer } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
 import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset } from './presets.mjs'
 
@@ -609,6 +609,10 @@ function handleRequest(req, res) {
   // ── randomizer (FVX): status + run ──────────────────────────────────────────
   if (path === '/api/randomizer/detect') {
     try { sendJson(res, { ok: true, ...randomizerStatus() }) } catch { sendJson(res, { ok: false }, 500) }
+    return
+  }
+  if (path === '/api/randomizer/open' && req.method === 'POST') {
+    try { const r = openRandomizer(); sendJson(res, r, r.ok ? 200 : 500) } catch { sendJson(res, { ok: false }, 500) }
     return
   }
   if (path === '/api/randomize') {

@@ -4,7 +4,7 @@
 // responses. The HTTP helpers stay as the "web transport"; a future CompanionBridge
 // will implement the same interface over IPC instead.
 
-import { USES_COMPANION, companionHealth, companionConfig, saveCompanionConfig, pickCompanionFile, validateRomHttp, randomizerStatusHttp, randomizeHttp } from '../lib/companion'
+import { USES_COMPANION, companionHealth, companionConfig, saveCompanionConfig, pickCompanionFile, validateRomHttp, randomizerStatusHttp, randomizeHttp, openRandomizerHttp } from '../lib/companion'
 import { findFile, launchEmulator } from '../lib/emulatorSettings'
 import { fetchProfiles, createProfileHttp, updateProfileHttp, deleteProfileHttp, duplicateProfileHttp, setActiveProfileHttp, prepareRunHttp } from '../lib/profiles'
 import { fetchPresets, importPresetHttp, renamePresetHttp, deletePresetHttp } from '../lib/presets'
@@ -33,4 +33,5 @@ export const webBridge: PlatformBridge = {
   importPreset: (input) => importPresetHttp(input),
   renamePreset: (id, name) => renamePresetHttp(id, name),
   deletePreset: (id) => deletePresetHttp(id),
+  openRandomizer: () => openRandomizerHttp(),
 }

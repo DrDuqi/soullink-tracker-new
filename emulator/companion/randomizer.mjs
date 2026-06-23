@@ -75,6 +75,20 @@ export function randomizerStatus() {
   return { found: true, source: fvx.source, version: versionFromDir(fvx.dir), dir: fvx.dir }
 }
 
+// Open the FVX GUI (Stufe-1 preset editor): the user loads a ROM, sets rules and
+// uses "Save Settings" → a .rnqs which SoulLink then imports as a custom preset.
+// Detached so it doesn't block the Companion. (FVX can't preload a ROM via args, so
+// the user opens it once inside FVX — documented in the UI.)
+export function openRandomizer() {
+  const fvx = resolveFvx()
+  if (!fvx) return { ok: false, error: 'fvx_not_found' }
+  try {
+    const child = spawn(fvx.java, ['-Xmx4608M', '-jar', fvx.jar, 'please-use-the-launcher'], { cwd: fvx.dir, detached: true, stdio: 'ignore' })
+    child.unref()
+    return { ok: true, dir: fvx.dir }
+  } catch (e) { return { ok: false, error: 'spawn_failed', detail: String(e?.message || e) } }
+}
+
 // Run FVX. settingsString (-S) wins over settingsFile (-s). Resolves with
 // { ok, outputRom, log } or { ok:false, error, ... }. Never throws.
 export function randomize({ inputRom, outputRom, settingsFile = null, settingsString = null, seed = null, log = true } = {}) {

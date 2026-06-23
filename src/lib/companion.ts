@@ -129,6 +129,15 @@ export async function randomizerStatusHttp(): Promise<RandomizerStatus | null> {
   } catch { return null }
 }
 
+/** Open the FVX GUI as a preset editor (the user saves a .rnqs to import). */
+export async function openRandomizerHttp(): Promise<{ ok: boolean; error?: string }> {
+  if (!USES_COMPANION) return { ok: false, error: 'no_companion' }
+  try {
+    const r = await fetch(`${EMU_BASE}/api/randomizer/open`, { method: 'POST' })
+    return (await r.json().catch(() => ({ ok: false }))) as { ok: boolean; error?: string }
+  } catch { return { ok: false, error: 'unreachable' } }
+}
+
 export interface RandomizeInput { inputRom: string; outputRom: string; settingsFile?: string; settingsString?: string; seed?: number | string | null }
 export interface RandomizeResult { ok: boolean; outputRom?: string; version?: string; error?: string; code?: number; log?: string }
 

@@ -17,7 +17,7 @@ export interface NavItem {
 export const NAV: NavItem[] = [
   { id: 'dashboard',  label: 'Dashboard',      icon: LayoutDashboard, to: '/' },
   { id: 'runs',       label: 'SoulLinks',      icon: Swords,          soon: true },
-  { id: 'randomizer', label: 'Randomizer',     icon: Dices,           soon: true },
+  { id: 'randomizer', label: 'Randomizer',     icon: Dices,           to: '/presets' },
   { id: 'emulator',   label: 'Emulator',       icon: Cpu,             to: '/setup' },
   { id: 'profiles',   label: 'Profile',        icon: Users,           to: '/profiles' },
   { id: 'stats',      label: 'Statistiken',    icon: BarChart3,       soon: true },
