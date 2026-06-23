@@ -47,3 +47,13 @@ export async function deletePresetHttp(id: string): Promise<boolean> {
     return !!j?.ok
   } catch { return false }
 }
+
+/** Auto-import the newest .rnqs the user saved in FVX after `sinceMs` (no file dialog). */
+export async function grabRulesHttp(sinceMs: number): Promise<Preset | null> {
+  if (!USES_COMPANION) return null
+  try {
+    const r = await fetch(`${EMU_BASE}/api/presets/grab?since=${sinceMs}`, { method: 'POST' })
+    const j = await r.json().catch(() => null)
+    return j?.ok && j.found ? (j.preset as Preset) : null
+  } catch { return null }
+}

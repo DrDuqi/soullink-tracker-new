@@ -11,8 +11,8 @@
 // reworking the flow: the list is generation-aware and presets are content-addressable
 // by id.
 
-import { existsSync, readFileSync, readdirSync, writeFileSync, renameSync, copyFileSync, mkdirSync, unlinkSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync, readdirSync, writeFileSync, renameSync, copyFileSync, mkdirSync, unlinkSync, statSync } from 'node:fs'
+import { join, basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 let BUILTIN_DIR = null
@@ -92,4 +92,26 @@ export function deletePreset(id) {
   if (i < 0) return false   // built-ins (not in registry) can't be deleted
   try { unlinkSync(join(CUSTOM_DIR, reg[i].file)) } catch { /* ignore */ }
   reg.splice(i, 1); saveReg(reg); return true
+}
+
+// After the user edits rules in FVX and clicks "Save Settings", they save a .rnqs
+// somewhere. Instead of making them import it, SoulLink finds the NEWEST .rnqs saved
+// AFTER the editor was opened (across the likely save locations) and imports it
+// automatically — so the user never picks a file or a folder. Returns the new preset
+// or null (nothing saved yet). Never scans CUSTOM_DIR (would re-grab its own imports).
+export function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene Regeln' } = {}) {
+  let best = null
+  let bestT = sinceMs
+  for (const root of roots) {
+    if (!root) continue
+    let entries = []
+    try { entries = readdirSync(root, { withFileTypes: true }) } catch { continue }
+    for (const e of entries) {
+      if (!e.isFile() || !/\.rnqs$/i.test(e.name)) continue
+      const p = join(root, e.name)
+      try { const t = statSync(p).mtimeMs; if (t > bestT) { bestT = t; best = p } } catch { /* ignore */ }
+    }
+  }
+  if (!best) return null
+  return importPreset({ name: name || basename(best).replace(/\.rnqs$/i, ''), sourceFile: best })
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Dices, Plus, Upload, Trash2, Pencil, Check, X, Loader2, ExternalLink } from 'lucide-react'
 import { getPlatform } from '../../platform'
 import type { Preset } from '../../lib/presets'
@@ -17,19 +17,34 @@ export default function PresetsPage() {
   const [editName, setEditName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
+  const [watching, setWatching] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const stopWatch = useCallback(() => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } setWatching(false) }, [])
+
   const reload = useCallback(async () => {
     const list = await platform.listPresets()
     setPresets(list ?? [])
     setLoading(false)
   }, [platform])
   useEffect(() => { reload() }, [reload])
+  useEffect(() => () => stopWatch(), [stopWatch])
 
+  // Open the FVX editor, then WATCH for the .rnqs the user saves and import it
+  // automatically — no file dialog, no "where do I save this?".
   async function openEditor() {
     setNotice(null)
     const r = await platform.openRandomizer()
-    setNotice(r.ok
-      ? 'Der Regel-Editor wird geöffnet. Lade dort deine ROM, stelle die Regeln ein und klicke „Save Settings". Importiere die gespeicherte Datei danach hier mit „Regeln importieren".'
-      : (r.error === 'fvx_not_found' ? 'Der Regel-Editor wurde noch nicht eingerichtet.' : 'Der Editor konnte nicht geöffnet werden.'))
+    if (!r.ok) { setNotice(r.error === 'fvx_not_found' ? 'Der Regel-Editor wurde noch nicht eingerichtet.' : 'Der Editor konnte nicht geöffnet werden.'); return }
+    setNotice('Der Regel-Editor öffnet sich. Stelle deine Regeln ein und klicke „Save Settings" — SoulLink übernimmt die Datei dann automatisch.')
+    const since = Date.now() - 3000
+    let elapsed = 0
+    stopWatch(); setWatching(true)
+    pollRef.current = setInterval(async () => {
+      elapsed += 3000
+      const p = await platform.grabRules(since)
+      if (p) { stopWatch(); setNotice(`Deine Regeln „${p.name}" wurden automatisch übernommen.`); await reload() }
+      else if (elapsed >= 240000) { stopWatch() }   // give up after 4 min
+    }, 3000)
   }
   async function importPreset() {
     setBusy(true); setNotice(null)
@@ -63,6 +78,13 @@ export default function PresetsPage() {
         </button>
       </div>
       {notice && <p className="mt-3 text-sm text-slate-300 bg-[#16161f] border border-[#2e2e42] rounded-xl px-3.5 py-2.5 flex items-start gap-2"><ExternalLink className="w-4 h-4 text-pk-red shrink-0 mt-0.5" /> {notice}</p>}
+      {watching && (
+        <div className="mt-2 text-sm text-slate-300 bg-[#16161f] border border-pk-red/30 rounded-xl px-3.5 py-2.5 flex items-center gap-2.5">
+          <Loader2 className="w-4 h-4 animate-spin text-pk-red shrink-0" />
+          <span className="flex-1">Warte auf deine gespeicherten Regeln … sobald du in FVX „Save Settings" klickst, übernehme ich sie automatisch.</span>
+          <button onClick={stopWatch} className="text-[11px] font-bold text-slate-400 hover:text-white">Abbrechen</button>
+        </div>
+      )}
 
       <div className="mt-6 space-y-2.5">
         {loading ? (

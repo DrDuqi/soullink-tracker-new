@@ -30,7 +30,7 @@ import { spawn, exec } from 'node:child_process'
 import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile, getProfile, recordRun } from './profiles.mjs'
 import { initRandomizer, randomizerStatus, randomize, openRandomizer } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
-import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset } from './presets.mjs'
+import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs } from './presets.mjs'
 import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun } from './runs.mjs'
 
 // Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
@@ -660,6 +660,21 @@ function handleRequest(req, res) {
       return
     }
     sendJson(res, { ok: false }, 405)
+    return
+  }
+  // grab: auto-import the newest .rnqs the user just saved in FVX (after `since`),
+  // so editing rules needs no manual import. POST ?since=<ms>
+  if (path === '/api/presets/grab' && req.method === 'POST') {
+    try {
+      let home = null; try { home = homedir() } catch { /* none */ }
+      const fvx = randomizerStatus()
+      const roots = [fvx?.dir]
+      if (home) roots.push(join(home, 'Desktop'), join(home, 'Downloads'), join(home, 'Documents'))
+      roots.push(join(ROOT, 'ROMs', 'Randomizer Settings'), join(dirname(ROOT), 'ROMs', 'Randomizer Settings'))
+      const since = Number(url.searchParams.get('since') || 0)
+      const p = grabLatestRnqs({ sinceMs: since, roots, name: 'Eigene Regeln' })
+      sendJson(res, { ok: true, found: !!p, preset: p })
+    } catch { sendJson(res, { ok: false }, 500) }
     return
   }
   // import a picked .rnqs (FVX editor output / shared file) as a custom preset
