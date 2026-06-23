@@ -7,8 +7,8 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useCompanion } from '../hooks/useCompanion'
 import { useEmulatorSync } from '../hooks/useEmulatorSync'
-import { companionConfig, saveCompanionConfig, pickCompanionFile, USES_COMPANION } from '../lib/companion'
-import { useEmulatorSettings, useEmulatorSettingsStore, findFile, launchEmulator } from '../lib/emulatorSettings'
+import { useEmulatorSettings, useEmulatorSettingsStore } from '../lib/emulatorSettings'
+import { getPlatform } from '../platform'
 import { DOWNLOADS } from '../lib/downloads'
 import AtmosphereBackground from '../components/AtmosphereBackground'
 import CompanionVersion from '../components/CompanionVersion'
@@ -59,6 +59,7 @@ export default function SetupPage() {
   const { user, loading: authLoading } = useAuth()
   const settings = useEmulatorSettings()
   const updateSettings = useEmulatorSettingsStore((s) => s.update)
+  const platform = getPlatform()   // the seam: HTTP today, native IPC later
 
   // ── live detection ─────────────────────────────────────────────────────────
   const companion = useCompanion(true)
@@ -68,20 +69,20 @@ export default function SetupPage() {
   const sync = useEmulatorSync(running)
   const liveSync = sync.phase === 'connected'
 
-  const refetchCfg = async () => { const c = await companionConfig(); if (c) { setCfg(c.config); setBizCandidates(c.detected?.bizhawkCandidates ?? []) } }
+  const refetchCfg = async () => { const c = await platform.getConfig(); if (c) { setCfg(c.config); setBizCandidates(c.detected?.bizhawkCandidates ?? []) } }
   useEffect(() => {
     if (!running) { setCfg(null); setBizCandidates([]); return }
     let cancel = false
-    const tick = () => { companionConfig().then((c) => { if (!cancel && c) { setCfg(c.config); setBizCandidates(c.detected?.bizhawkCandidates ?? []) } }) }
+    const tick = () => { platform.getConfig().then((c) => { if (!cancel && c) { setCfg(c.config); setBizCandidates(c.detected?.bizhawkCandidates ?? []) } }) }
     tick(); const id = setInterval(tick, 2500)
     return () => { cancel = true; clearInterval(id) }
   }, [running])
 
   // In dev there is no Companion config endpoint → fall back to local settings so
   // the page is still testable. In prod the Companion config is authoritative.
-  const bizhawkFound = !!(cfg?.bizhawk || (!USES_COMPANION && settings.bizhawkPath))
-  const romFound = !!(cfg?.rom || (!USES_COMPANION && settings.romPath))
-  const luaFound = !!(cfg?.lua || (!USES_COMPANION && settings.luaPath)) || running
+  const bizhawkFound = !!(cfg?.bizhawk || (!platform.usesCompanion && settings.bizhawkPath))
+  const romFound = !!(cfg?.rom || (!platform.usesCompanion && settings.romPath))
+  const luaFound = !!(cfg?.lua || (!platform.usesCompanion && settings.luaPath)) || running
 
   // Sticky "installed" (running implies installed; survives the Companion closing).
   const [installed, setInstalled] = useState(() => { try { return localStorage.getItem('onboard-companion-seen') === '1' } catch { return false } })
@@ -97,7 +98,7 @@ export default function SetupPage() {
   const [pickErr, setPickErr] = useState<{ k: 'rom' | 'biz'; msg: string } | null>(null)
   async function applyPicked(path: string, kind: 'rom' | 'biz') {
     updateSettings(kind === 'rom' ? { romPath: path } : { bizhawkPath: path })
-    await saveCompanionConfig(kind === 'rom' ? { rom: path } : { bizhawk: path })
+    await platform.saveConfig(kind === 'rom' ? { rom: path } : { bizhawk: path })
     refetchCfg()
   }
 
@@ -105,7 +106,7 @@ export default function SetupPage() {
   // Falls back to the browser picker only when the Companion can't show a dialog.
   async function pickFile(kind: 'rom' | 'biz') {
     setResolving(kind); setPickErr(null)
-    const res = await pickCompanionFile(kind)
+    const res = await platform.pickFile(kind)
     if (res.path) { await applyPicked(res.path, kind); setResolving(null); return }
     setResolving(null)
     if (res.error === 'cancelled') return                 // user closed the dialog → nothing
@@ -116,7 +117,7 @@ export default function SetupPage() {
   async function resolvePicked(file: File | undefined, kind: 'rom' | 'biz') {
     if (!file) return
     setResolving(kind); setPickErr(null)
-    const path = await findFile(file.name)
+    const path = await platform.resolveFileByName(file.name)
     setResolving(null)
     if (path) {
       await applyPicked(path, kind)
@@ -133,7 +134,7 @@ export default function SetupPage() {
   useEffect(() => () => { if (connectTimer.current) clearTimeout(connectTimer.current) }, [])
   async function connect(restart = false) {
     setConnectErr(null); setConnecting(true)
-    const res = await launchEmulator(settings, restart)
+    const res = await platform.launch(settings, restart)
     if (!res.ok) {
       setConnecting(false)
       setConnectErr(
