@@ -27,6 +27,7 @@ import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawn, exec } from 'node:child_process'
+import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile } from './profiles.mjs'
 
 // Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
 // (which CI bumps from the release tag) to startCompanion; CLI falls back to the
@@ -61,6 +62,8 @@ let nativePick = null
 // paths. This makes setup survive a browser change / cache reset and is the basis
 // for the future standalone app. Per-machine → gitignored.
 const CONFIG_FILE = process.env.SOULLINK_COMPANION_CONFIG || join(HERE, 'companion-config.json')
+// Profiles live next to the config, in the same per-machine folder.
+initProfiles(join(dirname(CONFIG_FILE), 'profiles.json'))
 function loadConfig() {
   try { const j = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')); return (j && typeof j === 'object') ? j : {} }
   catch { return {} }
@@ -476,6 +479,51 @@ function handleRequest(req, res) {
       return
     }
     sendJson(res, { ok: false }, 405)
+    return
+  }
+
+  // ── profiles: local per-machine game profiles (Valon + Leon, …) ─────────────
+  // GET list · POST create · PATCH ?id= update · DELETE ?id= remove
+  if (path === '/api/profiles') {
+    if (req.method === 'GET') {
+      try { sendJson(res, { ok: true, ...listProfiles() }) } catch { sendJson(res, { ok: false }, 500) }
+      return
+    }
+    if (req.method === 'POST' || req.method === 'PATCH') {
+      let body = ''
+      req.on('data', (c) => { body += c; if (body.length > 200_000) req.destroy() })
+      req.on('end', () => {
+        let data = {}
+        try { data = JSON.parse(body || '{}') } catch { /* invalid → empty */ }
+        try {
+          if (req.method === 'POST') {
+            const p = createProfile(data)
+            console.log('[profiles] erstellt:', p.name)
+            sendJson(res, { ok: true, profile: p })
+          } else {
+            const p = updateProfile(url.searchParams.get('id'), data)
+            sendJson(res, p ? { ok: true, profile: p } : { ok: false, error: 'not_found' }, p ? 200 : 404)
+          }
+        } catch (e) { sendJson(res, { ok: false, error: String(e?.message || e) }, 500) }
+      })
+      return
+    }
+    if (req.method === 'DELETE') {
+      try { sendJson(res, { ok: deleteProfile(url.searchParams.get('id')) }) } catch { sendJson(res, { ok: false }, 500) }
+      return
+    }
+    sendJson(res, { ok: false }, 405)
+    return
+  }
+  // profile actions: POST ?id= → duplicate / set-active
+  if (path === '/api/profiles/duplicate' && req.method === 'POST') {
+    try { const p = duplicateProfile(url.searchParams.get('id')); sendJson(res, p ? { ok: true, profile: p } : { ok: false, error: 'not_found' }, p ? 200 : 404) }
+    catch { sendJson(res, { ok: false }, 500) }
+    return
+  }
+  if (path === '/api/profiles/active' && req.method === 'POST') {
+    try { sendJson(res, { ok: setActiveProfile(url.searchParams.get('id')) }) }
+    catch { sendJson(res, { ok: false }, 500) }
     return
   }
 
