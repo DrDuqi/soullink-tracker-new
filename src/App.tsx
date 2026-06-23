@@ -19,6 +19,7 @@ const AppShell = lazy(() => import('./shell/AppShell'))
 const CompanionDashboard = lazy(() => import('./pages/companion/DashboardPage'))
 const NewRunPage = lazy(() => import('./pages/companion/NewRunPage'))
 const PresetsPage = lazy(() => import('./pages/companion/PresetsPage'))
+const CompanionSettings = lazy(() => import('./pages/companion/SettingsPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
@@ -47,6 +48,7 @@ export default function App() {
                   <Route element={<AppShell />}>
                     <Route path="/" element={<CompanionDashboard />} />
                     <Route path="/new" element={<NewRunPage />} />
+                    <Route path="/settings" element={<CompanionSettings />} />
                     <Route path="/presets" element={<PresetsPage />} />
                     <Route path="/setup" element={<SetupPage />} />
                     <Route path="/profiles" element={<ProfilesPage />} />
