@@ -668,7 +668,8 @@ function handleRequest(req, res) {
 // the Electron tray app — one implementation, no drift. Resolves with the server
 // once it is listening; rejects on bind error (e.g. EADDRINUSE) so the caller
 // decides what to do (CLI exits; the tray app shows "läuft bereits").
-export function startCompanion({ port = PORT, quiet = false, pickFile = null, version = null } = {}) {
+export function startCompanion({ port = PORT, quiet = false, pickFile = null, version = null, log = null } = {}) {
+  const step = (m) => { try { if (typeof log === 'function') log(m) } catch { /* ignore */ } }
   nativePick = typeof pickFile === 'function' ? pickFile : null
   // Real version: from the Electron host (app.getVersion()), else the companion-app
   // package.json (CLI/dev). Never a hardcoded constant.
@@ -676,13 +677,18 @@ export function startCompanion({ port = PORT, quiet = false, pickFile = null, ve
   else if (!appVersion) {
     try { appVersion = JSON.parse(readFileSync(join(ROOT, 'companion-app', 'package.json'), 'utf8')).version || null } catch { /* unknown */ }
   }
+  step(`✓ Version geladen: ${appVersion || '?'}`)
+  step(`✓ Config-Pfad: ${CONFIG_FILE}`)
+  step(`✓ Profile-Store initialisiert: ${join(dirname(CONFIG_FILE), 'profiles.json')}`)
   return new Promise((resolve, reject) => {
     const server = createServer(handleRequest)
-    server.once('error', reject)
+    const onBindError = (e) => { step(`✗ HTTP-Bind fehlgeschlagen: ${e && e.code ? e.code : e}`); reject(e) }
+    server.once('error', onBindError)
     // Bind to 127.0.0.1 only — never expose the launcher on the network.
     server.listen(port, '127.0.0.1', () => {
-      server.off('error', reject)
+      server.off('error', onBindError)
       server.on('error', (e) => console.error('[server]', e?.message || e))
+      step(`✓ HTTP-Server lauscht auf 127.0.0.1:${port}`)
       if (!quiet) {
         console.log('╔══════════════════════════════════════════════════════════╗')
         console.log('║  SoulLink Companion läuft                                  ║')

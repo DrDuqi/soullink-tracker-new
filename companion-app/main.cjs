@@ -20,6 +20,28 @@ let serverState = 'starting'   // 'starting' | 'running' | 'shared' | 'error'
 let serverMod = null           // the imported server.mjs (exposes dev helpers)
 let pickInFlight = false        // guard: only one native file dialog at a time
 
+// ── Startup diagnostics ──────────────────────────────────────────────────────
+// Every launch writes a fresh startup.log so a failed start can be diagnosed from
+// a file instead of a console the user never sees. Lives in userData (always
+// writable). Each step is logged; any exception writes message + code + stacktrace.
+let STARTUP_LOG = null
+function startupLogPath() {
+  if (STARTUP_LOG) return STARTUP_LOG
+  try { STARTUP_LOG = path.join(app.getPath('userData'), 'startup.log') }
+  catch { STARTUP_LOG = path.join(__dirname, 'startup.log') }
+  return STARTUP_LOG
+}
+function slog(line) {
+  try { fs.appendFileSync(startupLogPath(), `[${new Date().toISOString()}] ${line}\n`) } catch { /* ignore */ }
+}
+function slogErr(label, e) {
+  slog(`✗ ${label} FEHLGESCHLAGEN: ${e && e.code ? '[' + e.code + '] ' : ''}${(e && e.message) || e}`)
+  if (e && e.stack) slog('STACK:\n' + e.stack)
+}
+// Catch-all: anything unhandled (incl. errors before/around startup) lands in the log.
+process.on('uncaughtException', (e) => { slogErr('uncaughtException', e) })
+process.on('unhandledRejection', (e) => { slogErr('unhandledRejection', e) })
+
 // Only one instance — a second launch quietly exits; the first keeps serving.
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0) }
 
@@ -135,25 +157,33 @@ async function pickFile({ kind, defaultPath }) {
 
 async function startServer() {
   const userData = app.getPath('userData')
+  slog(`userData = ${userData}`)
   // The Lua writes its team JSON next to itself, so it must live in a WRITABLE
   // folder (resources/ is read-only). Copy it into userData on every launch (so
   // app updates also ship a fresh Lua) and point the server there.
   const luaDst = path.join(userData, 'soullink_sync.lua')
-  try { fs.copyFileSync(luaSrc, luaDst); process.env.SOULLINK_LUA = luaDst } catch (e) { console.error('[companion] Lua-Kopie fehlgeschlagen:', e) }
+  try { fs.copyFileSync(luaSrc, luaDst); process.env.SOULLINK_LUA = luaDst; slog('✓ Lua kopiert') }
+  catch (e) { console.error('[companion] Lua-Kopie fehlgeschlagen:', e); slogErr('Lua-Kopie', e) }
   process.env.SOULLINK_COMPANION_CONFIG = path.join(userData, 'companion-config.json')
 
   try {
+    slog(`Schritt: server.mjs importieren … (existiert: ${fs.existsSync(serverPath)})`)
     serverMod = await import(pathToFileURL(serverPath).href)
-    await serverMod.startCompanion({ quiet: true, pickFile, version: app.getVersion() })
+    slog('✓ server.mjs importiert')
+    slog('Schritt: startCompanion() …')
+    await serverMod.startCompanion({ quiet: true, pickFile, version: app.getVersion(), log: slog })
     serverState = 'running'
+    slog('✓ HTTP-Server gestartet (startCompanion ok)')
   } catch (e) {
     if (e && e.code === 'EADDRINUSE') {
       // Port already served (e.g. `npm run companion` is open) — that's fine, the
       // website still works; this instance just rides along in the tray.
       serverState = 'shared'
+      slog('✓ Port belegt → teile bestehenden Companion (kein Fehler)')
     } else {
       serverState = 'error'
       console.error('[companion] Start fehlgeschlagen:', e)
+      slogErr('startServer', e)
       notify('SoulLink Companion', 'Der Companion konnte nicht starten. Bitte App neu starten.')
     }
   }
@@ -172,9 +202,15 @@ function checkForUpdates() {
 app.on('window-all-closed', () => { /* no windows → stay alive in the tray */ })
 app.on('second-instance', () => notify('SoulLink Companion', 'Läuft bereits im System-Tray.'))
 
-app.whenReady().then(() => {
-  tray = new Tray(trayImage())
-  refreshTray()
-  startServer()
-  checkForUpdates()
+app.whenReady().then(async () => {
+  try { fs.writeFileSync(startupLogPath(), '') } catch { /* ignore */ }   // fresh log each launch
+  slog(`START — SoulLink Companion v${app.getVersion()} · packaged=${app.isPackaged}`)
+  slog(`node=${process.version} · electron=${process.versions.electron}`)
+  slog(`serverPath = ${serverPath} (existiert: ${fs.existsSync(serverPath)})`)
+  slog(`profiles.mjs daneben (existiert: ${fs.existsSync(path.join(path.dirname(serverPath), 'profiles.mjs'))})`)
+  try { tray = new Tray(trayImage()); refreshTray(); slog('✓ Tray erstellt') }
+  catch (e) { slogErr('Tray', e) }
+  await startServer()
+  try { checkForUpdates(); slog('✓ Update-Check angestoßen') } catch (e) { slogErr('Update-Check', e) }
+  slog(`✓ App bereit (Status=${serverState})`)
 })

@@ -25,7 +25,7 @@
     "directories": { "output": "dist" },
     "files": ["main.cjs", "assets/**"],
     "extraResources": [
-      { "from": "../emulator/companion/server.mjs", "to": "companion/server.mjs" },
+      { "from": "../emulator/companion", "to": "companion", "filter": ["*.mjs"] },
       { "from": "../emulator/bizhawk/soullink_sync.lua", "to": "companion/soullink_sync.lua" }
     ],
     "win": {
