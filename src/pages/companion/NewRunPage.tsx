@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { createRun } from '../../lib/createRun'
 import { saveRunRecipe } from '../../lib/runRecipe'
 import { useRunStore } from '../../store/runStore'
+import { useMyRuns } from '../../hooks/useMyRuns'
 import type { Preset } from '../../lib/presets'
 
 // The end-to-end flow that closes the loop: create a real Supabase run → randomize
@@ -36,7 +37,19 @@ export default function NewRunPage() {
   const platform = getPlatform()
   const { user, profile } = useAuth()
   const { active, loading } = useProfiles()
+  const { data: myRuns = [] } = useMyRuns()
   const setCurrentRun = useRunStore((s) => s.setCurrentRun)
+  // Recent partners (derived from past runs) → 1-click "Mit wem?", newest first.
+  const recentPartners = (() => {
+    const seen = new Set<string>(); const out: string[] = []
+    for (const vm of myRuns) {
+      const n = (vm.partnerName || '').trim()
+      if (!n || n === '—' || seen.has(n.toLowerCase())) continue
+      seen.add(n.toLowerCase()); out.push(n)
+      if (out.length >= 5) break
+    }
+    return out
+  })()
   const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1_000_000_000))
   const [presets, setPresets] = useState<Preset[]>([])
   const [presetId, setPresetId] = useState<string>('')
@@ -120,6 +133,20 @@ export default function NewRunPage() {
             <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">Mit wem spielst du?</label>
             <input value={partnerName} disabled={busy} onChange={(e) => setPartnerName(e.target.value)} placeholder="Name deines Freundes (oder leer = allein)"
               className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3.5 py-2.5 text-sm text-white" />
+            {recentPartners.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                <span className="text-slate-500 text-[11px] font-bold">Zuletzt:</span>
+                {recentPartners.map((n) => {
+                  const sel = partnerName.trim().toLowerCase() === n.toLowerCase()
+                  return (
+                    <button key={n} type="button" disabled={busy} onClick={() => setPartnerName(sel ? '' : n)}
+                      className={`text-[11px] font-bold rounded-full px-2.5 py-1 border transition-colors ${sel ? 'text-white border-pk-red/60 bg-pk-red/15' : 'text-slate-300 border-[#3a3a4e] hover:bg-white/5'}`}>
+                      {n}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
             <p className="text-slate-500 text-[11px] mt-2">Nach dem Start teilst du den Einladungs-Code — dein Freund tritt damit bei und randomisiert seine eigene ROM.</p>
           </div>
 
