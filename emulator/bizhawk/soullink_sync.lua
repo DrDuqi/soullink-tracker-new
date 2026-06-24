@@ -67,7 +67,7 @@ end
 -- normalen Nutzern ist die Variable NICHT gesetzt → kein Logging, kein Overhead.
 -- Rotation/Archiv/Pruning übernimmt der Companion VOR dem Start (current.log ist
 -- beim Start frisch); hier wird nur angehängt.
-local LUA_REV = "1.0.14"
+local LUA_REV = "1.0.15"
 local DEVLOG_DIR = (function() local d = os.getenv("SOULLINK_DEVLOG"); return (d and d ~= "") and d or nil end)()
 local DEV_VERSION = os.getenv("SOULLINK_VERSION") or "?"
 local function anonPath(s) return s and (tostring(s):gsub("[Cc]:[/\\][Uu]sers[/\\][^/\\]+", "C:\\Users\\<USER>")) or s end
@@ -105,9 +105,13 @@ local ORDERS = {
   "CDAB","CDBA","DABC","DACB","DBAC","DBCA","DCAB","DCBA",
 }
 
+-- scan_lo/scan_hi = the Main-RAM window where the Gen-4 party actually lives
+-- (Platinum party ≈ 0x27Exxx). The auto-scan checks THIS window first → finds the
+-- party in a few frames instead of sweeping all ~4 MB (which caused the freezes).
+-- A full-RAM scan still runs as a one-time fallback if the window comes up empty.
 local PROFILES = {
-  platinum  = { gen = 4, domain = "Main RAM", mon_size = 236, max_species = 493, party_addr = nil },
-  heartgold = { gen = 4, domain = "Main RAM", mon_size = 236, max_species = 493, party_addr = nil },
+  platinum  = { gen = 4, domain = "Main RAM", mon_size = 236, max_species = 493, party_addr = nil, scan_lo = 0x200000, scan_hi = 0x300000 },
+  heartgold = { gen = 4, domain = "Main RAM", mon_size = 236, max_species = 493, party_addr = nil, scan_lo = 0x200000, scan_hi = 0x300000 },
 }
 
 local STATUS_BITS = { [0x08]="psn", [0x10]="brn", [0x20]="frz", [0x40]="par", [0x80]="tox" }
@@ -438,7 +442,8 @@ local function logLocationChange()
 end
 
 -- ── Auto-Detect: Speicher in Frame-Chunks scannen ───────────────────────────
-local DET = { running = false, base = 0, found = {}, size = 0, fails = 0, nextAt = 0, missStreak = 0 }
+local DET = { running = false, base = 0, found = {}, size = 0, fails = 0, nextAt = 0, missStreak = 0,
+              lo = 0, hi = 0, windowed = false, fullFallback = false }
 -- So viele aufeinanderfolgende fehlgeschlagene Lead-Mon-Reads (je ~0,5s), bevor ein
 -- erneuter Scan ausgelöst wird. Transiente Fehlversuche lösen damit KEINEN Scan aus.
 local MISS_LIMIT = 20   -- ~10s
@@ -451,16 +456,30 @@ end
 
 local saveCachedAddr   -- Persistenter Party-Cache (erst NACH OUT_FILE definiert)
 
-local function detectStart(profile)
-  DET.running = true; DET.base = 0; DET.found = {}
+local function detectStart(profile, hint)
+  DET.running = true; DET.found = {}; DET.earlyStop = false
   DET.lastSig = nil                       -- nach (Neu-)Scan die nächste Party wieder senden
   profile.party_addr = nil; profile.team_size = nil
   local sz
   pcall(function() sz = memory.getmemorydomainsize(profile.domain) end)
   if not sz then pcall(function() sz = memory.getmemorydomainsize() end) end
   DET.size = sz or 0
+  -- Scan-Fenster wählen: erst der Kernbereich (Hinweis = zuletzt bekannte Adresse,
+  -- sonst die bekannte Gen-4-Region) → Party in wenigen Frames gefunden, kein Freeze.
+  -- Voll-Scan nur als Fallback (DET.fullFallback), wenn das Fenster nichts findet.
+  if DET.fullFallback or DET.size == 0 then
+    DET.lo, DET.hi, DET.windowed = 0, DET.size, false
+  elseif hint and hint > 0 then
+    DET.lo = math.max(0, hint - 0x40000); DET.hi = math.min(DET.size, hint + 0x40000); DET.windowed = true
+  elseif profile.scan_lo then
+    DET.lo = math.min(profile.scan_lo, DET.size); DET.hi = math.min(profile.scan_hi, DET.size); DET.windowed = true
+  else
+    DET.lo, DET.hi, DET.windowed = 0, DET.size, false
+  end
+  DET.base = DET.lo
   if DET.fails == 0 then    -- nur beim ersten Versuch ankündigen (kein Spam beim Warten)
-    console.log(string.format("[scan] Suche Party automatisch ... (%d KB)", DET.size // 1024))
+    console.log(string.format("[scan] Suche Party %s ... (0x%X..0x%X von %d KB)",
+      DET.windowed and "im Kernbereich" or "vollstaendig", DET.lo, DET.hi, DET.size // 1024))
   end
   if DET.size == 0 then
     console.log("[scan] Domain '" .. profile.domain .. "' nicht lesbar. Verfügbar: "
@@ -475,12 +494,13 @@ end
 local SCAN_SUB = 0x400            -- 1 KB pro Teilschritt (feine Granularität → sehr dünn)
 local function detectStep(profile)
   if DET.size <= 0 then return true end
+  local hi = DET.hi or DET.size
   -- Erste Suche zügig (ein vorhandenes Team schnell finden); Wiederhol-Scans ohne
   -- Team (z. B. Starterauswahl) extra dünn → keine spürbaren Mikro-Freezes.
   local budget = (DET.fails == 0) and 0.0025 or 0.0010
   local t0 = os.clock()
-  while DET.base < DET.size do
-    local remaining = DET.size - DET.base
+  while DET.base < hi do
+    local remaining = hi - DET.base
     local chunkLen = math.min(SCAN_SUB, remaining)
     -- + mon_size Überlappung, damit ein an der Teilschritt-Grenze beginnender Mon komplett ist
     local readLen = math.min(chunkLen + profile.mon_size, remaining)
@@ -491,14 +511,25 @@ local function detectStep(profile)
       local o = 0
       while o <= lastO do
         local mon = validateGen4(arr, bi + o, profile.max_species)
-        if mon then DET.found[#DET.found + 1] = { addr = DET.base + o, hp = mon.hp } end
+        if mon then
+          local a = DET.base + o
+          DET.found[#DET.found + 1] = { addr = a, hp = mon.hp }
+          -- Anker-Header (u32 @ addr-4 = 1..6) ⇒ mit hoher Sicherheit die Spieler-Party.
+          -- Dann den Scan SOFORT beenden statt den restlichen RAM weiter zu entschlüsseln
+          -- — das ist der eigentliche Freeze-Killer (Treffer meist schon im ersten Drittel).
+          if a >= 4 then
+            local cnt = safeU32(a - 4)
+            if cnt and cnt >= 1 and cnt <= 6 then DET.earlyStop = true end
+          end
+        end
         o = o + 4
       end
     end
     DET.base = DET.base + chunkLen                 -- IMMER weiterrücken (auch bei Read-Fehler)
+    if DET.earlyStop then DET.base = hi; break end -- Party gefunden → fertig (kein Weiterscannen)
     if (os.clock() - t0) >= budget then break end          -- Frame-Budget erschöpft → Rest nächster Frame
   end
-  return DET.base >= DET.size
+  return DET.base >= hi
 end
 
 -- Wählt die SPIELER-Party: der zusammenhängende Lauf, dem ein gültiger
@@ -545,6 +576,7 @@ local function detectFinish(profile)
   if best then
     profile.party_addr = best.addr
     profile.team_size  = best.team
+    profile.last_addr  = best.addr            -- Hinweis für eine spätere, schnelle Wieder-Erkennung
     console.log(string.format("[scan] OK Spieler-Party @ 0x%X · %d Pokemon%s",
       best.addr, best.team, bestScore >= 1000 and " (Header bestaetigt)" or " (laengster Lauf)"))
     devlog(string.format("Party gefunden @ 0x%X · %d Mon · %s", best.addr, best.team, bestScore >= 1000 and "Header" or "laengster Lauf"), "sync")
@@ -812,6 +844,7 @@ local function loadCachedAddr(profile)
   -- bei erfolgreichem Read (kein Müll). Erst bei dauerhaftem Fehlschlag wird neu
   -- gesucht. → Nach dem ersten Erfolg: nie wieder ein Scan beim Start.
   profile.party_addr = tonumber(a)
+  profile.last_addr = tonumber(a)          -- Hinweis für eine schnelle Wieder-Erkennung
   DET.missStreak = 0
   if readMon(profile, 0) then
     console.log(string.format("[scan] Party-Adresse aus Cache @ 0x%X — kein Scan noetig.", profile.party_addr))
@@ -920,8 +953,9 @@ if not loadCachedAddr(profile) then
 end
 
 -- Ein Frame Arbeit (wird vom Loop in pcall ausgeführt)
+-- (memory.usememorydomain wird EINMAL bei Init gesetzt — nicht mehr pro Frame, das
+--  war 60 unnötige API-Aufrufe/s; die Domain bleibt über den Lauf konstant.)
 local function stepOnce(frame)
-  pcall(function() memory.usememorydomain(profile.domain) end)
   if CONFIG.find_location then lfStep() end                  -- Kalibrierhilfe (nur Lesen + Log)
   if frame % CONFIG.interval_frames == 0 then logLocationChange() end
   -- PERF: alle 60 Frames die Messwerte ausgeben + Fenster zurücksetzen. Da der
@@ -948,14 +982,20 @@ local function stepOnce(frame)
     if detectStep(profile) then
       detectFinish(profile)
       if profile.party_addr then
-        DET.fails = 0                                            -- gefunden → Zähler zurücksetzen
+        DET.fails = 0; DET.fullFallback = false                  -- gefunden → Zähler zurücksetzen
+      elseif DET.windowed and not DET.fullFallback then
+        -- Kernbereich leer → EINMAL sofort vollständig scannen (kein Back-off, kein Fail).
+        DET.fullFallback = true
+        detectStart(profile)
       else
+        DET.fullFallback = false
         DET.fails = DET.fails + 1
         DET.nextAt = frame + retryDelay(DET.fails)               -- Back-off: immer seltener neu scannen
       end
     end
   elseif not profile.party_addr then
-    if frame >= (DET.nextAt or 0) then detectStart(profile) end  -- mit Back-off (kein Dauerscan mehr)
+    -- Wieder-Erkennung startet beim zuletzt bekannten Ort (winziges Fenster → kein Freeze).
+    if frame >= (DET.nextAt or 0) then detectStart(profile, profile.last_addr) end
   else
     if frame % CONFIG.interval_frames == 0 then
       -- EIN Bulk-Read der ganzen Party dient ZWEI Zwecken: Gültigkeitsprüfung (Lead-Mon)
@@ -991,7 +1031,7 @@ local function stepOnce(frame)
           DET.missStreak = 0
           console.log("[sync] Party-Adresse dauerhaft ungueltig — suche einmal neu ...")
           devlog("[WARN] Party-Adresse verloren (anhaltend) — Neu-Scan ausgeloest", "err")
-          detectStart(profile)
+          detectStart(profile, profile.party_addr)   -- Hinweis: zuletzt bekannte Adresse → schnelles Fenster
         end
       end
     end
