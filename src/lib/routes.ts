@@ -155,13 +155,20 @@ export function emulatorGameLabel(emuGame: string | null | undefined): string | 
 }
 
 /** True only when we are SURE the emulator game does not match the run edition.
- *  Unknown emulator codes or PokéMMO (multi-region) never count as a mismatch. */
+ *  Unknown emulator codes or PokéMMO (multi-region) never count as a mismatch.
+ *  Tolerant to how the run edition is stored: an emulator code ("platinum"), the
+ *  German label ("Platin") or a "Pokémon Platin" display string all match — so a
+ *  Platinum run on a Platinum emulator is never flagged. Still distinguishes the
+ *  paired editions (Schwarz ≠ Schwarz 2). */
 export function isGameMismatch(runGame: string | null | undefined, emuGame: string | null | undefined): boolean {
   if (!runGame || !emuGame) return false
   if (runGame === 'PokéMMO') return false
-  const label = EMU_GAME_TO_LABEL[emuGame.toLowerCase()]
-  if (!label) return false
-  return label !== runGame
+  const emuLabel = EMU_GAME_TO_LABEL[emuGame.toLowerCase()]
+  if (!emuLabel) return false                                  // unknown emu code → never a mismatch
+  if (runGame.toLowerCase() === emuGame.toLowerCase()) return false   // both the same code
+  const stripped = runGame.replace(/^pok[eé]mon\s+/i, '').trim().toLowerCase()
+  if (stripped === emuLabel.toLowerCase()) return false        // label / "Pokémon <Label>"
+  return true
 }
 
 // Normalize a location label for tolerant comparison (case/spaces/diacritics/punct).

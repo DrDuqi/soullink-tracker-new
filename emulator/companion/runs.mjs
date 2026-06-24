@@ -48,6 +48,28 @@ export function recordLocalRun(runId, data) {
 export function getLocalRun(runId) { return load().runs[String(runId)] || null }
 export function listLocalRuns() { return load().runs }
 
+// Which run does a launched ROM belong to? Lets the live-sync tell the UI whether
+// BizHawk is really on THIS run's ROM (vs. an old run still open). Matches by exact
+// ROM path; falls back to the per-run folder name (Runs/<runId>/…). null if unknown.
+export function runIdForRom(romPath) {
+  if (!romPath) return null
+  const norm = (p) => String(p).replace(/\\/g, '/').toLowerCase()
+  const target = norm(romPath)
+  const runs = load().runs
+  for (const id of Object.keys(runs)) {
+    if (runs[id]?.romPath && norm(runs[id].romPath) === target) return id
+  }
+  // Fallback: the ROM lives in Runs/<runId>/… → its parent folder is the run id.
+  try {
+    const parent = dirname(romPath)
+    if (RUNS_DIR && norm(dirname(parent)) === norm(RUNS_DIR)) {
+      const id = parent.replace(/\\/g, '/').split('/').pop()
+      if (id && runs[id]) return id
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
 // Write a self-describing metadata.json into the run folder, so the folder survives
 // even if the central registry is lost (and is human-readable).
 export function writeRunMetadata(runId, meta) {

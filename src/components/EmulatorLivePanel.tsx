@@ -199,9 +199,10 @@ function CompanionBanner({ status, onRecheck }: { status: 'checking' | 'absent';
 /** Live in-game party from the local emulator sync. Additive & non-destructive:
  *  it does NOT touch tracked encounters / soul links / the team system. */
 export default function EmulatorLivePanel({
-  game, onImport, importedSpeciesIds, importedPids,
+  game, runId, onImport, importedSpeciesIds, importedPids,
 }: {
   game?: string
+  runId?: string
   onImport?: (p: EncounterPrefill, suggestedRoute?: string) => void
   importedSpeciesIds?: Set<number>
   importedPids?: Set<string>
@@ -265,7 +266,7 @@ export default function EmulatorLivePanel({
     setShowWizard(true)
   }, [settingsHydrated, configured, companion.status, companionPulled])
 
-  const { phase, team, game: liveGame, currentLocationName, currentLocationId } = useEmulatorSync(enabled && companionReady)
+  const { phase, team, game: liveGame, currentLocationName, currentLocationId, runId: syncRunId } = useEmulatorSync(enabled && companionReady)
 
   // ── One-click launch (▶ Live-Sync starten) ───────────────────────────────
   const [launching, setLaunching] = useState(false)
@@ -377,7 +378,12 @@ export default function EmulatorLivePanel({
 
   // The RUN edition decides the available routes; the emulator must match it.
   const runGame = game ?? ''
-  const mismatch = isGameMismatch(runGame, liveGame)
+  // BizHawk is still on a DIFFERENT run's ROM (old run open while a new one started).
+  // null syncRunId = unknown → assume it's this run. Only fires when we're SURE.
+  const wrongRun = phase === 'connected' && runId != null && syncRunId != null && syncRunId !== runId
+  // Only flag an edition mismatch once we're actually connected to THIS run — never
+  // from a stale game value while still connecting.
+  const mismatch = phase === 'connected' && !wrongRun && isGameMismatch(runGame, liveGame)
   useLocationMap(runGame)   // reaktiv: Ort-Anzeige aktualisiert sich nach dem Lernen
   // Aktueller Ort: bei Spiel-Mismatch KEINE Zuordnung (kein falsches Auto-Matching).
   const learnedLoc = !mismatch && currentLocationId != null ? getLearnedRoute(runGame, currentLocationId) : null
@@ -410,9 +416,11 @@ export default function EmulatorLivePanel({
   else if (phase === 'offline') { icon = <WifiOff className="w-4 h-4" />; title = 'Emulator nicht gefunden'; color = '#94a3b8' }
   else if (phase === 'waiting') { icon = <Loader2 className="w-4 h-4 animate-spin" />; title = 'Datei gefunden – warte auf Pokémon'; color = '#fbbf24' }
   else { icon = <Wifi className="w-4 h-4" />; title = `Verbunden mit ${gameName}`; color = '#4ade80' }
+  // BizHawk is on another run → don't claim this run is connected.
+  if (wrongRun) { icon = <AlertTriangle className="w-4 h-4" />; title = 'Anderer Run im Emulator'; color = '#fbbf24' }
 
-  const showAge = enabled && (phase === 'connected' || phase === 'waiting')
-  const monCount = enabled && phase === 'connected' ? team.length : null
+  const showAge = enabled && !wrongRun && (phase === 'connected' || phase === 'waiting')
+  const monCount = enabled && phase === 'connected' && !wrongRun ? team.length : null
 
   return (
     <div className="rounded-2xl border overflow-hidden" style={{ borderColor: mismatch ? 'rgba(248,113,113,0.55)' : `${color}40` }}>
@@ -459,13 +467,22 @@ export default function EmulatorLivePanel({
       <input ref={romPick} type="file" accept=".nds,.gba,.gbc,.gb" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => reselectRom(e.target.files?.[0])} />
       <input ref={bizPick} type="file" accept=".exe" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => reselectBizhawk(e.target.files?.[0])} />
 
+      {/* BizHawk zeigt noch einen anderen Run → freundlicher Hinweis statt Fehler */}
+      {enabled && wrongRun && (
+        <div className="flex items-start gap-1.5 px-4 py-2 text-[11px] border-t" style={{ background: 'rgba(251,191,36,0.1)', borderColor: 'rgba(251,191,36,0.3)' }}>
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-400" />
+          <span className="text-amber-200 font-medium">
+            Bitte starte den neuen Run oder öffne die neu erzeugte ROM. Sobald dieser Run im Emulator läuft, verbindet sich SoulLink automatisch.
+          </span>
+        </div>
+      )}
+
       {/* Spiel-Mismatch — auch im eingeklappten Zustand sichtbar */}
       {enabled && mismatch && (
-        <div className="flex items-start gap-1.5 px-4 py-2 text-[11px] border-t" style={{ background: 'rgba(248,113,113,0.1)', borderColor: 'rgba(248,113,113,0.3)' }}>
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-400" />
-          <span className="text-red-300 font-medium">
-            Emulator-Spiel passt nicht zum Run: Run = {runGame || '—'}, Emulator = {emulatorGameLabel(liveGame) ?? gameName}.
-            Routen-Vorschläge sind deaktiviert; Import bleibt manuell möglich.
+        <div className="flex items-start gap-1.5 px-4 py-2 text-[11px] border-t" style={{ background: 'rgba(251,191,36,0.1)', borderColor: 'rgba(251,191,36,0.3)' }}>
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-400" />
+          <span className="text-amber-200 font-medium">
+            Der Emulator zeigt gerade {emulatorGameLabel(liveGame) ?? gameName}, dieser Run ist aber {runGame || '—'}. Bitte öffne die ROM dieses Runs — dann passt alles automatisch zusammen.
           </span>
         </div>
       )}
@@ -498,7 +515,7 @@ export default function EmulatorLivePanel({
         </div>
       )}
 
-      {!collapsed && enabled && phase === 'connected' && !mismatch && (
+      {!collapsed && enabled && phase === 'connected' && !mismatch && !wrongRun && (
         <div className="flex items-center gap-1.5 px-4 py-2 text-[11px] border-t" style={{ background: '#16161f', borderColor: '#2e2e42' }}>
           <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: matchedRoute ? '#4ade80' : '#64748b' }} />
           <span className="text-slate-400 font-medium">Aktueller Ort:</span>
@@ -509,7 +526,7 @@ export default function EmulatorLivePanel({
         </div>
       )}
 
-      {!collapsed && enabled && team.length > 0 && (
+      {!collapsed && enabled && !wrongRun && team.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3" style={{ background: '#161620' }}>
           {team.map((m) => (
             <MonRich

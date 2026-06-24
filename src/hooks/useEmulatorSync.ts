@@ -17,6 +17,7 @@ export interface EmulatorSyncState {
   trainer: string | null
   currentLocationName: string | null
   currentLocationId: number | null
+  runId: string | null    // which run's ROM is loaded (null = unknown → assume this run)
 }
 
 const POLL_MS = 1200
@@ -45,7 +46,7 @@ function plausibleFrame(team: EmulatorMon[]): boolean {
 // so it only changes on a real data change (no per-second re-render storm). The
 // age display reads `frameAt` via its own isolated 1s ticker (useEmulatorAgeSec).
 const EMPTY: EmulatorSyncState = {
-  phase: 'init', team: [], game: null, trainer: null, currentLocationName: null, currentLocationId: null,
+  phase: 'init', team: [], game: null, trainer: null, currentLocationName: null, currentLocationId: null, runId: null,
 }
 let snapshot: EmulatorSyncState = EMPTY
 let frameAt: number | null = null
@@ -64,7 +65,8 @@ function commit(next: EmulatorSyncState) {
     next.game === snapshot.game &&
     next.trainer === snapshot.trainer &&
     next.currentLocationName === snapshot.currentLocationName &&
-    next.currentLocationId === snapshot.currentLocationId
+    next.currentLocationId === snapshot.currentLocationId &&
+    next.runId === snapshot.runId
   ) return                                   // nothing changed → no re-render
   snapshot = next
   for (const l of listeners) l()
@@ -76,8 +78,9 @@ async function pollOnce() {
     if (!res.ok) throw new Error(String(res.status))
     const env = (await res.json()) as SyncEnvelope
     fails = 0
+    const envRunId = env.runId ?? null
 
-    if (!env.last || !env.last.data) { commit({ ...snapshot, phase: 'offline' }); return }
+    if (!env.last || !env.last.data) { commit({ ...snapshot, phase: 'offline', runId: envRunId }); return }
     const data = env.last.data
     frameAt = env.last.at
 
@@ -98,6 +101,7 @@ async function pollOnce() {
       trainer: data.trainer ?? null,
       currentLocationName: data.currentLocationName ?? null,
       currentLocationId: data.currentLocationId ?? null,
+      runId: envRunId,
     })
   } catch {
     fails += 1

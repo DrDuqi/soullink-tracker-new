@@ -31,7 +31,7 @@ import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile
 import { initRandomizer, randomizerStatus, randomize, openRandomizer } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
 import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs } from './presets.mjs'
-import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun } from './runs.mjs'
+import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun, runIdForRom } from './runs.mjs'
 
 // Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
 // (which CI bumps from the release tag) to startCompanion; CLI falls back to the
@@ -419,6 +419,10 @@ function findFileByName(root, name) {
 // EmuHawk is alive and we have a team, we report the data as fresh; the staleness
 // (file mtime) only matters once BizHawk is gone.
 let bizhawkAlive = false
+// Which run's ROM did we ACTUALLY load into BizHawk last? Set only when we really
+// launch a ROM (not on the "already open, no restart" no-op), so the UI can tell a
+// fresh run from one where BizHawk is still showing the previous run.
+let currentRunId = null
 let lastAliveCheck = 0
 function refreshBizhawkAlive() {
   const now = Date.now()
@@ -881,7 +885,7 @@ function handleRequest(req, res) {
         const r = await tryLaunch(bizhawk, v.args, cwd, 2500, launchEnv)
         last = r
         console.log(`[launch] "${v.label}" alive=${r.alive} exit=${r.code} (${hex32(r.code)}) pid=${r.pid ?? '-'}`)
-        if (r.alive) { bizhawkAlive = true; lastAliveCheck = Date.now(); sendJson(res, { ok: true, launched: true, lua: true, restarted: running && restart, variant: v.label }); return }
+        if (r.alive) { bizhawkAlive = true; lastAliveCheck = Date.now(); currentRunId = runIdForRom(rom); console.log('[launch] aktiver Run:', currentRunId || '(unbekannt)'); sendJson(res, { ok: true, launched: true, lua: true, restarted: running && restart, variant: v.label }); return }
       }
 
       const code = last?.code ?? null
@@ -912,7 +916,8 @@ function handleRequest(req, res) {
       // Keep "connected" alive while EmuHawk runs, regardless of write frequency.
       refreshBizhawkAlive()
       if (last && bizhawkAlive) last = { data: last.data, at: Date.now() }
-      sendJson(res, { ok: true, last })
+      // runId = which run's ROM is loaded (null = unknown → UI assumes it's fine).
+      sendJson(res, { ok: true, last, runId: bizhawkAlive ? currentRunId : null })
       return
     }
     sendJson(res, { ok: false }, 405)

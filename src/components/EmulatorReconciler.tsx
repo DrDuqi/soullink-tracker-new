@@ -18,27 +18,38 @@ import type { Encounter } from '../types/database'
  * match) are never touched.
  */
 export default function EmulatorReconciler({ encounters, runId }: { encounters: Encounter[]; runId: string }) {
-  const { team, phase, game: emuGame, currentLocationName, currentLocationId } = useEmulatorSync(true)
+  const { team, phase, game: emuGame, currentLocationName, currentLocationId, runId: syncRunId } = useEmulatorSync(true)
   const updateEncounter = useUpdateEncounter()
   const updateMoves = useUpdateMoves()
   const setEmuTeam = useEmuTeamStore((s) => s.setTeam)
 
+  // BizHawk is still showing a DIFFERENT run's ROM (e.g. right after starting a new
+  // SoulLink while the old run is open). Treat as "not connected to THIS run": show
+  // nothing live and never bind the old team's Pokémon to this run's encounters.
+  // (null runId = unknown → assume it's this run, so nothing regresses.)
+  const wrongRun = syncRunId != null && syncRunId !== runId
+  const liveTeam = wrongRun ? [] : team
+
+  // Clear the shared live team the instant the run changes, so a freshly opened run
+  // never flashes the previous run's team before the first poll arrives.
+  useEffect(() => { setEmuTeam([], false, {}) }, [runId, setEmuTeam])
+
   // Re-run only when identity-relevant data changes (not on the 1s age ticker).
-  const teamKey = team.map((m) => `${m.pid ?? ''}:${m.speciesId}:${(m.moveIds ?? []).join('|')}`).join(',')
+  const teamKey = liveTeam.map((m) => `${m.pid ?? ''}:${m.speciesId}:${(m.moveIds ?? []).join('|')}`).join(',')
   const encKey = encounters.map((e) => `${e.emu_pid ?? ''}#${e.pokemon_id}#${e.move_1}|${e.move_2}|${e.move_3}|${e.move_4}`).join(',')
 
   // Publish the live team to the shared store (drives the Team/Box overview).
   // Keyed incl. HP/level/item so the overview shows them live.
-  const liveKey = team.map((m) => `${m.pid ?? ''}:${m.speciesId}:${m.level}:${m.hp}:${m.maxHp}:${m.heldItemId ?? ''}:${(m.moveIds ?? []).join('|')}`).join(',')
+  const liveKey = liveTeam.map((m) => `${m.pid ?? ''}:${m.speciesId}:${m.level}:${m.hp}:${m.maxHp}:${m.heldItemId ?? ''}:${(m.moveIds ?? []).join('|')}`).join(',')
   useEffect(() => {
-    setEmuTeam(team, phase === 'connected', { game: emuGame, locationName: currentLocationName, locationId: currentLocationId })
-  }, [liveKey, phase, emuGame, currentLocationName, currentLocationId, setEmuTeam]) // eslint-disable-line react-hooks/exhaustive-deps
+    setEmuTeam(liveTeam, phase === 'connected' && !wrongRun, { game: emuGame, locationName: currentLocationName, locationId: currentLocationId })
+  }, [liveKey, phase, wrongRun, emuGame, currentLocationName, currentLocationId, setEmuTeam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let cancelled = false
 
     async function reconcile() {
-      for (const mon of team) {
+      for (const mon of liveTeam) {
         if (cancelled) break
         if (mon.pid == null) continue
         const pid = String(mon.pid)

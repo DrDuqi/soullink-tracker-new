@@ -847,6 +847,7 @@ export default function RunPage() {
               {isMyFocus && liveSyncMode && (
                 <EmulatorLivePanel
                   game={currentRun.game}
+                  runId={currentRun.id}
                   importedSpeciesIds={myEncounterSpeciesIds}
                   importedPids={myEncounterPids}
                   onImport={(p, route) => { setEmuPrefill(p); setAddEncounterRoute(route); setShowAddEncounter(true) }}
