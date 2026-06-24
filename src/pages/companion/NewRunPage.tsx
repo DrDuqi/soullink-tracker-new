@@ -131,8 +131,8 @@ export default function NewRunPage() {
         <>
           <div className="mt-7 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
             <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">Mit wem spielst du?</label>
-            <input value={partnerName} disabled={busy} onChange={(e) => setPartnerName(e.target.value)} placeholder="Name deines Freundes (oder leer = allein)"
-              className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3.5 py-2.5 text-sm text-white" />
+            <input value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Name deines Freundes (oder leer = allein)"
+              className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3.5 py-2.5 text-sm text-white disabled:opacity-100" />
             {recentPartners.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
                 <span className="text-slate-500 text-[11px] font-bold">Zuletzt:</span>

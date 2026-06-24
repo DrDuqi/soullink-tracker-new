@@ -18,6 +18,7 @@ export interface EmulatorSyncState {
   currentLocationName: string | null
   currentLocationId: number | null
   runId: string | null    // which run's ROM is loaded (null = unknown → assume this run)
+  alive: boolean          // BizHawk is running (connected) even if the team is still empty
 }
 
 const POLL_MS = 1200
@@ -46,7 +47,7 @@ function plausibleFrame(team: EmulatorMon[]): boolean {
 // so it only changes on a real data change (no per-second re-render storm). The
 // age display reads `frameAt` via its own isolated 1s ticker (useEmulatorAgeSec).
 const EMPTY: EmulatorSyncState = {
-  phase: 'init', team: [], game: null, trainer: null, currentLocationName: null, currentLocationId: null, runId: null,
+  phase: 'init', team: [], game: null, trainer: null, currentLocationName: null, currentLocationId: null, runId: null, alive: false,
 }
 let snapshot: EmulatorSyncState = EMPTY
 let frameAt: number | null = null
@@ -66,7 +67,8 @@ function commit(next: EmulatorSyncState) {
     next.trainer === snapshot.trainer &&
     next.currentLocationName === snapshot.currentLocationName &&
     next.currentLocationId === snapshot.currentLocationId &&
-    next.runId === snapshot.runId
+    next.runId === snapshot.runId &&
+    next.alive === snapshot.alive
   ) return                                   // nothing changed → no re-render
   snapshot = next
   for (const l of listeners) l()
@@ -79,8 +81,9 @@ async function pollOnce() {
     const env = (await res.json()) as SyncEnvelope
     fails = 0
     const envRunId = env.runId ?? null
+    const alive = !!env.alive
 
-    if (!env.last || !env.last.data) { commit({ ...snapshot, phase: 'offline', runId: envRunId }); return }
+    if (!env.last || !env.last.data) { commit({ ...snapshot, phase: 'offline', runId: envRunId, alive }); return }
     const data = env.last.data
     frameAt = env.last.at
 
@@ -102,6 +105,7 @@ async function pollOnce() {
       currentLocationName: data.currentLocationName ?? null,
       currentLocationId: data.currentLocationId ?? null,
       runId: envRunId,
+      alive,
     })
   } catch {
     fails += 1

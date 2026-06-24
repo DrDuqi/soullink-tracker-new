@@ -266,7 +266,7 @@ export default function EmulatorLivePanel({
     setShowWizard(true)
   }, [settingsHydrated, configured, companion.status, companionPulled])
 
-  const { phase, team, game: liveGame, currentLocationName, currentLocationId, runId: syncRunId } = useEmulatorSync(enabled && companionReady)
+  const { phase, team, game: liveGame, currentLocationName, currentLocationId, runId: syncRunId, alive } = useEmulatorSync(enabled && companionReady)
 
   // ── One-click launch (▶ Live-Sync starten) ───────────────────────────────
   const [launching, setLaunching] = useState(false)
@@ -416,6 +416,9 @@ export default function EmulatorLivePanel({
   else if (phase === 'offline') { icon = <WifiOff className="w-4 h-4" />; title = 'Emulator nicht gefunden'; color = '#94a3b8' }
   else if (phase === 'waiting') { icon = <Loader2 className="w-4 h-4 animate-spin" />; title = 'Datei gefunden – warte auf Pokémon'; color = '#fbbf24' }
   else { icon = <Wifi className="w-4 h-4" />; title = `Verbunden mit ${gameName}`; color = '#4ade80' }
+  // BizHawk is running but its party is still empty (fresh game / just launched) →
+  // we ARE connected; never imply the user must launch it manually.
+  if (alive && phase !== 'connected') { icon = <Wifi className="w-4 h-4" />; title = 'Verbunden – warte auf dein erstes Pokémon'; color = '#4ade80' }
   // BizHawk is on another run → don't claim this run is connected.
   if (wrongRun) { icon = <AlertTriangle className="w-4 h-4" />; title = 'Anderer Run im Emulator'; color = '#fbbf24' }
 
@@ -487,8 +490,16 @@ export default function EmulatorLivePanel({
         </div>
       )}
 
-      {/* ▶ Live-Sync starten — startet BizHawk + ROM + Lua mit einem Klick */}
-      {!collapsed && enabled && phase !== 'connected' && (
+      {/* BizHawk läuft schon (frisches Spiel ohne Team) → kein manueller Button nötig */}
+      {!collapsed && enabled && alive && !wrongRun && phase !== 'connected' && (
+        <div className="flex items-center gap-2 px-4 py-3 text-[11px] border-t" style={{ background: '#16161f', borderColor: '#2e2e42' }}>
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-green-400 shrink-0" />
+          <span className="text-slate-400">Verbunden – sobald du dein erstes Pokémon hast, erscheint dein Team hier automatisch.</span>
+        </div>
+      )}
+
+      {/* ▶ Live-Sync starten — nur wenn BizHawk NICHT läuft (sonst übernimmt der Start automatisch) */}
+      {!collapsed && enabled && phase !== 'connected' && !alive && !wrongRun && (
         <div className="p-3 border-t" style={{ background: '#16161f', borderColor: '#2e2e42' }}>
           {companion.usesCompanion && !companionReady ? (
             <CompanionBanner status={companion.status === 'checking' ? 'checking' : 'absent'} onRecheck={companion.recheck} />

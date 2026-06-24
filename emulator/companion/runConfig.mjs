@@ -45,10 +45,13 @@ export function ensureRunBizhawkConfig({ runId, bizhawkPath, runDir, legacySaveN
     if (Array.isArray(paths)) for (const p of paths) { if (p && dirs[p.Type]) p.Path = dirs[p.Type] }
   } catch { /* ignore — fall through to writing what we have */ }
 
-  // In-game SaveRAM is the canonical save: flush it automatically (survives an
-  // unclean close) and keep a backup. Never auto-load/save a save STATE slot — the
-  // SoulLink workflow must never depend on emulator snapshots.
-  cfg.AutosaveSaveRAM = true
+  // SaveRAM is the canonical save. BizHawk writes it on a clean ROM/emulator close
+  // (and we close BizHawk gracefully before any relaunch so it flushes). We do NOT
+  // enable AutosaveSaveRAM: it spawns a second '.AutoSaveRAM.SaveRAM' that competes
+  // with the real save (→ "lands at the beginning") and writes to disk constantly
+  // (→ in-game lag). Keep a .bak for safety. Never auto-load/save a save STATE slot —
+  // the SoulLink workflow must never depend on emulator snapshots.
+  cfg.AutosaveSaveRAM = false
   cfg.BackupSaveram = true
   cfg.AutoLoadLastSaveSlot = false
   cfg.AutoSaveLastSaveSlot = false

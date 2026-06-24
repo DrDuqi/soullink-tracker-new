@@ -282,9 +282,13 @@ function isBizhawkRunning() {
     } catch { resolve(false) }
   })
 }
-function killBizhawk() {
+// Graceful by default: a plain taskkill sends a close request so BizHawk FLUSHES the
+// SaveRAM (in-game save) to disk before exiting. Only force-kill (/F) as a fallback
+// when it didn't close in time — otherwise an in-game save can be lost on relaunch.
+function killBizhawk({ force = false } = {}) {
   return new Promise((resolve) => {
-    try { exec('taskkill /IM EmuHawk.exe /F', { windowsHide: true }, () => resolve()) } catch { resolve() }
+    const cmd = force ? 'taskkill /IM EmuHawk.exe /F' : 'taskkill /IM EmuHawk.exe'
+    try { exec(cmd, { windowsHide: true }, () => resolve()) } catch { resolve() }
   })
 }
 
@@ -891,7 +895,14 @@ function handleRequest(req, res) {
       // We're about to (re)launch a ROM → wipe the previous run's team so the new run
       // starts EMPTY until its own Lua writes a team (no cross-run Pokémon).
       clearTeamSource()
-      if (running && doRestart) { console.log('[launch] schliesse laufendes EmuHawk' + (differentRun ? ' (anderer Run)' : '') + ' …'); await killBizhawk(); await delay(1200) }
+      if (running && doRestart) {
+        // Graceful close first so the OUTGOING run's in-game SaveRAM is flushed; only
+        // force-kill if it's still alive after a grace period.
+        console.log('[launch] schliesse laufendes EmuHawk' + (differentRun ? ' (anderer Run)' : '') + ' …')
+        await killBizhawk()
+        for (let i = 0; i < 12 && (await isBizhawkRunning()); i++) await delay(500)
+        if (await isBizhawkRunning()) { console.log('[launch] reagiert nicht — erzwinge Schliessen.'); await killBizhawk({ force: true }); await delay(1200) }
+      }
 
       const cwd = dirname(bizhawk)
       const folder = bizhawkFolderInfo(cwd)
@@ -949,7 +960,9 @@ function handleRequest(req, res) {
       refreshBizhawkAlive()
       if (last && bizhawkAlive) last = { data: last.data, at: Date.now() }
       // runId = which run's ROM is loaded (null = unknown → UI assumes it's fine).
-      sendJson(res, { ok: true, last, runId: bizhawkAlive ? currentRunId : null })
+      // alive = BizHawk is running → the UI shows "warte auf Pokémon" instead of the
+      // manual "Lua-Sync verbinden" button (a fresh game has no team for a while).
+      sendJson(res, { ok: true, last, runId: bizhawkAlive ? currentRunId : null, alive: bizhawkAlive })
       return
     }
     sendJson(res, { ok: false }, 405)

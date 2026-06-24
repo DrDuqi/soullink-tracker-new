@@ -41,6 +41,7 @@ export interface SyncEnvelope {
   ok: boolean
   last: { data: EmulatorPayload; at: number } | null  // at = epoch ms the endpoint received it
   runId?: string | null   // which run's ROM BizHawk actually has loaded (null = unknown)
+  alive?: boolean         // BizHawk is currently running (Lua connected, team may be empty)
 }
 
 export const SYNC_ENDPOINT = `${EMU_BASE}/api/emulator-sync`
