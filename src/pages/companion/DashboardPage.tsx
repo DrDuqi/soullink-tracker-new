@@ -55,7 +55,7 @@ export default function DashboardPage() {
         if (r.ok) lr = { runId: vm.run.id, romPath: r.outputRom || '', bizhawk: r.bizhawk, seed: r.seed }
       }
     }
-    if (lr?.romPath) await platform.launch({ bizhawkPath: lr.bizhawk || '', romPath: lr.romPath, luaPath: '', syncFolder: '' }, false)
+    if (lr?.romPath) await platform.launch({ bizhawkPath: lr.bizhawk || '', romPath: lr.romPath, luaPath: '', syncFolder: '' }, false, vm.run.id)
     setBusyId(null); await reloadLocals(); openRun(vm)
   }
 
@@ -80,7 +80,7 @@ export default function DashboardPage() {
     const recipe = await fetchRunRecipe(newId)
     if (recipe?.preset_data && active?.paths.originalRom && active?.paths.bizhawk) {
       const r = await platform.prepareRun({ runId: newId, profileId: active.id, presetData: recipe.preset_data, seed: recipe.world_seed ?? undefined })
-      if (r.ok) await platform.launch({ bizhawkPath: r.bizhawk || '', romPath: r.outputRom || '', luaPath: '', syncFolder: '' }, false)
+      if (r.ok) await platform.launch({ bizhawkPath: r.bizhawk || '', romPath: r.outputRom || '', luaPath: '', syncFolder: '' }, true, newId)
     }
     await refetch(); await reloadLocals()
     setBusyId(null)

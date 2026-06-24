@@ -293,7 +293,7 @@ export default function EmulatorLivePanel({
     setLaunchMsg(restart ? 'BizHawk wird neu gestartet …' : 'Verbinde …')
 
     const eff = { ...emuSettings, ...override }   // override = frischer Pfad bei einem internen Retry
-    const res = await launchEmulator(eff, restart)
+    const res = await launchEmulator(eff, restart, runId)   // runId → per-run sandbox + correct ROM
     if (!res.ok) {
       if (res.error === 'rom_not_found') {
         // Self-heal: nach einem Ordner-Umzug kennt der Companion die neue ROM oft

@@ -102,7 +102,7 @@ export default function NewRunPage() {
 
     // 3) Launch BizHawk with the randomized ROM + live-sync.
     setStep('launching')
-    const lr = await platform.launch({ bizhawkPath: r.bizhawk || '', romPath: r.outputRom || '', luaPath: '', syncFolder: '' }, false)
+    const lr = await platform.launch({ bizhawkPath: r.bizhawk || '', romPath: r.outputRom || '', luaPath: '', syncFolder: '' }, false, run.id)
     if (!lr.ok) { setErr('BizHawk-Start fehlgeschlagen' + (lr.error ? ` (${lr.error})` : '')); setStep('error'); return }
 
     // 4) Open the existing RunPage; the live-sync feeds it in the background.

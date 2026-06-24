@@ -48,8 +48,10 @@ export interface PlatformBridge {
   pickFile(kind: PickKind): Promise<PickResult>
   /** Resolve a bare filename (browser-picker fallback) to an absolute path. */
   resolveFileByName(name: string): Promise<string | null>
-  /** Start the emulator with the saved ROM + sync script. */
-  launch(settings: EmulatorSettings, restart?: boolean): Promise<LaunchResult>
+  /** Start the emulator with the saved ROM + sync script. Passing `runId` launches
+   *  the run in its own sandbox (per-run SaveRAM/State/…) and lets the Companion
+   *  auto-restart BizHawk when it's currently on a different run. */
+  launch(settings: EmulatorSettings, restart?: boolean, runId?: string): Promise<LaunchResult>
 
   // ── profiles (local per-machine game profiles) ─────────────────────────────
   /** All profiles + which one is active. null when no Companion is present. */

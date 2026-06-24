@@ -32,6 +32,7 @@ import { initRandomizer, randomizerStatus, randomize, openRandomizer } from './r
 import { validateRom } from './roms.mjs'
 import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs } from './presets.mjs'
 import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun, runIdForRom } from './runs.mjs'
+import { ensureRunBizhawkConfig } from './runConfig.mjs'
 
 // Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
 // (which CI bumps from the release tag) to startCompanion; CLI falls back to the
@@ -834,6 +835,7 @@ function handleRequest(req, res) {
       const bizhawk = clean(cfg.bizhawk) || eff.config.bizhawk || ''
       const rom = clean(cfg.rom) || eff.config.rom || ''
       const lua = eff.config.lua || clean(cfg.lua) || ''
+      const runId = cfg.runId ? String(cfg.runId) : (rom ? runIdForRom(rom) : null)
       const restart = !!cfg.restart
 
       console.log('\n[launch] ── Request ─────────────────────────────')
@@ -859,9 +861,24 @@ function handleRequest(req, res) {
       console.log('[launch] Team-Datei:', TEAM_FILE)
       console.log('[launch] Tipp: Falls BizHawk ruckelt, diesen Ordner in Windows Defender ausschliessen:', APPDATA_DIR)
 
+      // Per-run isolation: launch with a config that points SaveRAM/State/Screenshots/
+      // Cheats into THIS run's folder (so no other run's data can ever surface).
+      let runConfig = null
+      if (runId) {
+        try {
+          const lr = getLocalRun(runId)
+          runConfig = ensureRunBizhawkConfig({ runId, bizhawkPath: bizhawk, runDir: runFolder(runId), legacySaveName: lr?.saveName })
+          console.log('[launch] Run-Sandbox:', runId, '· Config:', runConfig || '(keine — globale Ordner)')
+        } catch (e) { console.error('[launch] Run-Config fehlgeschlagen:', e?.message || e) }
+      }
+
+      // Restart when asked, OR when BizHawk is on a DIFFERENT run (so "Weiterspielen"
+      // always boots the right run's ROM + savegame). Same run already open = no-op.
       const running = await isBizhawkRunning()
-      if (running && !restart) { console.log('[launch] bereits offen, kein Neustart.'); sendJson(res, { ok: true, already: true, lua: true }); return }
-      if (running && restart) { console.log('[launch] schliesse laufendes EmuHawk …'); await killBizhawk(); await delay(1200) }
+      const differentRun = running && currentRunId != null && runId != null && currentRunId !== runId
+      const doRestart = restart || differentRun
+      if (running && !doRestart) { console.log('[launch] bereits offen (gleicher Run), kein Neustart.'); sendJson(res, { ok: true, already: true, lua: true }); return }
+      if (running && doRestart) { console.log('[launch] schliesse laufendes EmuHawk' + (differentRun ? ' (anderer Run)' : '') + ' …'); await killBizhawk(); await delay(1200) }
 
       const cwd = dirname(bizhawk)
       const folder = bizhawkFolderInfo(cwd)
@@ -876,16 +893,18 @@ function handleRequest(req, res) {
         launchEnv.SOULLINK_VERSION = appVersion || ''
         console.log('[dev] Diagnose-Log →', join(devDir, 'current.log'))
       }
+      // --config (per-run sandbox) MUST come first; ROM + --lua follow.
+      const cfgArg = runConfig ? ['--config=' + runConfig] : []
       const variants = [
-        { label: 'rom --lua', args: [rom, '--lua=' + lua] },
-        { label: '--lua rom', args: ['--lua=' + lua, rom] },
+        { label: 'rom --lua', args: [...cfgArg, rom, '--lua=' + lua] },
+        { label: '--lua rom', args: [...cfgArg, '--lua=' + lua, rom] },
       ]
       let last = null
       for (const v of variants) {
         const r = await tryLaunch(bizhawk, v.args, cwd, 2500, launchEnv)
         last = r
         console.log(`[launch] "${v.label}" alive=${r.alive} exit=${r.code} (${hex32(r.code)}) pid=${r.pid ?? '-'}`)
-        if (r.alive) { bizhawkAlive = true; lastAliveCheck = Date.now(); currentRunId = runIdForRom(rom); console.log('[launch] aktiver Run:', currentRunId || '(unbekannt)'); sendJson(res, { ok: true, launched: true, lua: true, restarted: running && restart, variant: v.label }); return }
+        if (r.alive) { bizhawkAlive = true; lastAliveCheck = Date.now(); currentRunId = runId ?? runIdForRom(rom); console.log('[launch] aktiver Run:', currentRunId || '(unbekannt)'); sendJson(res, { ok: true, launched: true, lua: true, restarted: running && doRestart, variant: v.label }); return }
       }
 
       const code = last?.code ?? null
