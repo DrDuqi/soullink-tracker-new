@@ -447,6 +447,16 @@ function readTeamFile() {
   }
 }
 
+// Drop ALL traces of the previous run's team before (re)launching, so a fresh run is
+// EMPTY until its own Lua writes a team. Without this, the global soullink_team.json
+// (+ its in-memory cache + the last dev POST) still holds the previous run's party,
+// and the UI shows those Pokémon in a brand-new run that has none yet.
+function clearTeamSource() {
+  try { unlinkSync(TEAM_FILE) } catch { /* not present */ }
+  fileCache = null
+  lastPost = null
+}
+
 // ── CORS + Private Network Access ────────────────────────────────────────────
 // A public HTTPS origin (Vercel) calling http://127.0.0.1 is a "private network"
 // request: Chrome/Edge send a preflight with Access-Control-Request-Private-Network
@@ -878,6 +888,9 @@ function handleRequest(req, res) {
       const differentRun = running && currentRunId != null && runId != null && currentRunId !== runId
       const doRestart = restart || differentRun
       if (running && !doRestart) { console.log('[launch] bereits offen (gleicher Run), kein Neustart.'); sendJson(res, { ok: true, already: true, lua: true }); return }
+      // We're about to (re)launch a ROM → wipe the previous run's team so the new run
+      // starts EMPTY until its own Lua writes a team (no cross-run Pokémon).
+      clearTeamSource()
       if (running && doRestart) { console.log('[launch] schliesse laufendes EmuHawk' + (differentRun ? ' (anderer Run)' : '') + ' …'); await killBizhawk(); await delay(1200) }
 
       const cwd = dirname(bizhawk)

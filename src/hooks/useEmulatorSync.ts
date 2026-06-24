@@ -121,6 +121,19 @@ function release() {
 function subscribe(cb: () => void) { listeners.add(cb); return () => { listeners.delete(cb) } }
 function getSnapshot() { return snapshot }
 
+/** Forget the last-seen team/game/age. MUST be called on a run switch: the poller is
+ *  a singleton and deliberately keeps the last good team across "empty" frames (to
+ *  ride out battle/save transitions). Without a reset, a brand-new run would inherit
+ *  the previous run's party until its own Lua writes a team — showing foreign Pokémon. */
+export function resetEmulatorSync() {
+  snapshot = EMPTY
+  frameAt = null
+  lastTeamText = null
+  goodLen = 0
+  fails = 0
+  for (const l of listeners) l()
+}
+
 /** Reactive emulator state from the shared poller. `enabled` only gates whether
  *  THIS consumer keeps the poll loop alive (ref-counted) — the snapshot is shared. */
 export function useEmulatorSync(enabled = true): EmulatorSyncState {

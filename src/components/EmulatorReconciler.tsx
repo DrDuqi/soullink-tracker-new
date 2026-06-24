@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { fetchPokemon, fetchEvolutionChain, fetchMoveById } from '../lib/pokemon-api'
 import { useUpdateEncounter, useUpdateMoves } from '../hooks/useEncounters'
-import { useEmulatorSync } from '../hooks/useEmulatorSync'
+import { useEmulatorSync, resetEmulatorSync } from '../hooks/useEmulatorSync'
 import { useEmuTeamStore } from '../store/emuTeamStore'
 import type { Encounter } from '../types/database'
 
@@ -30,9 +30,10 @@ export default function EmulatorReconciler({ encounters, runId }: { encounters: 
   const wrongRun = syncRunId != null && syncRunId !== runId
   const liveTeam = wrongRun ? [] : team
 
-  // Clear the shared live team the instant the run changes, so a freshly opened run
-  // never flashes the previous run's team before the first poll arrives.
-  useEffect(() => { setEmuTeam([], false, {}) }, [runId, setEmuTeam])
+  // Clear the shared live team AND the sync poller's last-seen team the instant the
+  // run changes, so a freshly opened run never inherits the previous run's party
+  // (which the poller otherwise keeps across the new game's empty frames).
+  useEffect(() => { resetEmulatorSync(); setEmuTeam([], false, {}) }, [runId, setEmuTeam])
 
   // Re-run only when identity-relevant data changes (not on the 1s age ticker).
   const teamKey = liveTeam.map((m) => `${m.pid ?? ''}:${m.speciesId}:${(m.moveIds ?? []).join('|')}`).join(',')
