@@ -97,7 +97,7 @@ export default function MeinSetupPage() {
         <Row icon={Cpu} title="Emulator (BizHawk)" done={!!biz} value={fname(biz)}
           desc="Der Emulator, in dem dein Pokémon läuft — SoulLink richtet ihn automatisch ein."
           busy={busy === 'biz'} action={biz ? 'Ändern' : 'Selbst wählen'} onClick={pickBiz} icon2={FolderOpen}
-          extra={!biz ? (
+          extra={
             bizInstall ? (
               bizInstall.state === 'error' ? (
                 <div className="text-[11px]">
@@ -116,10 +116,10 @@ export default function MeinSetupPage() {
             ) : (
               <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={autoInstallBiz} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold text-white" style={{ background: '#CC0000' }}><Sparkles className="w-3.5 h-3.5" /> Automatisch einrichten</button>
-                <span className="text-[11px] text-slate-500">lädt BizHawk ~65 MB · empfohlen</span>
+                <span className="text-[11px] text-slate-500">{biz ? 'lädt eine frische, verwaltete BizHawk-Kopie (~65 MB)' : 'lädt BizHawk ~65 MB · empfohlen'}</span>
               </div>
             )
-          ) : null} />
+          } />
 
         {/* Standard-Spielregeln */}
         <div className="rounded-2xl border border-[#2e2e42] bg-[#16161f] p-4">
