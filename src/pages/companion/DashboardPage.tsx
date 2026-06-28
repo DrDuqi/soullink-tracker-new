@@ -11,10 +11,18 @@ import { renameRun, deleteRunRemote, setRunStatus, newAttemptRemote, loadRun } f
 import { createRun } from '../../lib/createRun'
 import type { LocalRun } from '../../lib/profiles'
 
-// Player-first home: your SoulLinks as cards. Each card has a ⋮ menu to manage
-// parallel runs (rename/archive/delete/duplicate). "Weiterspielen" relaunches the
-// run's exact ROM (its own savegame); a run not yet set up here is reproduced from
-// its shared recipe on demand.
+const EDITIONS: Record<string, string> = {
+  platinum: 'Pokémon Platin', diamond: 'Pokémon Diamant', pearl: 'Pokémon Perl',
+  heartgold: 'Pokémon HeartGold', soulsilver: 'Pokémon SoulSilver',
+  black: 'Pokémon Schwarz', white: 'Pokémon Weiß', black2: 'Pokémon Schwarz 2', white2: 'Pokémon Weiß 2',
+}
+const editionLabel = (e?: string | null) => (e && EDITIONS[e]) || e || 'Pokémon'
+
+// Player-first home: every active SoulLink is an EQUAL, fully-actionable card
+// (Weiterspielen · Nur Tracker · ⋮ menu) — so several parallel runs are all started
+// the same way. The most recently played one just gets a "Zuletzt gespielt" badge.
+// "Weiterspielen" relaunches the run's exact ROM (its own savegame); a run not yet set
+// up on this PC is reproduced from its shared recipe on demand.
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
@@ -35,7 +43,6 @@ export default function DashboardPage() {
   const isFinished = (vm: RunVM) => vm.run.status === 'won' || vm.run.status === 'lost'
   const activeRuns = visible.filter((vm) => !isFinished(vm))
   const pastRuns = visible.filter(isFinished)
-  const [hero, ...rest] = activeRuns
 
   function openRun(vm: RunVM) {
     const mine = vm.players.find((p) => p.auth_user_id === user?.id)
@@ -123,7 +130,7 @@ export default function DashboardPage() {
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <div className="text-slate-400 text-sm">Willkommen zurück, {name}</div>
-          <h1 className="text-white font-black text-3xl tracking-tight mt-0.5">Weiterspielen</h1>
+          <h1 className="text-white font-black text-3xl tracking-tight mt-0.5">Deine SoulLinks</h1>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => navigate('/join')} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5"><LogIn className="w-4 h-4" /> Beitreten</button>
@@ -141,34 +148,44 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          {hero && (
-            <div className="mt-7 rounded-2xl border border-pk-red/40 bg-gradient-to-r from-pk-red/10 to-transparent p-6 relative">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Swords className="w-5 h-5 text-pk-red" />
-                    <span className="text-white font-black text-xl">{hero.run.name}</span>
-                    {hero.run.game && <span className="text-[11px] font-bold text-slate-300 bg-white/5 border border-[#2e2e42] rounded-full px-2 py-0.5">{hero.run.game}</span>}
+          {activeRuns.length > 0 && (
+            <div className="mt-7 space-y-3">
+              {activeRuns.map((vm, i) => {
+                const lr = locals[vm.run.id]
+                const busy = busyId === vm.run.id
+                const latest = i === 0
+                return (
+                  <div key={vm.run.id} className={`rounded-2xl border p-5 relative ${latest ? 'border-pk-red/40 bg-gradient-to-r from-pk-red/10 to-transparent' : 'border-[#2e2e42] bg-[#16161f]'}`}>
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Swords className="w-5 h-5 text-pk-red shrink-0" />
+                          <span className="text-white font-black text-lg">{vm.run.name}</span>
+                          <span className="text-[11px] font-bold text-slate-300 bg-white/5 border border-[#2e2e42] rounded-full px-2 py-0.5">{editionLabel(vm.run.game)}</span>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-green-300 bg-green-500/10 rounded px-1.5 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Aktiv</span>
+                          {latest && <span className="text-[10px] font-black uppercase tracking-wide text-pk-yellow bg-pk-yellow/10 rounded px-1.5 py-0.5">Zuletzt gespielt</span>}
+                        </div>
+                        <div className="flex items-center gap-3 mt-2 text-slate-400 text-xs flex-wrap">
+                          <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> {vm.players.map((p) => p.name).join(' & ')}</span>
+                          <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {relTime(vm.lastActivity)}</span>
+                          {lr?.seed != null
+                            ? <span className="font-mono">Seed {lr.seed}</span>
+                            : <span className="text-amber-400/80">hier noch nicht eingerichtet</span>}
+                        </div>
+                      </div>
+                      <RunMenu open={menuFor === vm.run.id} onToggle={() => setMenuFor(menuFor === vm.run.id ? null : vm.run.id)}
+                        onAttempt={() => newAttempt(vm)} onWon={() => markStatus(vm, 'won')} onLost={() => markStatus(vm, 'lost')}
+                        onRename={() => doRename(vm)} onArchive={() => doArchive(vm)} onDelete={() => doDelete(vm)} onDuplicate={() => doDuplicate(vm)} onTracker={() => { setMenuFor(null); openRun(vm) }} />
+                    </div>
+                    <div className="flex items-center gap-2.5 mt-4 flex-wrap">
+                      <button onClick={() => playRun(vm)} disabled={busy} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-white disabled:opacity-60" style={{ background: '#CC0000' }}>
+                        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} {lr ? 'Weiterspielen' : 'Spielen'}
+                      </button>
+                      <button onClick={() => openRun(vm)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5">Nur Tracker <ArrowRight className="w-4 h-4" /></button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 mt-2 text-slate-400 text-xs flex-wrap">
-                    <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> {hero.players.map((p) => p.name).join(' & ')}</span>
-                    <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {relTime(hero.lastActivity)}</span>
-                    {locals[hero.run.id]?.seed != null && <span className="font-mono">Seed {locals[hero.run.id].seed}</span>}
-                  </div>
-                </div>
-                <RunMenu open={menuFor === hero.run.id} onToggle={() => setMenuFor(menuFor === hero.run.id ? null : hero.run.id)}
-                  onAttempt={() => newAttempt(hero)} onWon={() => markStatus(hero, 'won')} onLost={() => markStatus(hero, 'lost')}
-                  onRename={() => doRename(hero)} onArchive={() => doArchive(hero)} onDelete={() => doDelete(hero)} onDuplicate={() => doDuplicate(hero)} onTracker={() => { setMenuFor(null); openRun(hero) }} />
-              </div>
-              <div className="flex items-center gap-2.5 mt-4 flex-wrap">
-                <button onClick={() => playRun(hero)} disabled={busyId === hero.run.id} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-white disabled:opacity-60" style={{ background: '#CC0000' }}>
-                  {busyId === hero.run.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} {locals[hero.run.id] ? 'Weiterspielen' : 'Spielen'}
-                </button>
-                <button onClick={() => openRun(hero)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5">Nur Tracker <ArrowRight className="w-4 h-4" /></button>
-                <div className="flex-1" />
-                <button onClick={() => markStatus(hero, 'won')} disabled={busyId === hero.run.id} title="Run gewonnen" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs text-green-300 border border-green-700/40 hover:bg-green-500/10 disabled:opacity-40"><Trophy className="w-4 h-4" /> Gewonnen</button>
-                <button onClick={() => markStatus(hero, 'lost')} disabled={busyId === hero.run.id} title="Run verloren" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs text-slate-400 border border-[#3a3a4e] hover:text-red-300 hover:bg-red-500/10 disabled:opacity-40"><Skull className="w-4 h-4" /> Verloren</button>
-              </div>
+                )
+              })}
             </div>
           )}
 
@@ -176,28 +193,6 @@ export default function DashboardPage() {
             <div className="mt-7 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-6 text-center">
               <p className="text-white font-black">Kein aktiver SoulLink</p>
               <p className="text-slate-400 text-sm mt-1">Starte unten bei einem vergangenen Run „Neuer Versuch" — oder lege einen neuen an.</p>
-            </div>
-          )}
-
-          {rest.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-slate-200 text-xs font-black uppercase tracking-widest mb-2.5">Weitere SoulLinks</h3>
-              <div className="space-y-2">
-                {rest.map((vm) => (
-                  <div key={vm.run.id} className="rounded-xl border border-[#2e2e42] bg-[#16161f] p-4 flex items-center gap-3 relative">
-                    <button onClick={() => playRun(vm)} disabled={busyId === vm.run.id} className="flex items-center gap-3 min-w-0 flex-1 text-left">
-                      {busyId === vm.run.id ? <Loader2 className="w-4 h-4 animate-spin text-pk-red shrink-0" /> : <Swords className="w-4 h-4 text-slate-400 shrink-0" />}
-                      <span className="min-w-0">
-                        <span className="block text-white font-bold truncate">{vm.run.name}</span>
-                        <span className="block text-slate-500 text-xs">{vm.players.map((p) => p.name).join(' & ')} · {relTime(vm.lastActivity)}</span>
-                      </span>
-                    </button>
-                    <RunMenu open={menuFor === vm.run.id} onToggle={() => setMenuFor(menuFor === vm.run.id ? null : vm.run.id)}
-                      onAttempt={() => newAttempt(vm)} onWon={() => markStatus(vm, 'won')} onLost={() => markStatus(vm, 'lost')}
-                      onRename={() => doRename(vm)} onArchive={() => doArchive(vm)} onDelete={() => doDelete(vm)} onDuplicate={() => doDuplicate(vm)} onTracker={() => { setMenuFor(null); openRun(vm) }} />
-                  </div>
-                ))}
-              </div>
             </div>
           )}
 

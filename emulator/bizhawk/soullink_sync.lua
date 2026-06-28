@@ -67,7 +67,7 @@ end
 -- normalen Nutzern ist die Variable NICHT gesetzt → kein Logging, kein Overhead.
 -- Rotation/Archiv/Pruning übernimmt der Companion VOR dem Start (current.log ist
 -- beim Start frisch); hier wird nur angehängt.
-local LUA_REV = "1.0.16"
+local LUA_REV = "1.0.17"
 local DEVLOG_DIR = (function() local d = os.getenv("SOULLINK_DEVLOG"); return (d and d ~= "") and d or nil end)()
 local DEV_VERSION = os.getenv("SOULLINK_VERSION") or "?"
 local function anonPath(s) return s and (tostring(s):gsub("[Cc]:[/\\][Uu]sers[/\\][^/\\]+", "C:\\Users\\<USER>")) or s end
@@ -964,13 +964,17 @@ local AC_done = false
 local AC_TIMEOUT = 3600                  -- ~60 s Sicherheits-Limit
 local function autoContinueStep(frame)
   if AC_done then return end
-  if profile.party_addr then             -- im Spiel angekommen → sofort aufhören
+  -- WICHTIG: erst aufhören, wenn ein gültiges Lead-Pokémon WIRKLICH live lesbar ist —
+  -- NICHT schon, wenn nur eine (gecachte) party_addr gesetzt ist. Am Continue-Menü ist
+  -- der Party-RAM noch leer (readMon → nil), also wird weitergedrückt, bis das Spiel
+  -- tatsächlich geladen hat. (Read nur alle paar Frames → kein Overhead.)
+  if frame % 6 == 0 and readMon(profile, 0) then
     AC_done = true
     console.log("[continue] Spielstand geladen — Auto-Continue beendet.")
     return
   end
   if frame > AC_TIMEOUT then AC_done = true; console.log("[continue] Timeout — bitte einmal 'Weiter' selbst waehlen."); return end
-  local press = (frame % 18) < 9         -- ~3 Tipps/s: 9 Frames A gedrückt, 9 Frames los
+  local press = (frame % 16) < 8         -- ~3,75 Tipps/s: 8 Frames A gedrückt, 8 Frames los
   pcall(function() joypad.set({ A = press }, 1) end)
 end
 if AUTO_CONTINUE then console.log("[continue] Auto-Continue aktiv — waehle 'Weiter' automatisch …") end
