@@ -7,7 +7,7 @@ import { DOWNLOADS } from '../lib/downloads'
 // live-sync panel) show it only when something needs attention.
 export default function CompanionVersion({ hideWhenCurrent = false, className = '' }: { hideWhenCurrent?: boolean; className?: string }) {
   const { data: comp } = useQuery({ queryKey: ['companion-info'], queryFn: () => companionInfo(), staleTime: 10_000, refetchInterval: 8_000 })
-  const { data: latest } = useQuery({ queryKey: ['companion-latest'], queryFn: () => latestCompanionVersion(), staleTime: 600_000 })
+  const { data: latest } = useQuery({ queryKey: ['companion-latest'], queryFn: () => latestCompanionVersion(), staleTime: 60_000, refetchOnWindowFocus: true, refetchOnMount: true })
 
   const running = !!comp?.ok
   const installed = comp?.version && comp.version !== 'dev' ? comp.version : null

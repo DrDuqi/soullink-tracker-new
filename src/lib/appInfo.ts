@@ -18,7 +18,9 @@ export const LINKS = {
 /** Newest published Companion version from GitHub Releases (e.g. "1.0.8"). null on error. */
 export async function latestCompanionVersion(signal?: AbortSignal): Promise<string | null> {
   try {
-    const r = await fetch(`${REPO_API}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, signal })
+    // cache:'no-store' so a freshly published release is seen immediately (GitHub's
+    // API responses are otherwise HTTP-cached → the version could read stale).
+    const r = await fetch(`${REPO_API}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store', signal })
     if (!r.ok) return null
     const j = await r.json().catch(() => null)
     const tag = (j?.tag_name as string) || ''
