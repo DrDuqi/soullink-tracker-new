@@ -14,7 +14,6 @@ import { GAME_LIST } from '../lib/routes'
 import { setRunMode, type RunMode } from '../lib/runMode'
 import { useSettings } from '../store/settingsStore'
 import UserMenu from '../components/UserMenu'
-import RunModeCards from '../components/RunModeCards'
 import AtmosphereBackground from '../components/AtmosphereBackground'
 import LandingPage from './LandingPage'
 import type { Run, Player } from '../types/database'
@@ -78,7 +77,7 @@ function Dashboard() {
   const toast = useToastStore()
   const [game, setGame] = useState(GAME_LIST[0])
   const [runName, setRunName] = useState('')
-  const [mode, setMode] = useState<RunMode>(() => useSettings.getState().defaultRunMode)
+  const mode: RunMode = 'manual'   // the website is the MANUAL tracker; Live-Sync needs the Companion
   const [playerCount, setPlayerCount] = useState<number>(() => useSettings.getState().defaultPlayers)
   const [customCode, setCustomCode] = useState('')
   const [joinCode, setJoinCode] = useState('')
@@ -169,14 +168,14 @@ function Dashboard() {
     const { error } = await supabase.rpc('leave_run', { p_run_id: vm.run.id })
     setActionBusy(false)
     if (error) { toast.show(error.message, 'error'); return }
-    toast.show('Run verlassen', 'success'); refetch()
+    toast.show('Tracker verlassen', 'success'); refetch()
   }
   async function doDelete(vm: RunVM) {
     setActionBusy(true)
     const { error } = await supabase.rpc('delete_run', { p_run_id: vm.run.id })
     setActionBusy(false)
     if (error) { toast.show(error.message, 'error'); return }
-    setDeleteFor(null); toast.show('Run dauerhaft gelöscht', 'success'); refetch()
+    setDeleteFor(null); toast.show('Tracker dauerhaft gelöscht', 'success'); refetch()
   }
   async function doTransferAndLeave(vm: RunVM, newOwnerId: string) {
     setActionBusy(true)
@@ -185,7 +184,7 @@ function Dashboard() {
     const { error: lErr } = await supabase.rpc('leave_run', { p_run_id: vm.run.id })
     setActionBusy(false)
     if (lErr) { toast.show(lErr.message, 'error'); return }
-    setTransferFor(null); toast.show('Besitz übertragen & Run verlassen', 'success'); refetch()
+    setTransferFor(null); toast.show('Besitz übertragen & Tracker verlassen', 'success'); refetch()
   }
 
   function onLeaveClick(vm: RunVM) {
@@ -224,7 +223,7 @@ function Dashboard() {
           <div className="flex items-center gap-2 text-white font-black"><Swords className="w-5 h-5 text-pk-red" /> Manuellen Tracker erstellen</div>
           <p className="text-slate-500 text-xs -mt-1">Ein Browser-Tracker zum Eintragen von Hand. Zum Spielen mit Emulator startest du Runs im Companion.</p>
           <div>
-            <label className="text-slate-300 text-sm font-bold mb-2 block">Run-Name <span className="text-slate-600 font-normal">(optional)</span></label>
+            <label className="text-slate-300 text-sm font-bold mb-2 block">Tracker-Name <span className="text-slate-600 font-normal">(optional)</span></label>
             <input value={runName} onChange={(e) => setRunName(e.target.value)} placeholder="z. B. Mein Platin SoulLink" maxLength={40} className="pk-input" />
           </div>
           <div>
@@ -232,7 +231,7 @@ function Dashboard() {
             <select value={game} onChange={(e) => setGame(e.target.value)} className="pk-input">{GAME_LIST.map((g) => <option key={g}>{g}</option>)}</select>
           </div>
           <div>
-            <label className="text-slate-300 text-sm font-bold mb-2 block">Run-Code <span className="text-slate-600 font-normal">(optional)</span></label>
+            <label className="text-slate-300 text-sm font-bold mb-2 block">Code <span className="text-slate-600 font-normal">(optional)</span></label>
             <div className="flex gap-2">
               <input value={customCode} onChange={(e) => setCustomCode(e.target.value)} placeholder="Automatisch generieren" className="pk-input font-mono" maxLength={12} />
               <button type="button" onClick={() => setCustomCode('')} title="Zufällig" className="shrink-0 w-12 flex items-center justify-center rounded-xl border border-[#2e2e42] text-slate-400 hover:text-white hover:border-slate-500 transition-colors" style={{ background: '#16161f' }}><Shuffle className="w-4 h-4" /></button>
@@ -250,18 +249,15 @@ function Dashboard() {
               ))}
             </div>
           </div>
-          <div>
-            <label className="text-slate-300 text-sm font-bold mb-2 block">Spielmodus</label>
-            <RunModeCards selected={mode} onSelect={setMode} />
-          </div>
           <p className="text-slate-600 text-xs">Spielername: <span className="text-slate-400 font-bold">{profile?.username}</span> (aus deinem Account)</p>
           <button type="submit" disabled={busy} className="btn-primary w-full py-3.5">{busy ? 'Wird erstellt…' : '🖊 Manuellen Tracker starten'}</button>
         </form>
 
         <form onSubmit={handleJoin} className="pk-card p-6 space-y-4">
-          <div className="flex items-center gap-2 text-white font-black"><Users className="w-5 h-5 text-pk-red" /> Run beitreten</div>
+          <div className="flex items-center gap-2 text-white font-black"><Users className="w-5 h-5 text-pk-red" /> Per Code beitreten</div>
+          <p className="text-slate-500 text-xs -mt-1">Tritt dem SoulLink eines Freundes bei, um im Browser mitzutracken oder zuzuschauen.</p>
           <div>
-            <label className="text-slate-300 text-sm font-bold mb-2 block">Run-Code</label>
+            <label className="text-slate-300 text-sm font-bold mb-2 block">Code</label>
             <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="z. B. abc12345" className="pk-input font-mono tracking-widest" required />
           </div>
           <p className="text-slate-600 text-xs">Du trittst als <span className="text-slate-400 font-bold">{profile?.username}</span> bei.</p>
@@ -271,7 +267,7 @@ function Dashboard() {
 
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-white font-black text-lg">Meine Runs</h2>
+          <h2 className="text-white font-black text-lg">Meine Tracker</h2>
           <button onClick={() => refetch()} className="text-slate-500 text-xs hover:text-white transition-colors">Aktualisieren</button>
         </div>
 
@@ -279,8 +275,8 @@ function Dashboard() {
           <div className="text-slate-500 text-sm py-8 text-center">Lade deine Runs…</div>
         ) : myRuns.length === 0 ? (
           <div className="text-center py-12 rounded-2xl border border-dashed border-[#2e2e42]">
-            <p className="text-slate-400 font-bold">Noch keine Runs</p>
-            <p className="text-slate-600 text-sm mt-1">Erstelle oben deinen ersten Run oder tritt einem bei.</p>
+            <p className="text-slate-400 font-bold">Noch keine Tracker</p>
+            <p className="text-slate-600 text-sm mt-1">Erstelle oben deinen ersten manuellen Tracker oder tritt per Code bei.</p>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 gap-3">
@@ -311,12 +307,12 @@ function Dashboard() {
                             </button>
                             {!soleOwner && (
                               <button onClick={() => onLeaveClick(vm)} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
-                                <LogOut className="w-4 h-4" /> Run verlassen
+                                <LogOut className="w-4 h-4" /> Tracker verlassen
                               </button>
                             )}
                             {amOwner && (
                               <button onClick={() => { setMenuFor(null); setDeleteFor(vm) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-red-400 hover:text-red-300 hover:bg-red-400/5 transition-colors border-t border-[#2e2e42]">
-                                <Trash2 className="w-4 h-4" /> Run dauerhaft löschen
+                                <Trash2 className="w-4 h-4" /> Tracker dauerhaft löschen
                               </button>
                             )}
                           </div>
@@ -332,7 +328,7 @@ function Dashboard() {
                     </div>
                   </button>
                   {soleOwner && (
-                    <p className="text-slate-600 text-[10px] mt-2">Als alleiniger Owner kannst du den Run nur dauerhaft löschen.</p>
+                    <p className="text-slate-600 text-[10px] mt-2">Als alleiniger Owner kannst du den Tracker nur dauerhaft löschen.</p>
                   )}
                 </div>
               )
@@ -352,11 +348,11 @@ function DeleteConfirmModal({ vm, busy, onCancel, onConfirm }: { vm: RunVM; busy
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[210] p-4 anim-fade">
       <div className="bg-[#1c1c26] rounded-3xl w-full max-w-md border border-[#2e2e42] shadow-2xl anim-pop">
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#2e2e42]">
-          <h2 className="text-white font-black text-lg flex items-center gap-2"><Trash2 className="w-5 h-5 text-red-400" /> Run löschen</h2>
+          <h2 className="text-white font-black text-lg flex items-center gap-2"><Trash2 className="w-5 h-5 text-red-400" /> Tracker löschen</h2>
           <button onClick={onCancel} className="text-slate-500 hover:text-white p-2 hover:bg-white/5 rounded-xl transition-colors"><X className="w-5 h-5" /></button>
         </div>
         <div className="px-6 py-6 space-y-4">
-          <p className="text-slate-300 text-sm">Run wirklich dauerhaft löschen? Diese Aktion kann nicht rückgängig gemacht werden.</p>
+          <p className="text-slate-300 text-sm">Tracker wirklich dauerhaft löschen? Diese Aktion kann nicht rückgängig gemacht werden.</p>
           <div className="rounded-xl px-4 py-3 bg-[#16161f] border border-[#2e2e42]">
             <div className="text-white font-bold">{vm.run.name}</div>
             <div className="text-slate-500 text-xs">{vm.run.game} · {vm.run.share_code}</div>
@@ -383,7 +379,7 @@ function TransferOwnerModal({ vm, myId, busy, onCancel, onConfirm }: { vm: RunVM
           <button onClick={onCancel} className="text-slate-500 hover:text-white p-2 hover:bg-white/5 rounded-xl transition-colors"><X className="w-5 h-5" /></button>
         </div>
         <div className="px-6 py-6 space-y-4">
-          <p className="text-slate-400 text-sm">Du bist Owner von <span className="text-white font-bold">{vm.run.name}</span>. Übertrage den Besitz, bevor du den Run verlässt.</p>
+          <p className="text-slate-400 text-sm">Du bist Owner von <span className="text-white font-bold">{vm.run.name}</span>. Übertrage den Besitz, bevor du den Tracker verlässt.</p>
           <div className="space-y-2">
             {others.map((p) => (
               <button key={p.id} onClick={() => setSel(p.auth_user_id!)}
