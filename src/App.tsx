@@ -22,6 +22,8 @@ const JoinRunPage = lazy(() => import('./pages/companion/JoinRunPage'))
 const PresetsPage = lazy(() => import('./pages/companion/PresetsPage'))
 const CompanionSettings = lazy(() => import('./pages/companion/SettingsPage'))
 const MeinSetupPage = lazy(() => import('./pages/companion/MeinSetupPage'))
+const DexPage = lazy(() => import('./pages/dex/DexPage'))
+const DexEntryPage = lazy(() => import('./pages/dex/DexEntryPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
@@ -53,6 +55,8 @@ export default function App() {
                     <Route path="/join" element={<JoinRunPage />} />
                     <Route path="/settings" element={<CompanionSettings />} />
                     <Route path="/mysetup" element={<MeinSetupPage />} />
+                    <Route path="/dex" element={<DexPage />} />
+                    <Route path="/dex/pokemon/:id" element={<DexEntryPage />} />
                     <Route path="/presets" element={<PresetsPage />} />
                     <Route path="/setup" element={<SetupPage />} />
                     <Route path="/profiles" element={<ProfilesPage />} />
@@ -67,6 +71,8 @@ export default function App() {
                 // backend and just confused people). /run is the manual tracker / viewer.
                 <Routes>
                   <Route path="/" element={<HomePage />} />
+                  <Route path="/dex" element={<DexPage />} />
+                  <Route path="/dex/pokemon/:id" element={<DexEntryPage />} />
                   <Route path="/run/:runId" element={<RunPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
