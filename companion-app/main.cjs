@@ -291,6 +291,9 @@ function semverGt(a, b) {
 
 function parentWin() { return (win && !win.isDestroyed()) ? win : null }
 function msgBox(opts) { const p = parentWin(); return p ? dialog.showMessageBoxSync(p, opts) : dialog.showMessageBoxSync(opts) }
+// Push an update-lifecycle event to the React window (the in-app overlay). No-op when
+// there is no window (login-hidden tray mode) → the native dialog path takes over.
+function sendUI(channel, payload) { try { const p = parentWin(); if (p) p.webContents.send(channel, payload) } catch { /* ignore */ } }
 
 function getUpdater() {
   if (_updater) return _updater
@@ -307,6 +310,12 @@ function wireUpdater(au) {
     const v = (info && info.version) || '?'
     slog(`Update verfügbar: v${v}`)
     if (_suppressDialog) return   // the in-app Settings flow shows its own UI
+    let notes = (info && info.releaseNotes) || null
+    if (Array.isArray(notes)) notes = notes.map((n) => (n && n.note) || '').join('\n')
+    // Window present → the React overlay drives the whole flow (version, changelog,
+    // "Jetzt aktualisieren", progress bar). Only fall back to a native dialog when
+    // running headless in the tray (login-hidden), where there is no UI to show.
+    if (parentWin()) { sendUI('update:available', { version: v, notes, date: (info && info.releaseDate) || null }); return }
     const r = msgBox({
       type: 'info', noLink: true, defaultId: 0, cancelId: 1,
       title: 'Update verfügbar',
@@ -320,14 +329,18 @@ function wireUpdater(au) {
       au.downloadUpdate().catch((e) => { slogErr('downloadUpdate', e); notify('SoulLink Companion', 'Update-Download fehlgeschlagen.') })
     }
   })
-  au.on('download-progress', (p) => { try { if (tray) tray.setToolTip(`SoulLink Companion — Update lädt … ${Math.round(p.percent || 0)}%`) } catch { /* ignore */ } })
-  au.on('update-downloaded', () => {
+  au.on('download-progress', (p) => {
+    try { if (tray) tray.setToolTip(`SoulLink Companion — Update lädt … ${Math.round(p.percent || 0)}%`) } catch { /* ignore */ }
+    sendUI('update:progress', { percent: p.percent || 0, transferred: p.transferred || 0, total: p.total || 0, bytesPerSecond: p.bytesPerSecond || 0 })
+  })
+  au.on('update-downloaded', (info) => {
     slog('Update heruntergeladen.')
     try { refreshTray() } catch { /* ignore */ }
+    sendUI('update:downloaded', { version: (info && info.version) || null })
     if (_updateAccepted) { quitting = true; setImmediate(() => { try { au.quitAndInstall() } catch (e) { slogErr('quitAndInstall', e) } }) }
     else notify('SoulLink Companion', 'Update bereit — wird beim nächsten Start installiert.')
   })
-  au.on('error', (e) => slogErr('autoUpdater', e))
+  au.on('error', (e) => { slogErr('autoUpdater', e); sendUI('update:error', { message: (e && e.message) || String(e) }) })
 }
 
 // Automatic, silent check on startup (only nags when an update actually exists).

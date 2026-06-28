@@ -2,6 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { Wifi, WifiOff, CheckCircle2, ArrowUpCircle, AlertTriangle, Download } from 'lucide-react'
 import { companionInfo, latestCompanionVersion, updateState } from '../lib/appInfo'
 import { DOWNLOADS } from '../lib/downloads'
+import { IN_COMPANION_WINDOW } from '../lib/companion'
+
+function startInAppUpdate() {
+  try { (window as unknown as { soullinkNative?: { startUpdate?: () => void } }).soullinkNative?.startUpdate?.() } catch { /* ignore */ }
+}
 
 // Companion version / update status. `hideWhenCurrent` lets callers (e.g. the
 // live-sync panel) show it only when something needs attention.
@@ -43,7 +48,11 @@ export default function CompanionVersion({ hideWhenCurrent = false, className = 
             </div>
           </div>
         </div>
-        {(state === 'outdated' || unknownVersion) && (
+        {state === 'outdated' && IN_COMPANION_WINDOW ? (
+          <button onClick={startInAppUpdate} className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg shrink-0" style={{ color: '#fff', background: 'var(--color-pk-red)' }}>
+            <Download className="w-3.5 h-3.5" /> Jetzt aktualisieren
+          </button>
+        ) : (state === 'outdated' || unknownVersion) && (
           <a href={DOWNLOADS.companion} download className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg shrink-0" style={{ color: '#fff', background: 'var(--color-pk-red)' }}>
             <Download className="w-3.5 h-3.5" /> {state === 'outdated' ? 'Jetzt aktualisieren' : 'Neu installieren'}
           </a>
@@ -53,7 +62,7 @@ export default function CompanionVersion({ hideWhenCurrent = false, className = 
         <p className="text-slate-400 text-xs mt-2">Bitte den Companion einmal <b>neu starten</b>. Hilft das nicht, lade ihn oben neu herunter und installiere ihn erneut.</p>
       )}
       {state === 'outdated' && (
-        <p className="text-slate-400 text-xs mt-2">Der Companion aktualisiert sich auch automatisch beim nächsten Neustart.</p>
+        <p className="text-slate-400 text-xs mt-2">{IN_COMPANION_WINDOW ? 'Das Update wird direkt in der App geladen und installiert – kein Browser nötig.' : 'Der Companion aktualisiert sich auch automatisch beim nächsten Neustart.'}</p>
       )}
     </div>
   )

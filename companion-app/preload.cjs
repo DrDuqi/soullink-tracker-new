@@ -28,4 +28,15 @@ contextBridge.exposeInMainWorld('soullinkNative', {
   checkForUpdates: () => ipcRenderer.invoke('app:check-updates'),
   // Download + install + relaunch (after the user chose to update).
   startUpdate: () => ipcRenderer.send('app:start-update'),
+  // Live update lifecycle for the in-app overlay. cb receives { type, ...payload }
+  // where type ∈ available | progress | downloaded | error. Returns an unsubscribe fn.
+  onUpdate: (cb) => {
+    const map = { 'update:available': 'available', 'update:progress': 'progress', 'update:downloaded': 'downloaded', 'update:error': 'error' }
+    const reg = Object.entries(map).map(([ch, type]) => {
+      const h = (_e, payload) => { try { cb({ type, ...(payload || {}) }) } catch { /* ignore */ } }
+      ipcRenderer.on(ch, h)
+      return [ch, h]
+    })
+    return () => reg.forEach(([ch, h]) => ipcRenderer.removeListener(ch, h))
+  },
 })

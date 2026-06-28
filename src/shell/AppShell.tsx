@@ -3,6 +3,7 @@ import Sidebar from './Sidebar'
 import TitleBar from './TitleBar'
 import CompanionAuth from './CompanionAuth'
 import AtmosphereBackground from '../components/AtmosphereBackground'
+import UpdateOverlay from '../components/UpdateOverlay'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../store/settingsStore'
 
@@ -48,6 +49,7 @@ export default function AppShell() {
           </div>
         )}
       </div>
+      <UpdateOverlay />
     </div>
   )
 }
