@@ -226,12 +226,16 @@ ipcMain.handle('app:check-updates', async () => {
   } catch (e) { slogErr('app:check-updates', e); return { state: 'error', current, error: (e && e.message) || String(e) } }
   finally { _suppressDialog = false }
 })
-// In-app "Jetzt aktualisieren": download then quit+install (reuses the wired flow).
+// In-app "Jetzt aktualisieren": re-check (electron-updater requires fresh update info
+// right before downloadUpdate → otherwise "Please check update first"), then download →
+// quit+install (the wired update-downloaded handler relaunches).
 ipcMain.on('app:start-update', () => {
   const au = getUpdater(); if (!au) return
-  wireUpdater(au); _updateAccepted = true
+  wireUpdater(au); _updateAccepted = true; _suppressDialog = true
   notify('SoulLink Companion', 'Update wird heruntergeladen …')
-  au.downloadUpdate().catch((e) => { slogErr('app:start-update', e); notify('SoulLink Companion', 'Update-Download fehlgeschlagen.') })
+  au.checkForUpdates()
+    .then((r) => { _suppressDialog = false; if (!r || !r.updateInfo) throw new Error('Keine Update-Info'); return au.downloadUpdate() })
+    .catch((e) => { _suppressDialog = false; slogErr('app:start-update', e); sendUI('update:error', { message: (e && e.message) || String(e) }); notify('SoulLink Companion', 'Update-Download fehlgeschlagen.') })
 })
 
 async function startServer() {
