@@ -67,7 +67,7 @@ end
 -- normalen Nutzern ist die Variable NICHT gesetzt → kein Logging, kein Overhead.
 -- Rotation/Archiv/Pruning übernimmt der Companion VOR dem Start (current.log ist
 -- beim Start frisch); hier wird nur angehängt.
-local LUA_REV = "1.0.15"
+local LUA_REV = "1.0.16"
 local DEVLOG_DIR = (function() local d = os.getenv("SOULLINK_DEVLOG"); return (d and d ~= "") and d or nil end)()
 local DEV_VERSION = os.getenv("SOULLINK_VERSION") or "?"
 local function anonPath(s) return s and (tostring(s):gsub("[Cc]:[/\\][Uu]sers[/\\][^/\\]+", "C:\\Users\\<USER>")) or s end
@@ -952,10 +952,34 @@ if not loadCachedAddr(profile) then
   detectStart(profile)
 end
 
+-- ── Auto-Continue ("Weiterspielen" ohne Tastendruck) ────────────────────────
+-- Drückt nach dem Start automatisch A (im Tipp-Rhythmus), bis das Team im Spiel
+-- erkannt wird → der Spieler landet ohne eigene Eingabe am letzten Ingame-Stand.
+-- Sicherheiten: NUR mit SOULLINK_AUTOCONTINUE=1 (der Companion setzt das ausschliesslich
+-- bei "Weiterspielen", wenn ein SaveRAM existiert — niemals bei einem neuen Spiel),
+-- stoppt SOFORT sobald die Party gefunden ist, und gibt nach einem Timeout auf
+-- (mäht nie endlos im Overworld weiter).
+local AUTO_CONTINUE = (os.getenv("SOULLINK_AUTOCONTINUE") == "1")
+local AC_done = false
+local AC_TIMEOUT = 3600                  -- ~60 s Sicherheits-Limit
+local function autoContinueStep(frame)
+  if AC_done then return end
+  if profile.party_addr then             -- im Spiel angekommen → sofort aufhören
+    AC_done = true
+    console.log("[continue] Spielstand geladen — Auto-Continue beendet.")
+    return
+  end
+  if frame > AC_TIMEOUT then AC_done = true; console.log("[continue] Timeout — bitte einmal 'Weiter' selbst waehlen."); return end
+  local press = (frame % 18) < 9         -- ~3 Tipps/s: 9 Frames A gedrückt, 9 Frames los
+  pcall(function() joypad.set({ A = press }, 1) end)
+end
+if AUTO_CONTINUE then console.log("[continue] Auto-Continue aktiv — waehle 'Weiter' automatisch …") end
+
 -- Ein Frame Arbeit (wird vom Loop in pcall ausgeführt)
 -- (memory.usememorydomain wird EINMAL bei Init gesetzt — nicht mehr pro Frame, das
 --  war 60 unnötige API-Aufrufe/s; die Domain bleibt über den Lauf konstant.)
 local function stepOnce(frame)
+  if AUTO_CONTINUE then autoContinueStep(frame) end          -- A drücken bis im Spiel (nur Weiterspielen)
   if CONFIG.find_location then lfStep() end                  -- Kalibrierhilfe (nur Lesen + Log)
   if frame % CONFIG.interval_frames == 0 then logLocationChange() end
   -- PERF: alle 60 Frames die Messwerte ausgeben + Fenster zurücksetzen. Da der

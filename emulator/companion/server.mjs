@@ -292,6 +292,20 @@ function killBizhawk({ force = false } = {}) {
   })
 }
 
+// Does this run already have an in-game SaveRAM (→ "Continue" exists)? Gates Auto-
+// Continue so a brand-new game is never auto-advanced past its intro/starter choice.
+function runHasSave(runId) {
+  try {
+    const dir = join(runFolder(runId), 'SaveRAM')
+    for (const f of readdirSync(dir)) {
+      if (/\.SaveRAM$/i.test(f)) {
+        try { if (statSync(join(dir, f)).size > 0) return true } catch { return true }
+      }
+    }
+  } catch { /* no folder / no save yet */ }
+  return false
+}
+
 // Does the EmuHawk.exe folder look like a COMPLETE BizHawk install? A loose copy
 // of just EmuHawk.exe crashes at startup (.NET 0xE0434352) — missing DLLs/gamedb.
 function bizhawkFolderInfo(exeDir) {
@@ -910,6 +924,13 @@ function handleRequest(req, res) {
 
       // Tell the Lua where to write (AppData) so both sides always agree.
       const launchEnv = { ...process.env, SOULLINK_TEAM_FILE: TEAM_FILE }
+      // Auto-Continue: the Lua taps A until the team loads. ONLY for "Weiterspielen"
+      // (cfg.autoContinue) AND only when a SaveRAM actually exists for this run — so a
+      // brand-new game is never auto-advanced past its intro/starter choice.
+      if (cfg.autoContinue && runId && runHasSave(runId)) {
+        launchEnv.SOULLINK_AUTOCONTINUE = '1'
+        console.log('[launch] Auto-Continue aktiv (SaveRAM vorhanden).')
+      }
       // Developer diagnostics (dev machine only): point the Lua at the rotated log.
       const devDir = setupDevLog()
       if (devDir) {

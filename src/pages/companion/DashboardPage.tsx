@@ -55,7 +55,7 @@ export default function DashboardPage() {
         if (r.ok) lr = { runId: vm.run.id, romPath: r.outputRom || '', bizhawk: r.bizhawk, seed: r.seed }
       }
     }
-    if (lr?.romPath) await platform.launch({ bizhawkPath: lr.bizhawk || '', romPath: lr.romPath, luaPath: '', syncFolder: '' }, false, vm.run.id)
+    if (lr?.romPath) await platform.launch({ bizhawkPath: lr.bizhawk || '', romPath: lr.romPath, luaPath: '', syncFolder: '' }, false, vm.run.id, true)
     setBusyId(null); await reloadLocals(); openRun(vm)
   }
 

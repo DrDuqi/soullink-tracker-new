@@ -171,7 +171,12 @@ function createWindow(show) {
   if (win && !win.isDestroyed()) { if (show) { win.show(); win.focus() } return win }
   win = new BrowserWindow({
     width: 1120, height: 740, minWidth: 900, minHeight: 600,
-    show: false, frame: false, backgroundColor: '#0b0b10', title: 'SoulLink Companion',
+    show: false, backgroundColor: '#0b0b10', title: 'SoulLink Companion',
+    // Native Windows window controls (real min/max/close) drawn as an overlay on top
+    // of our custom title bar → genuine OS behaviour: Snap Layouts on the maximize
+    // button, double-click to maximize, drag-to-move, drag-to-edge snap, taskbar.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#0b0b10', symbolColor: '#9aa4b2', height: 36 },
     icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),

@@ -50,8 +50,9 @@ export interface PlatformBridge {
   resolveFileByName(name: string): Promise<string | null>
   /** Start the emulator with the saved ROM + sync script. Passing `runId` launches
    *  the run in its own sandbox (per-run SaveRAM/State/…) and lets the Companion
-   *  auto-restart BizHawk when it's currently on a different run. */
-  launch(settings: EmulatorSettings, restart?: boolean, runId?: string): Promise<LaunchResult>
+   *  auto-restart BizHawk when it's currently on a different run. `autoContinue` (only
+   *  honoured when a SaveRAM exists) makes the Lua tap A until the game has loaded. */
+  launch(settings: EmulatorSettings, restart?: boolean, runId?: string, autoContinue?: boolean): Promise<LaunchResult>
 
   // ── profiles (local per-machine game profiles) ─────────────────────────────
   /** All profiles + which one is active. null when no Companion is present. */
