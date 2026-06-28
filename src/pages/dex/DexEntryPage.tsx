@@ -1,14 +1,18 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Sparkles } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronLeft, Sparkles, ChevronRight, Loader2 } from 'lucide-react'
 import { useSettings } from '../../store/settingsStore'
-import { dexEntry, dexName, artUrl, shinyArtUrl, typeLabel, typeColor, STAT_LABEL, statTotal } from '../../lib/dex/dex'
+import { dexEntry, dexName, artUrl, shinyArtUrl, spriteUrl, typeLabel, typeColor, STAT_LABEL, statTotal } from '../../lib/dex/dex'
+import { getDexDetail, type DexDetail, type DexEvo } from '../../lib/dex/detail'
 
 // SoulDex entry — instant, offline detail from the bundled index (artwork, shiny, types,
-// base stats). Lazy sections (abilities, evolution line, moves, Pokédex text) load from
-// PokéAPI + cache in the next release. No placeholder sections: only what's real shows.
+// base stats) plus lazy sections (Pokédex text, evolution line, abilities incl. hidden,
+// egg groups, level-up moves) fetched once from PokéAPI and cached for offline reuse.
+// No placeholder sections: a block only renders when it actually has data.
 const STAT_MAX = 200
 const statColor = (v: number) => (v >= 120 ? '#4ade80' : v >= 90 ? '#a3e635' : v >= 60 ? '#fbbf24' : '#fb923c')
+const titleize = (s: string) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
 export default function DexEntryPage() {
   const { id } = useParams()
@@ -67,7 +71,115 @@ export default function DexEntryPage() {
             </div>
           </div>
         </div>
+
+        <DetailSections id={e.id} lang={lang} />
       </div>
     </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
+      <h2 className="text-white font-bold text-sm mb-3">{title}</h2>
+      {children}
+    </section>
+  )
+}
+
+function DetailSections({ id, lang }: { id: number; lang: 'de' | 'en' }) {
+  const { data, isLoading, isError } = useQuery({ queryKey: ['dex-detail', id], queryFn: () => getDexDetail(id), staleTime: Infinity, gcTime: 60 * 60 * 1000, retry: 1 })
+  const t = (de: string, en: string) => (lang === 'de' ? de : en)
+
+  if (isLoading) return <div className="mt-4 flex items-center gap-2 text-slate-400 text-sm px-1"><Loader2 className="w-4 h-4 animate-spin" /> {t('Lädt Details …', 'Loading details …')}</div>
+  if (isError || !data) return <div className="mt-4 text-slate-500 text-sm px-1">{t('Weitere Details konnten nicht geladen werden (offline?).', 'Could not load further details (offline?).')}</div>
+
+  const flavor = lang === 'de' ? data.flavor.de || data.flavor.en : data.flavor.en || data.flavor.de
+  return (
+    <>
+      {flavor && <Section title={t('Pokédex-Eintrag', 'Pokédex entry')}><p className="text-slate-300 text-sm leading-relaxed">{flavor}</p></Section>}
+      {data.evo.length > 1 && <EvoLine evo={data.evo} lang={lang} t={t} />}
+      <AbilitiesEgg data={data} lang={lang} t={t} />
+      {data.moves.length > 0 && <Moves data={data} lang={lang} t={t} />}
+    </>
+  )
+}
+
+function EvoLine({ evo, lang, t }: { evo: DexEvo[]; lang: 'de' | 'en'; t: (de: string, en: string) => string }) {
+  const navigate = useNavigate()
+  const name = (e: DexEvo) => (lang === 'de' ? e.de || e.en : e.en || e.de)
+  const cond = (e: DexEvo) => {
+    if (e.level) return `Lv. ${e.level}`
+    if (e.item) return titleize(e.item)
+    if (e.trigger && e.trigger !== 'level-up') return titleize(e.trigger)
+    return ''
+  }
+  return (
+    <Section title={t('Entwicklung', 'Evolution')}>
+      <div className="flex items-center flex-wrap gap-1">
+        {evo.map((e, i) => (
+          <div key={e.id} className="contents">
+            {i > 0 && (
+              <div className="flex flex-col items-center text-slate-500 px-1">
+                <ChevronRight className="w-4 h-4" />
+                {cond(e) && <span className="text-[10px] font-bold text-slate-400">{cond(e)}</span>}
+              </div>
+            )}
+            <button onClick={() => navigate(`/dex/pokemon/${e.id}`)} className="flex flex-col items-center rounded-xl px-2 py-1.5 hover:bg-white/[0.06] transition-colors">
+              <img src={spriteUrl(e.id)} alt="" draggable={false} loading="lazy" className="w-14 h-14 object-contain" style={{ imageRendering: 'pixelated' }} />
+              <span className="text-xs font-bold text-slate-200">{name(e)}</span>
+            </button>
+          </div>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
+function AbilitiesEgg({ data, lang, t }: { data: DexDetail; lang: 'de' | 'en'; t: (de: string, en: string) => string }) {
+  const aName = (de: string, en: string) => (lang === 'de' ? de || en : en || de)
+  if (!data.abilities.length && !data.eggGroups.length) return null
+  return (
+    <div className="grid sm:grid-cols-2 gap-4 mt-4">
+      {data.abilities.length > 0 && (
+        <section className="rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
+          <h2 className="text-white font-bold text-sm mb-3">{t('Fähigkeiten', 'Abilities')}</h2>
+          <div className="flex flex-wrap gap-2">
+            {data.abilities.map((a, i) => (
+              <span key={i} className="inline-flex items-center gap-1.5 text-xs font-bold rounded-lg px-2.5 py-1.5 border" style={{ background: 'rgba(255,255,255,0.04)', borderColor: a.hidden ? '#7c5cff55' : '#ffffff14', color: '#e2e8f0' }}>
+                {aName(a.de, a.en)}
+                {a.hidden && <span className="text-[10px] font-bold rounded px-1.5 py-0.5" style={{ background: '#7c5cff22', color: '#b9a8ff' }}>{t('versteckt', 'hidden')}</span>}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+      {data.eggGroups.length > 0 && (
+        <section className="rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
+          <h2 className="text-white font-bold text-sm mb-3">{t('Ei-Gruppen', 'Egg groups')}</h2>
+          <div className="flex flex-wrap gap-2">
+            {data.eggGroups.map((g, i) => <span key={i} className="text-xs font-bold rounded-lg px-2.5 py-1.5 border border-white/10 text-slate-200" style={{ background: 'rgba(255,255,255,0.04)' }}>{aName(g.de, g.en)}</span>)}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+function Moves({ data, lang, t }: { data: DexDetail; lang: 'de' | 'en'; t: (de: string, en: string) => string }) {
+  const mName = (de: string, en: string) => (lang === 'de' ? de || en : en || de)
+  return (
+    <Section title={t('Attacken (Level-Up)', 'Moves (level-up)')}>
+      <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
+        {data.moves.map((m, i) => (
+          <div key={i} className="flex items-center gap-2.5 text-sm py-0.5">
+            <span className="font-mono text-xs text-slate-500 w-9 text-right shrink-0">{m.level > 0 ? m.level : '—'}</span>
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: typeColor(m.type) }} />
+            <span className="text-slate-200 truncate">{mName(m.de, m.en)}</span>
+            <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-wide shrink-0">{typeLabel(m.type, lang)}</span>
+          </div>
+        ))}
+      </div>
+    </Section>
   )
 }

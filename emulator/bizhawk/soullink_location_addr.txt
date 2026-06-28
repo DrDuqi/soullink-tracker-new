@@ -1,0 +1,1 @@
+platinum location_addr = 0x101D8E
