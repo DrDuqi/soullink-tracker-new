@@ -208,7 +208,31 @@ ipcMain.on('win:toggle-maximize', () => { if (win && !win.isDestroyed()) { win.i
 ipcMain.on('win:close', () => { if (win && !win.isDestroyed()) win.close() })
 ipcMain.handle('win:is-maximized', () => !!(win && !win.isDestroyed() && win.isMaximized()))
 ipcMain.handle('app:version', () => app.getVersion())
-ipcMain.on('app:check-updates', () => { try { checkForUpdatesManual() } catch (e) { slogErr('check-updates (ipc)', e) } })
+// In-app (Settings) update check: returns the RESULT so the React UI can show
+// "✓ aktuell" or "neue Version → Jetzt aktualisieren" — no native dialog, no download.
+ipcMain.handle('app:check-updates', async () => {
+  const current = app.getVersion()
+  if (!app.isPackaged) return { state: 'dev', current }
+  const au = getUpdater(); if (!au) return { state: 'error', current, error: 'Updater nicht verfügbar' }
+  wireUpdater(au)
+  _suppressDialog = true
+  try {
+    const r = await au.checkForUpdates()
+    const latest = (r && r.updateInfo && r.updateInfo.version) || null
+    const available = !!(latest && semverGt(latest, current))
+    let notes = (r && r.updateInfo && r.updateInfo.releaseNotes) || null
+    if (Array.isArray(notes)) notes = notes.map((n) => (n && n.note) || '').join('\n')
+    return { state: available ? 'available' : 'current', current, latest, notes, date: (r && r.updateInfo && r.updateInfo.releaseDate) || null }
+  } catch (e) { slogErr('app:check-updates', e); return { state: 'error', current, error: (e && e.message) || String(e) } }
+  finally { _suppressDialog = false }
+})
+// In-app "Jetzt aktualisieren": download then quit+install (reuses the wired flow).
+ipcMain.on('app:start-update', () => {
+  const au = getUpdater(); if (!au) return
+  wireUpdater(au); _updateAccepted = true
+  notify('SoulLink Companion', 'Update wird heruntergeladen …')
+  au.downloadUpdate().catch((e) => { slogErr('app:start-update', e); notify('SoulLink Companion', 'Update-Download fehlgeschlagen.') })
+})
 
 async function startServer() {
   const userData = app.getPath('userData')
@@ -254,7 +278,16 @@ async function startServer() {
 let _updater = null
 let _updaterWired = false
 let _updateAccepted = false     // user chose "Jetzt aktualisieren" → install once downloaded
+let _suppressDialog = false     // true while the in-app (Settings) check runs → no native dialog
 const CHANGELOG_URL = 'https://github.com/DrDuqi/soullink-tracker-new/releases'
+
+// a.b.c semver compare → true if A is strictly newer than B.
+function semverGt(a, b) {
+  const pa = String(a || '').split('.').map((n) => parseInt(n, 10) || 0)
+  const pb = String(b || '').split('.').map((n) => parseInt(n, 10) || 0)
+  for (let i = 0; i < 3; i++) { const d = (pa[i] || 0) - (pb[i] || 0); if (d) return d > 0 }
+  return false
+}
 
 function parentWin() { return (win && !win.isDestroyed()) ? win : null }
 function msgBox(opts) { const p = parentWin(); return p ? dialog.showMessageBoxSync(p, opts) : dialog.showMessageBoxSync(opts) }
@@ -273,6 +306,7 @@ function wireUpdater(au) {
   au.on('update-available', (info) => {
     const v = (info && info.version) || '?'
     slog(`Update verfügbar: v${v}`)
+    if (_suppressDialog) return   // the in-app Settings flow shows its own UI
     const r = msgBox({
       type: 'info', noLink: true, defaultId: 0, cancelId: 1,
       title: 'Update verfügbar',

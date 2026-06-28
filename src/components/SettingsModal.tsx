@@ -8,6 +8,7 @@ import {
 import { useSettings, ACCENTS, type Accent, type Lang } from '../store/settingsStore'
 import { LANGUAGES, useT } from '../lib/i18n'
 import { companionInfo, APP_VERSION, LINKS } from '../lib/appInfo'
+import { IN_COMPANION_WINDOW } from '../lib/companion'
 import { DOWNLOADS } from '../lib/downloads'
 import { useToastStore } from '../store/toastStore'
 import type { RunMode } from '../lib/runMode'
@@ -16,6 +17,12 @@ import ChangelogModal from './ChangelogModal'
 import CompanionVersion from './CompanionVersion'
 
 type Section = 'appearance' | 'language' | 'gameplay' | 'notifications' | 'performance' | 'companion' | 'about'
+
+interface UpdateResult { state: 'current' | 'available' | 'error' | 'dev'; current: string; latest?: string | null; error?: string }
+interface NativeApp { checkForUpdates?: () => Promise<UpdateResult>; startUpdate?: () => void }
+function nativeApp(): NativeApp | null {
+  return (typeof window !== 'undefined' ? (window as unknown as { soullinkNative?: NativeApp }).soullinkNative : null) ?? null
+}
 
 interface Opt<T> { value: T; label: string; hint?: string; icon?: React.ReactNode }
 function Choice<T extends string | number>({ options, value, onChange, cols = 2 }: { options: Opt<T>[]; value: T; onChange: (v: T) => void; cols?: number }) {
@@ -55,6 +62,16 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
   const [section, setSection] = useState<Section>('appearance')
   const [showChangelog, setShowChangelog] = useState(false)
+  const [updChecking, setUpdChecking] = useState(false)
+  const [upd, setUpd] = useState<UpdateResult | null>(null)
+
+  async function checkUpdates() {
+    const n = nativeApp(); if (!n?.checkForUpdates) return
+    setUpdChecking(true); setUpd(null)
+    try { setUpd(await n.checkForUpdates()) }
+    catch { setUpd({ state: 'error', current: '', error: t('settings.checkFailed') }) }
+    setUpdChecking(false)
+  }
 
   const { data: comp, refetch, isFetching } = useQuery({ queryKey: ['companion-info'], queryFn: () => companionInfo(), staleTime: 30_000 })
 
@@ -163,8 +180,42 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           {section === 'companion' && (
             <Block title={t('settings.companion')}>
               <div className="mb-4"><CompanionVersion /></div>
+
+              {/* Updates — real check (companion) or download CTA (website). */}
+              {IN_COMPANION_WINDOW ? (
+                <div className="rounded-2xl border border-[#2e2e42] bg-[#1c1c26] p-4 mb-3">
+                  {(!upd || updChecking) ? (
+                    <button onClick={checkUpdates} disabled={updChecking} className="lp-action w-full justify-center">
+                      <RefreshCw className={`w-4 h-4 ${updChecking ? 'animate-spin' : ''}`} /> {updChecking ? t('settings.checking') : t('settings.checkUpdates')}
+                    </button>
+                  ) : upd.state === 'current' ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-2 text-green-400 font-bold text-sm"><Check className="w-4 h-4" /> {t('settings.upToDate')} (v{upd.current})</span>
+                      <button onClick={checkUpdates} className="text-xs font-bold text-slate-500 hover:text-white">{t('settings.recheck')}</button>
+                    </div>
+                  ) : upd.state === 'available' ? (
+                    <div>
+                      <div className="flex items-center gap-2 text-white font-black"><Download className="w-4 h-4 text-pk-red" /> {t('settings.newVersionAvail')}: v{upd.latest}</div>
+                      <div className="text-slate-500 text-xs mt-0.5">{t('settings.youUse')} v{upd.current}.</div>
+                      <div className="flex items-center gap-2 mt-3 flex-wrap">
+                        <button onClick={() => nativeApp()?.startUpdate?.()} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-black text-sm text-white" style={{ background: '#CC0000' }}><Download className="w-4 h-4" /> {t('settings.updateNow')}</button>
+                        <button onClick={() => setShowChangelog(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5"><ScrollText className="w-4 h-4" /> {t('settings.whatsNew')}</button>
+                      </div>
+                    </div>
+                  ) : upd.state === 'dev' ? (
+                    <div className="text-slate-400 text-sm">{t('settings.updatesPackagedOnly')}</div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-amber-400 text-sm">{upd.error || t('settings.checkFailed')}</span>
+                      <button onClick={checkUpdates} className="text-xs font-bold text-slate-400 hover:text-white">{t('settings.recheck')}</button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <a href={DOWNLOADS.companion} className="lp-action mb-3 inline-flex"><Download className="w-4 h-4" /> {t('settings.downloadCompanion')}</a>
+              )}
+
               <div className="grid sm:grid-cols-2 gap-3">
-                <a href={DOWNLOADS.companion} className="lp-action"><Download className="w-4 h-4" /> {t('settings.checkUpdates')}</a>
                 <button onClick={reconnect} disabled={isFetching} className="lp-action"><RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} /> {t('settings.reconnect')}</button>
                 <button onClick={reSetup} className="lp-action"><RotateCcw className="w-4 h-4" /> {t('settings.resetup')}</button>
               </div>

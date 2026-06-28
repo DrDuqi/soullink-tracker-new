@@ -36,6 +36,12 @@ const de: Dict = {
   'settings.reconnect': 'Companion neu verbinden', 'settings.resetup': 'Companion neu einrichten',
   'settings.companionConnected': 'Verbunden', 'settings.companionOffline': 'Nicht verbunden',
   'settings.appVersion': 'SoulLink Tracker', 'settings.viewChangelog': 'Changelog ansehen',
+  'settings.checking': 'Wird geprüft…', 'settings.upToDate': 'SoulLink ist aktuell',
+  'settings.newVersionAvail': 'Neue Version verfügbar', 'settings.updateNow': 'Jetzt aktualisieren',
+  'settings.whatsNew': 'Was ist neu?', 'settings.checkFailed': 'Prüfung fehlgeschlagen — bist du online?',
+  'settings.youUse': 'Du nutzt', 'settings.recheck': 'Erneut prüfen',
+  'settings.updatesPackagedOnly': 'Updates sind nur in der installierten App verfügbar.',
+  'settings.downloadCompanion': 'Companion herunterladen',
 }
 
 const en: Dict = {
@@ -66,6 +72,12 @@ const en: Dict = {
   'settings.reconnect': 'Reconnect companion', 'settings.resetup': 'Re-run setup',
   'settings.companionConnected': 'Connected', 'settings.companionOffline': 'Not connected',
   'settings.appVersion': 'SoulLink Tracker', 'settings.viewChangelog': 'View changelog',
+  'settings.checking': 'Checking…', 'settings.upToDate': 'SoulLink is up to date',
+  'settings.newVersionAvail': 'New version available', 'settings.updateNow': 'Update now',
+  'settings.whatsNew': "What's new?", 'settings.checkFailed': 'Check failed — are you online?',
+  'settings.youUse': "You're on", 'settings.recheck': 'Check again',
+  'settings.updatesPackagedOnly': 'Updates are only available in the installed app.',
+  'settings.downloadCompanion': 'Download Companion',
 }
 
 const DICT: Record<Lang, Dict> = { de, en }

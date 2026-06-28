@@ -4,6 +4,7 @@ import TitleBar from './TitleBar'
 import CompanionAuth from './CompanionAuth'
 import AtmosphereBackground from '../components/AtmosphereBackground'
 import { useAuth } from '../contexts/AuthContext'
+import { useSettings } from '../store/settingsStore'
 
 // The Companion desktop shell: a custom title bar on top, then a persistent left
 // Sidebar + a large work area (Outlet) that swaps content without remounting the
@@ -17,10 +18,19 @@ import { useAuth } from '../contexts/AuthContext'
 // aware, so it never costs interaction or frames.
 export default function AppShell() {
   const { user, loading } = useAuth()
+  // OLED = true black (#000) + a barely-there atmosphere for the higher-contrast look;
+  // Dark = the cinematic deep-space backdrop. "Hintergrundeffekte deaktivieren" removes
+  // the atmosphere entirely — so both toggles have an immediate, visible effect.
+  const oled = useSettings((s) => s.theme === 'oled')
+  const disableBg = useSettings((s) => s.perf.disableBg)
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden relative" style={{ background: '#06070B' }}>
-      <AtmosphereBackground />
+    <div className="flex flex-col h-screen overflow-hidden relative" style={{ background: oled ? '#000000' : '#06070B' }}>
+      {!disableBg && (
+        <div aria-hidden="true" style={{ opacity: oled ? 0.4 : 1, transition: 'opacity .35s ease' }}>
+          <AtmosphereBackground />
+        </div>
+      )}
       <div className="relative z-10 flex flex-col h-full min-h-0">
         <TitleBar />
         {loading ? (
