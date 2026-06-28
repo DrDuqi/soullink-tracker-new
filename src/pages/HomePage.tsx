@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Swords, Users, Zap, Shuffle, ArrowRight, Link2, Clock,
-  MoreVertical, Crown, Trash2, LogOut, X,
+  MoreVertical, Crown, Trash2, LogOut, X, Download, Gamepad2,
 } from 'lucide-react'
+import { LINKS } from '../lib/appInfo'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useRunStore } from '../store/runStore'
@@ -87,8 +88,6 @@ function Dashboard() {
   const [deleteFor, setDeleteFor] = useState<RunVM | null>(null)
   const [transferFor, setTransferFor] = useState<RunVM | null>(null)
   const [actionBusy, setActionBusy] = useState(false)
-  // Onboarding entry — shown until the Companion has been set up at least once.
-  const [showOnboard] = useState(() => { try { return localStorage.getItem('onboard-companion-seen') !== '1' } catch { return true } })
 
   const { data: myRuns = [], isLoading, refetch } = useQuery<RunVM[]>({
     queryKey: ['my-runs', user?.id],
@@ -199,30 +198,31 @@ function Dashboard() {
 
   return (
     <div className="w-full max-w-5xl anim-fade-up">
-      <div className="mb-8">
+      <div className="mb-6">
+        <div className="inline-flex items-center gap-1.5 text-pk-red font-black text-[11px] uppercase tracking-widest mb-1.5"><span>🖊</span> Browser-Tracker (manuell)</div>
         <h1 className="text-3xl font-black text-white">Willkommen, {profile?.display_name || profile?.username} 👋</h1>
-        <p className="text-slate-500 mt-1">Erstelle einen neuen Run oder tritt mit einem Code bei.</p>
+        <p className="text-slate-500 mt-1">Tracke deinen SoulLink im Browser — von Hand oder als Zuschauer. Zum echten Spielen mit Emulator &amp; automatischem Live-Sync brauchst du den Companion.</p>
       </div>
 
-      {showOnboard && (
-        <button onClick={() => navigate('/setup')} className="w-full text-left rounded-2xl p-5 mb-8 flex items-center gap-4 transition-transform active:scale-[0.99]"
-          style={{ background: 'linear-gradient(120deg, rgba(204,0,0,0.20), rgba(204,0,0,0.05))', border: '1px solid rgba(204,0,0,0.35)' }}>
-          <div className="shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(204,0,0,0.22)' }}>
-            <Zap className="w-6 h-6 text-pk-red" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-white font-black text-lg">Erste Einrichtung – in 5 Minuten spielbereit</div>
-            <div className="text-slate-300 text-sm">Companion, BizHawk & Live-Sync Schritt für Schritt einrichten.</div>
-          </div>
-          <span className="shrink-0 hidden sm:flex items-center gap-1.5 text-pk-red font-bold text-sm">Starten <ArrowRight className="w-4 h-4" /></span>
-        </button>
-      )}
+      {/* Companion = das eigentliche Spielen (Emulator, Randomizer, Live-Sync, Weiterspielen, Multiplayer). */}
+      <a href={LINKS.download} className="w-full text-left rounded-2xl p-5 mb-8 flex items-center gap-4 transition-transform active:scale-[0.99]"
+        style={{ background: 'linear-gradient(120deg, rgba(204,0,0,0.20), rgba(204,0,0,0.05))', border: '1px solid rgba(204,0,0,0.35)' }}>
+        <div className="shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(204,0,0,0.22)' }}>
+          <Gamepad2 className="w-6 h-6 text-pk-red" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-white font-black text-lg">Mit Emulator &amp; Live-Sync spielen? → Companion herunterladen</div>
+          <div className="text-slate-300 text-sm">ROM randomisieren, BizHawk starten, automatischer Team-Sync, Weiterspielen &amp; Multiplayer — alles in der Desktop-App.</div>
+        </div>
+        <span className="shrink-0 hidden sm:flex items-center gap-1.5 text-pk-red font-bold text-sm"><Download className="w-4 h-4" /> Download</span>
+      </a>
 
       {error && <div className="bg-red-950/60 border border-red-800 text-red-400 rounded-xl p-4 mb-6 text-sm font-medium">{error}</div>}
 
       <div className="grid md:grid-cols-2 gap-5 mb-10">
         <form onSubmit={handleCreate} className="pk-card p-6 space-y-4">
-          <div className="flex items-center gap-2 text-white font-black"><Swords className="w-5 h-5 text-pk-red" /> Neuer Run</div>
+          <div className="flex items-center gap-2 text-white font-black"><Swords className="w-5 h-5 text-pk-red" /> Manuellen Tracker erstellen</div>
+          <p className="text-slate-500 text-xs -mt-1">Ein Browser-Tracker zum Eintragen von Hand. Zum Spielen mit Emulator startest du Runs im Companion.</p>
           <div>
             <label className="text-slate-300 text-sm font-bold mb-2 block">Run-Name <span className="text-slate-600 font-normal">(optional)</span></label>
             <input value={runName} onChange={(e) => setRunName(e.target.value)} placeholder="z. B. Mein Platin SoulLink" maxLength={40} className="pk-input" />
@@ -255,7 +255,7 @@ function Dashboard() {
             <RunModeCards selected={mode} onSelect={setMode} />
           </div>
           <p className="text-slate-600 text-xs">Spielername: <span className="text-slate-400 font-bold">{profile?.username}</span> (aus deinem Account)</p>
-          <button type="submit" disabled={busy} className="btn-primary w-full py-3.5">{busy ? 'Wird erstellt…' : '⚡ Run starten'}</button>
+          <button type="submit" disabled={busy} className="btn-primary w-full py-3.5">{busy ? 'Wird erstellt…' : '🖊 Manuellen Tracker starten'}</button>
         </form>
 
         <form onSubmit={handleJoin} className="pk-card p-6 space-y-4">

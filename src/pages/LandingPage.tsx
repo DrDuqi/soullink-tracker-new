@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { LINKS } from '../lib/appInfo'
 import AtmosphereBackground from '../components/AtmosphereBackground'
 
 const SPRITE = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
@@ -92,12 +93,12 @@ function Hero() {
       </p>
 
       <div className="anim-fade-up delay-3 flex flex-col sm:flex-row items-center gap-4 mt-10">
-        <button onClick={goLogin} className="btn-primary text-lg !px-9 !py-4 flex items-center gap-2 shadow-2xl">
-          <Zap className="w-5 h-5" /> Kostenlos starten <ArrowRight className="w-5 h-5" />
-        </button>
-        <button onClick={goDemo} className="btn-ghost text-base !px-7 !py-4 flex items-center gap-2">Live-Sync ansehen <ArrowDown className="w-4 h-4" /></button>
+        <a href={LINKS.download} className="btn-primary text-lg !px-9 !py-4 flex items-center gap-2 shadow-2xl">
+          <Download className="w-5 h-5" /> Companion herunterladen
+        </a>
+        <button onClick={goLogin} className="btn-ghost text-base !px-7 !py-4 flex items-center gap-2">Kostenlos anmelden <ArrowRight className="w-4 h-4" /></button>
       </div>
-      <p className="anim-fade-up delay-4 text-slate-500 text-sm mt-5">Bereits kostenlos verfügbar · Keine Kreditkarte · Keine Werbung</p>
+      <p className="anim-fade-up delay-4 text-slate-500 text-sm mt-5">Windows-App · Kostenlos · Keine Werbung · <button onClick={goDemo} className="text-slate-400 hover:text-white underline underline-offset-2">Live-Sync ansehen</button></p>
 
       <button onClick={goDemo} aria-label="Mehr" className="absolute bottom-6 left-1/2 -translate-x-1/2 text-slate-600 hover:text-slate-300 transition-colors">
         <ArrowDown className="w-6 h-6 animate-bounce" />

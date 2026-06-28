@@ -41,7 +41,14 @@ import ChangeEditionModal from '../components/ChangeEditionModal'
 import ChangeModeModal from '../components/ChangeModeModal'
 import PlayersPanel from '../components/PlayersPanel'
 import { useRunMode, setRunMode, type RunMode } from '../lib/runMode'
+import { IN_COMPANION_WINDOW } from '../lib/companion'
+import { LINKS } from '../lib/appInfo'
 import { useEmuTeamStore } from '../store/emuTeamStore'
+
+// Emulator Live-Sync belongs to the Companion (it launches BizHawk). Show it only
+// inside the Companion window (or the dev server for testing); on the public website
+// the run is a manual tracker / spectator view, never a dead emulator panel.
+const LIVE_SURFACE = IN_COMPANION_WINDOW || import.meta.env.DEV
 import { usePresence } from '../hooks/usePresence'
 import { useCompanion } from '../hooks/useCompanion'
 import { useAuth } from '../contexts/AuthContext'
@@ -167,7 +174,7 @@ export default function RunPage() {
   // Online the live-sync runs through a local Companion; in dev this is always
   // 'connected' (Vite plugin). Gates the invisible reconciler so it only polls
   // when a backend is actually reachable.
-  const companion = useCompanion(liveSyncMode)
+  const companion = useCompanion(liveSyncMode && LIVE_SURFACE)
 
   // Run-Namen ändern (nur Owner). Verändert NICHTS an Encountern/SoulLinks.
   async function saveRunName() {
@@ -843,8 +850,8 @@ export default function RunPage() {
                 </div>
               )}
 
-              {/* Emulator live-team — only in Live-Sync mode (dev plugin or online Companion; additive) */}
-              {isMyFocus && liveSyncMode && (
+              {/* Emulator live-team — only inside the Companion (it runs BizHawk). */}
+              {isMyFocus && liveSyncMode && LIVE_SURFACE && (
                 <EmulatorLivePanel
                   game={currentRun.game}
                   runId={currentRun.id}
@@ -852,6 +859,18 @@ export default function RunPage() {
                   importedPids={myEncounterPids}
                   onImport={(p, route) => { setEmuPrefill(p); setAddEncounterRoute(route); setShowAddEncounter(true) }}
                 />
+              )}
+
+              {/* On the website a Live-Sync run is a MANUAL tracker — point to the Companion. */}
+              {isMyFocus && liveSyncMode && !LIVE_SURFACE && (
+                <div className="rounded-2xl border border-pk-red/30 bg-gradient-to-r from-pk-red/10 to-transparent p-4 flex items-center gap-3 flex-wrap">
+                  <span className="text-xl">🖊</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-white font-black text-sm">Browser-Tracker (manuell)</div>
+                    <div className="text-slate-400 text-xs mt-0.5">Pokémon, Routen, SoulLinks & Box trägst du hier von Hand ein. Für automatischen Live-Sync mit BizHawk brauchst du den Companion.</div>
+                  </div>
+                  <a href={LINKS.download} className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>Companion herunterladen</a>
+                </div>
               )}
 
               {/* Team / Box / Besiegt / Partner — derived from the live emulator team (by PID), fallback to team_slots */}
@@ -1121,7 +1140,7 @@ export default function RunPage() {
 
       {/* Invisible: keeps emulator-imported encounters in sync by stable PID (evolution etc.).
           Mounts only when a sync backend is reachable (dev plugin, or online Companion). */}
-      {myPlayerId && liveSyncMode && companion.status === 'connected' && (
+      {myPlayerId && liveSyncMode && LIVE_SURFACE && companion.status === 'connected' && (
         <EmulatorReconciler encounters={myEncounters} runId={currentRun.id} />
       )}
 

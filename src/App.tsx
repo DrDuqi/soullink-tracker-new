@@ -61,11 +61,12 @@ export default function App() {
                   </Route>
                 </Routes>
               ) : (
-                // Public website: landing + run views, unchanged.
+                // Public website = Landing + Browser-Tracker (manuell) + spectator.
+                // The emulator/Live-Sync setup lives ONLY in the Companion, so the
+                // website no longer exposes /setup or /profiles (they need a local
+                // backend and just confused people). /run is the manual tracker / viewer.
                 <Routes>
                   <Route path="/" element={<HomePage />} />
-                  <Route path="/setup" element={<SetupPage />} />
-                  <Route path="/profiles" element={<ProfilesPage />} />
                   <Route path="/run/:runId" element={<RunPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
