@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, Sparkles, ChevronRight, Loader2 } from 'lucide-react'
 import { useSettings } from '../../store/settingsStore'
 import { dexEntry, dexName, artUrl, shinyArtUrl, spriteUrl, typeLabel, typeColor, STAT_LABEL, statTotal } from '../../lib/dex/dex'
-import { getDexDetail, type DexDetail, type DexEvo } from '../../lib/dex/detail'
+import { getDexDetail, type DexDetail, type DexEvo, type DexMeta } from '../../lib/dex/detail'
 
 // SoulDex entry — instant, offline detail from the bundled index (artwork, shiny, types,
 // base stats) plus lazy sections (Pokédex text, evolution line, abilities incl. hidden,
@@ -98,10 +98,78 @@ function DetailSections({ id, lang }: { id: number; lang: 'de' | 'en' }) {
   return (
     <>
       {flavor && <Section title={t('Pokédex-Eintrag', 'Pokédex entry')}><p className="text-slate-300 text-sm leading-relaxed">{flavor}</p></Section>}
+      {data.meta && <MetaGrid meta={data.meta} t={t} />}
       {data.evo.length > 1 && <EvoLine evo={data.evo} lang={lang} t={t} />}
       <AbilitiesEgg data={data} lang={lang} t={t} />
+      {data.encounters.length > 0 && <Encounters data={data} lang={lang} t={t} />}
       {data.moves.length > 0 && <Moves data={data} lang={lang} t={t} />}
     </>
+  )
+}
+
+function MetaGrid({ meta, t }: { meta: DexMeta; t: (de: string, en: string) => string }) {
+  const gender = meta.genderRate < 0
+    ? t('Geschlechtslos', 'Genderless')
+    : `♂ ${Math.round((1 - meta.genderRate / 8) * 100)}% · ♀ ${Math.round((meta.genderRate / 8) * 100)}%`
+  const cells: { label: string; value: string }[] = [
+    { label: t('Größe', 'Height'), value: `${meta.height.toFixed(1)} m` },
+    { label: t('Gewicht', 'Weight'), value: `${meta.weight.toFixed(1)} kg` },
+    { label: t('Fangrate', 'Capture rate'), value: String(meta.captureRate) },
+    { label: t('Geschlecht', 'Gender'), value: gender },
+    { label: t('Basis-Freundschaft', 'Base friendship'), value: String(meta.baseHappiness) },
+    { label: t('Ei-Zyklen', 'Egg cycles'), value: String(meta.hatchCounter) },
+    { label: t('Wachstum', 'Growth'), value: meta.growth ? titleize(meta.growth) : '—' },
+    { label: t('Basis-EP', 'Base exp.'), value: String(meta.baseExp) },
+  ]
+  return (
+    <Section title={t('Pokédex-Daten', 'Pokédex data')}>
+      {(meta.legendary || meta.mythical || meta.baby) && (
+        <div className="flex gap-2 mb-3">
+          {meta.legendary && <span className="text-[10px] font-black uppercase tracking-wide rounded px-2 py-1" style={{ background: '#fbbf2422', color: '#fbbf24' }}>{t('Legendär', 'Legendary')}</span>}
+          {meta.mythical && <span className="text-[10px] font-black uppercase tracking-wide rounded px-2 py-1" style={{ background: '#c084fc22', color: '#c084fc' }}>{t('Mysteriös', 'Mythical')}</span>}
+          {meta.baby && <span className="text-[10px] font-black uppercase tracking-wide rounded px-2 py-1" style={{ background: '#f472b622', color: '#f472b6' }}>{t('Baby', 'Baby')}</span>}
+        </div>
+      )}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {cells.map((c) => (
+          <div key={c.label} className="rounded-xl border border-white/[0.06] px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)' }}>
+            <div className="text-[11px] text-slate-500">{c.label}</div>
+            <div className="text-slate-100 font-bold text-sm mt-0.5">{c.value}</div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
+function Encounters({ data, lang, t }: { data: DexDetail; lang: 'de' | 'en'; t: (de: string, en: string) => string }) {
+  const name = (x: { de: string; en: string }) => (lang === 'de' ? x.de || x.en : x.en || x.de)
+  // Group locations under their edition.
+  const byVersion = new Map<string, { version: string; rows: DexDetail['encounters'] }>()
+  for (const e of data.encounters) {
+    const v = name(e.version)
+    const g = byVersion.get(v) || { version: v, rows: [] }
+    g.rows.push(e); byVersion.set(v, g)
+  }
+  return (
+    <Section title={t('Fundorte (nach Edition)', 'Encounters (by edition)')}>
+      <div className="space-y-4">
+        {[...byVersion.values()].map((g) => (
+          <div key={g.version}>
+            <div className="text-xs font-black uppercase tracking-wide text-pk-red mb-1.5">{g.version}</div>
+            <div className="space-y-1">
+              {g.rows.map((e, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-200 truncate">{name(e.location)}</span>
+                  <span className="ml-auto font-mono text-xs text-slate-500 shrink-0">Lv {e.min === e.max ? e.min : `${e.min}–${e.max}`}</span>
+                  <span className="font-mono text-xs text-slate-400 w-12 text-right shrink-0">{e.chance}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
   )
 }
 
@@ -109,8 +177,10 @@ function EvoLine({ evo, lang, t }: { evo: DexEvo[]; lang: 'de' | 'en'; t: (de: s
   const navigate = useNavigate()
   const name = (e: DexEvo) => (lang === 'de' ? e.de || e.en : e.en || e.de)
   const cond = (e: DexEvo) => {
+    if (e.item) return e.item
     if (e.level) return `Lv. ${e.level}`
-    if (e.item) return titleize(e.item)
+    if (e.happiness) return lang === 'de' ? 'Freundschaft' : 'Friendship'
+    if (e.time) return titleize(e.time)
     if (e.trigger && e.trigger !== 'level-up') return titleize(e.trigger)
     return ''
   }
