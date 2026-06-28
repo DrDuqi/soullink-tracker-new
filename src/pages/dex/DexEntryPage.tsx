@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, Sparkles, ChevronRight, Loader2 } from 'lucide-react'
 import { useSettings } from '../../store/settingsStore'
 import { dexEntry, dexName, artUrl, shinyArtUrl, spriteUrl, typeLabel, typeColor, STAT_LABEL, statTotal } from '../../lib/dex/dex'
-import { getDexDetail, type DexDetail, type DexEvo, type DexMeta } from '../../lib/dex/detail'
+import { getDexDetail, type DexDetail, type DexEvo, type DexMeta, type DexAbility } from '../../lib/dex/detail'
+import { LEARN_METHODS, METHOD_LABEL, type LearnMethod } from '../../lib/dex/learn'
 
 // SoulDex entry — instant, offline detail from the bundled index (artwork, shiny, types,
 // base stats) plus lazy sections (Pokédex text, evolution line, abilities incl. hidden,
@@ -206,6 +207,22 @@ function EvoLine({ evo, lang, t }: { evo: DexEvo[]; lang: 'de' | 'en'; t: (de: s
   )
 }
 
+function AbilityItem({ a, lang, t }: { a: DexAbility; lang: 'de' | 'en'; t: (de: string, en: string) => string }) {
+  const [open, setOpen] = useState(false)
+  const name = lang === 'de' ? a.de || a.en : a.en || a.de
+  const effect = lang === 'de' ? a.effectDe || a.effectEn : a.effectEn || a.effectDe
+  return (
+    <div className="rounded-xl border" style={{ borderColor: a.hidden ? '#7c5cff44' : '#ffffff12', background: 'rgba(255,255,255,0.02)' }}>
+      <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center gap-2 px-3 py-2 text-left">
+        <span className="text-sm font-bold text-slate-100">{name}</span>
+        {a.hidden && <span className="text-[10px] font-bold rounded px-1.5 py-0.5" style={{ background: '#7c5cff22', color: '#b9a8ff' }}>{t('versteckt', 'hidden')}</span>}
+        <ChevronRight className={`w-4 h-4 text-slate-500 ml-auto transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && <p className="px-3 pb-2.5 text-xs text-slate-400 leading-relaxed">{effect || t('Keine Beschreibung verfügbar.', 'No description available.')}</p>}
+    </div>
+  )
+}
+
 function AbilitiesEgg({ data, lang, t }: { data: DexDetail; lang: 'de' | 'en'; t: (de: string, en: string) => string }) {
   const aName = (de: string, en: string) => (lang === 'de' ? de || en : en || de)
   if (!data.abilities.length && !data.eggGroups.length) return null
@@ -214,13 +231,8 @@ function AbilitiesEgg({ data, lang, t }: { data: DexDetail; lang: 'de' | 'en'; t
       {data.abilities.length > 0 && (
         <section className="rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
           <h2 className="text-white font-bold text-sm mb-3">{t('Fähigkeiten', 'Abilities')}</h2>
-          <div className="flex flex-wrap gap-2">
-            {data.abilities.map((a, i) => (
-              <span key={i} className="inline-flex items-center gap-1.5 text-xs font-bold rounded-lg px-2.5 py-1.5 border" style={{ background: 'rgba(255,255,255,0.04)', borderColor: a.hidden ? '#7c5cff55' : '#ffffff14', color: '#e2e8f0' }}>
-                {aName(a.de, a.en)}
-                {a.hidden && <span className="text-[10px] font-bold rounded px-1.5 py-0.5" style={{ background: '#7c5cff22', color: '#b9a8ff' }}>{t('versteckt', 'hidden')}</span>}
-              </span>
-            ))}
+          <div className="space-y-2">
+            {data.abilities.map((a, i) => <AbilityItem key={i} a={a} lang={lang} t={t} />)}
           </div>
         </section>
       )}
@@ -239,12 +251,27 @@ function AbilitiesEgg({ data, lang, t }: { data: DexDetail; lang: 'de' | 'en'; t
 function Moves({ data, lang, t }: { data: DexDetail; lang: 'de' | 'en'; t: (de: string, en: string) => string }) {
   const navigate = useNavigate()
   const mName = (de: string, en: string) => (lang === 'de' ? de || en : en || de)
+  const byMethod = {} as Record<LearnMethod, typeof data.moves>
+  LEARN_METHODS.forEach((m) => { byMethod[m] = [] })
+  data.moves.forEach((m) => byMethod[m.method].push(m))
+  const available = LEARN_METHODS.filter((m) => byMethod[m].length)
+  const [tab, setTab] = useState<LearnMethod>(available[0] || 'level-up')
+  const active = available.includes(tab) ? tab : available[0]
+  const list = byMethod[active] || []
   return (
-    <Section title={t('Attacken (Level-Up)', 'Moves (level-up)')}>
+    <Section title={t('Attacken', 'Moves')}>
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {available.map((m) => (
+          <button key={m} onClick={() => setTab(m)} className="text-[11px] font-bold rounded-full px-3 py-1 border transition-colors"
+            style={m === active ? { background: 'var(--color-pk-red)', borderColor: 'var(--color-pk-red)', color: '#fff' } : { borderColor: '#2e2e42', color: '#cbd5e1' }}>
+            {METHOD_LABEL[lang][m]} <span className="opacity-60">{byMethod[m].length}</span>
+          </button>
+        ))}
+      </div>
       <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
-        {data.moves.map((m, i) => (
+        {list.map((m, i) => (
           <button key={i} onClick={() => navigate(`/moves/${m.id}`)} className="flex items-center gap-2.5 text-sm py-1 px-1 -mx-1 rounded-lg hover:bg-white/[0.05] transition-colors text-left">
-            <span className="font-mono text-xs text-slate-500 w-9 text-right shrink-0">{m.level > 0 ? m.level : '—'}</span>
+            {active === 'level-up' && <span className="font-mono text-xs text-slate-500 w-9 text-right shrink-0">{m.level > 0 ? m.level : '—'}</span>}
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: typeColor(m.type) }} />
             <span className="text-slate-200 truncate">{mName(m.de, m.en)}</span>
             <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-wide shrink-0">{typeLabel(m.type, lang)}</span>

@@ -4,7 +4,10 @@ import raw from '../../data/items.json'
 
 export interface ItemEntry { id: number; n: string; de: string; en: string; c: string; cost: number }
 
-export const ITEMS = raw as ItemEntry[]
+// Drop placeholder / non-usable entries (missing names, "★…" glitch items, unused data).
+const HIDDEN_CATS = new Set(['unused', 'all-machines', 'data-cards', 'dynamax-crystals'])
+const isReal = (it: ItemEntry) => !!it.en && !/^[★☆?]/.test(it.en) && !/^[★☆?]/.test(it.de || '') && !HIDDEN_CATS.has(it.c)
+export const ITEMS = (raw as ItemEntry[]).filter(isReal)
 const byId = new Map(ITEMS.map((it) => [it.id, it]))
 export const itemEntry = (id: number): ItemEntry | null => byId.get(id) || null
 export const itemName = (it: ItemEntry, lang: 'de' | 'en') => (lang === 'de' ? it.de || it.en : it.en || it.de)

@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, Loader2 } from 'lucide-react'
+import { ChevronLeft, Loader2, Search, X } from 'lucide-react'
 import { useSettings } from '../../store/settingsStore'
 import { typeLabel, typeColor, spriteUrl, dexEntry, dexName } from '../../lib/dex/dex'
 import { moveEntry, moveName, CAT_LABEL, catColor } from '../../lib/dex/moves'
 import { getMoveDetail } from '../../lib/dex/moveDetail'
+import { LEARN_METHODS, METHOD_LABEL, type LearnMethod } from '../../lib/dex/learn'
 
 // SoulDex → Attacke-Detail. Base data (type, power, accuracy, pp, category, priority) is
 // instant/offline; effect, flavour and the learner list load lazily + cache for offline.
@@ -64,7 +66,6 @@ function MoveExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: st
 
   const effect = lang === 'de' ? data.effect.de || data.effect.en : data.effect.en || data.effect.de
   const flavor = lang === 'de' ? data.flavor.de || data.flavor.en : data.flavor.en || data.flavor.de
-  const learners = data.learners.map((lid) => dexEntry(lid)).filter((e): e is NonNullable<typeof e> => !!e)
   return (
     <>
       {(effect || flavor) && (
@@ -74,19 +75,53 @@ function MoveExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: st
           {effect && flavor && flavor !== effect && <p className="text-slate-500 text-xs mt-2 leading-relaxed">{flavor}</p>}
         </section>
       )}
-      {learners.length > 0 && (
-        <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
-          <h2 className="text-white font-bold text-sm mb-3">{t('Lernt diese Attacke', 'Learned by')} <span className="text-slate-500 font-mono">({learners.length})</span></h2>
-          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))' }}>
-            {learners.map((e) => (
-              <button key={e.id} onClick={() => navigate(`/dex/pokemon/${e.id}`)} className="flex flex-col items-center rounded-xl px-1 py-1.5 hover:bg-white/[0.06] transition-colors" style={{ contentVisibility: 'auto', containIntrinsicSize: '76px' } as React.CSSProperties}>
-                <img src={spriteUrl(e.id)} alt="" loading="lazy" draggable={false} className="w-12 h-12 object-contain" style={{ imageRendering: 'pixelated' }} />
-                <span className="text-[11px] font-bold text-slate-300 truncate max-w-full">{dexName(e, lang)}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+      <Learners learners={data.learners} lang={lang} t={t} navigate={navigate} />
     </>
+  )
+}
+
+function Learners({ learners, lang, t, navigate }: { learners: { id: number; method: LearnMethod; level: number }[]; lang: 'de' | 'en'; t: (de: string, en: string) => string; navigate: (to: string) => void }) {
+  const [q, setQ] = useState('')
+  const resolved = learners.map((l) => ({ ...l, e: dexEntry(l.id) })).filter((x): x is typeof x & { e: NonNullable<typeof x.e> } => !!x.e)
+  const byMethod = {} as Record<LearnMethod, typeof resolved>
+  LEARN_METHODS.forEach((m) => { byMethod[m] = [] })
+  resolved.forEach((r) => byMethod[r.method].push(r))
+  const available = LEARN_METHODS.filter((m) => byMethod[m].length)
+  const [tab, setTab] = useState<LearnMethod>('level-up')
+  const active = available.includes(tab) ? tab : (available[0] || 'level-up')
+  if (!available.length) return null
+  const query = q.trim().toLowerCase()
+  const list = byMethod[active].filter((r) => !query || dexName(r.e, lang).toLowerCase().includes(query)).sort((a, b) => (active === 'level-up' ? a.level - b.level : 0) || dexName(a.e, lang).localeCompare(dexName(b.e, lang)))
+  return (
+    <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
+      <h2 className="text-white font-bold text-sm mb-3">{t('Welches Pokémon lernt diese Attacke?', 'Which Pokémon learn this move?')}</h2>
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {available.map((m) => (
+          <button key={m} onClick={() => setTab(m)} className="text-[11px] font-bold rounded-full px-3 py-1 border transition-colors"
+            style={m === active ? { background: 'var(--color-pk-red)', borderColor: 'var(--color-pk-red)', color: '#fff' } : { borderColor: '#2e2e42', color: '#cbd5e1' }}>
+            {METHOD_LABEL[lang][m]} <span className="opacity-60">{byMethod[m].length}</span>
+          </button>
+        ))}
+      </div>
+      <div className="relative mb-3">
+        <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Pokémon in dieser Liste suchen …', 'Search Pokémon in this list …')}
+          className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none pl-9 pr-9 py-2 text-sm text-white" />
+        {q ? <button onClick={() => setQ('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"><X className="w-4 h-4" /></button> : null}
+      </div>
+      {list.length === 0 ? (
+        <p className="text-slate-500 text-sm">{t('Kein Treffer.', 'No match.')}</p>
+      ) : (
+        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))' }}>
+          {list.map((r) => (
+            <button key={`${r.id}-${r.method}`} onClick={() => navigate(`/dex/pokemon/${r.id}`)} className="flex flex-col items-center rounded-xl px-1 py-1.5 hover:bg-white/[0.06] transition-colors" style={{ contentVisibility: 'auto', containIntrinsicSize: '84px' } as React.CSSProperties}>
+              <img src={spriteUrl(r.id)} alt="" loading="lazy" draggable={false} className="w-12 h-12 object-contain" style={{ imageRendering: 'pixelated' }} />
+              <span className="text-[11px] font-bold text-slate-300 truncate max-w-full">{dexName(r.e, lang)}</span>
+              <span className="text-[10px] text-slate-500">{active === 'level-up' ? (r.level > 0 ? `Lv. ${r.level}` : '—') : METHOD_LABEL[lang][active]}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
