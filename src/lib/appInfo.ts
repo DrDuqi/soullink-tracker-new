@@ -9,6 +9,8 @@ const REPO_API = 'https://api.github.com/repos/DrDuqi/soullink-tracker-new'
 export const LINKS = {
   github: REPO,
   changelog: `${REPO}/releases`,
+  // Always-newest installer (GitHub serves the latest release's asset by name).
+  download: `${REPO}/releases/latest/download/SoulLink-Companion-Setup.exe`,
   // No public Discord invite yet. Paste it here to light up the Discord menu entry.
   discord: '',
 }

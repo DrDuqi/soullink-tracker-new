@@ -112,6 +112,9 @@ function refreshTray() {
     { label: 'SoulLink öffnen', click: () => showWindow() },
     { type: 'separator' },
     { label: statusLabel(), enabled: false },
+    { label: `Version ${app.getVersion()}`, enabled: false },
+    { label: 'Nach Updates suchen …', click: () => checkForUpdatesManual() },
+    { label: 'Was ist neu? (Changelog)', click: () => shell.openExternal(CHANGELOG_URL) },
     { label: 'Landing-Website öffnen', click: () => shell.openExternal(WEBSITE) },
     { label: 'Mit Windows starten', type: 'checkbox', checked: autoStartEnabled(), click: (mi) => setAutoStart(mi.checked) },
     ...devMenu(),
@@ -204,6 +207,8 @@ ipcMain.on('win:minimize', () => { if (win && !win.isDestroyed()) win.minimize()
 ipcMain.on('win:toggle-maximize', () => { if (win && !win.isDestroyed()) { win.isMaximized() ? win.unmaximize() : win.maximize() } })
 ipcMain.on('win:close', () => { if (win && !win.isDestroyed()) win.close() })
 ipcMain.handle('win:is-maximized', () => !!(win && !win.isDestroyed() && win.isMaximized()))
+ipcMain.handle('app:version', () => app.getVersion())
+ipcMain.on('app:check-updates', () => { try { checkForUpdatesManual() } catch (e) { slogErr('check-updates (ipc)', e) } })
 
 async function startServer() {
   const userData = app.getPath('userData')
@@ -241,13 +246,72 @@ async function startServer() {
   refreshTray()
 }
 
+// ── Auto-Update (electron-updater + GitHub Releases) ─────────────────────────
+// Discord/Steam-style: check on start (and manually via the tray), ASK before
+// downloading, then download → quit → install → relaunch in one click. No more
+// manual GitHub installer downloads. The release already ships latest.yml + the
+// installer + blockmap, which is everything electron-updater needs.
+let _updater = null
+let _updaterWired = false
+let _updateAccepted = false     // user chose "Jetzt aktualisieren" → install once downloaded
+const CHANGELOG_URL = 'https://github.com/DrDuqi/soullink-tracker-new/releases'
+
+function parentWin() { return (win && !win.isDestroyed()) ? win : null }
+function msgBox(opts) { const p = parentWin(); return p ? dialog.showMessageBoxSync(p, opts) : dialog.showMessageBoxSync(opts) }
+
+function getUpdater() {
+  if (_updater) return _updater
+  try { _updater = require('electron-updater').autoUpdater } catch { return null }
+  _updater.autoDownload = false            // ask first (don't surprise-download)
+  _updater.autoInstallOnAppQuit = true     // if they pick "Später" after a download, install on quit
+  return _updater
+}
+
+function wireUpdater(au) {
+  if (_updaterWired) return
+  _updaterWired = true
+  au.on('update-available', (info) => {
+    const v = (info && info.version) || '?'
+    slog(`Update verfügbar: v${v}`)
+    const r = msgBox({
+      type: 'info', noLink: true, defaultId: 0, cancelId: 1,
+      title: 'Update verfügbar',
+      message: `Neue Version verfügbar: v${v}`,
+      detail: 'SoulLink Companion kann sich jetzt selbst aktualisieren: Update laden, neu starten und installieren — alles automatisch.',
+      buttons: ['Jetzt aktualisieren', 'Später'],
+    })
+    if (r === 0) {
+      _updateAccepted = true
+      notify('SoulLink Companion', `Update v${v} wird heruntergeladen …`)
+      au.downloadUpdate().catch((e) => { slogErr('downloadUpdate', e); notify('SoulLink Companion', 'Update-Download fehlgeschlagen.') })
+    }
+  })
+  au.on('download-progress', (p) => { try { if (tray) tray.setToolTip(`SoulLink Companion — Update lädt … ${Math.round(p.percent || 0)}%`) } catch { /* ignore */ } })
+  au.on('update-downloaded', () => {
+    slog('Update heruntergeladen.')
+    try { refreshTray() } catch { /* ignore */ }
+    if (_updateAccepted) { quitting = true; setImmediate(() => { try { au.quitAndInstall() } catch (e) { slogErr('quitAndInstall', e) } }) }
+    else notify('SoulLink Companion', 'Update bereit — wird beim nächsten Start installiert.')
+  })
+  au.on('error', (e) => slogErr('autoUpdater', e))
+}
+
+// Automatic, silent check on startup (only nags when an update actually exists).
 function checkForUpdates() {
-  try {
-    const { autoUpdater } = require('electron-updater')
-    autoUpdater.autoDownload = true
-    autoUpdater.on('update-downloaded', () => notify('SoulLink Companion', 'Update bereit — wird beim nächsten Start installiert.'))
-    autoUpdater.checkForUpdatesAndNotify().catch(() => { /* no releases yet → ignore */ })
-  } catch { /* updater unavailable in dev → ignore */ }
+  if (!app.isPackaged) return
+  const au = getUpdater(); if (!au) return
+  wireUpdater(au)
+  au.checkForUpdates().catch((e) => slogErr('checkForUpdates', e))
+}
+
+// Manual check from the tray → also confirms when already up to date.
+function checkForUpdatesManual() {
+  if (!app.isPackaged) { msgBox({ type: 'info', noLink: true, message: 'Updates sind nur in der installierten App verfügbar.', buttons: ['OK'] }); return }
+  const au = getUpdater(); if (!au) return
+  wireUpdater(au)
+  const onNone = () => { au.removeListener('update-not-available', onNone); msgBox({ type: 'info', noLink: true, title: 'Kein Update', message: `Du hast bereits die neueste Version (v${app.getVersion()}).`, buttons: ['OK'] }) }
+  au.once('update-not-available', onNone)
+  au.checkForUpdates().catch((e) => { au.removeListener('update-not-available', onNone); slogErr('checkForUpdatesManual', e); msgBox({ type: 'warning', noLink: true, message: 'Update-Prüfung fehlgeschlagen. Bist du online?', buttons: ['OK'] }) })
 }
 
 app.on('window-all-closed', () => { /* close-to-tray → stay alive in the tray */ })

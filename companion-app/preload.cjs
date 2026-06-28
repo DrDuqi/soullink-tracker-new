@@ -22,4 +22,7 @@ contextBridge.exposeInMainWorld('soullinkNative', {
     ipcRenderer.on('win:maximize-changed', handler)
     return () => ipcRenderer.removeListener('win:maximize-changed', handler)
   },
+  // App version + self-update (Settings → Über).
+  getVersion: () => ipcRenderer.invoke('app:version'),
+  checkForUpdates: () => ipcRenderer.send('app:check-updates'),
 })
