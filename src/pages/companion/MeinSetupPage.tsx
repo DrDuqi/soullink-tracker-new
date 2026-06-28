@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Gamepad2, Cpu, Dices, Check, Loader2, Download, ChevronRight, FolderOpen } from 'lucide-react'
+import { Gamepad2, Cpu, Dices, Check, Loader2, ChevronRight, FolderOpen, Sparkles } from 'lucide-react'
 import { useProfiles } from '../../hooks/useProfiles'
 import { useCompanion } from '../../hooks/useCompanion'
 import { getPlatform } from '../../platform'
-import { DOWNLOADS } from '../../lib/downloads'
 import type { RomInfo } from '../../lib/companion'
 import type { Preset } from '../../lib/presets'
 
@@ -42,6 +41,29 @@ export default function MeinSetupPage() {
   }
   async function setRules(presetId: string) { if (active) await update(active.id, { presetId }) }
 
+  // Auto-install BizHawk (download + extract into the managed folder) so the player
+  // never picks an emulator by hand. Poll the progress for a bar.
+  const [bizInstall, setBizInstall] = useState<{ state: string; percent: number; error: string | null } | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+  async function autoInstallBiz() {
+    setBizInstall({ state: 'downloading', percent: 0, error: null })
+    await platform.installBizhawk()
+    if (pollRef.current) clearInterval(pollRef.current)
+    pollRef.current = setInterval(async () => {
+      const st = await platform.bizhawkStatus()
+      if (!st) return
+      setBizInstall({ state: st.state, percent: st.percent, error: st.error })
+      if (st.state === 'done' && st.exe && active) {
+        if (pollRef.current) clearInterval(pollRef.current)
+        await update(active.id, { paths: { bizhawk: st.exe } })
+        setBizInstall(null)
+      } else if (st.state === 'error') {
+        if (pollRef.current) clearInterval(pollRef.current)
+      }
+    }, 1000)
+  }
+
   if (!available) {
     return (
       <div className="max-w-2xl mx-auto px-8 py-10">
@@ -73,9 +95,31 @@ export default function MeinSetupPage() {
 
         {/* Emulator */}
         <Row icon={Cpu} title="Emulator (BizHawk)" done={!!biz} value={fname(biz)}
-          desc="Der Emulator, in dem dein Pokémon läuft."
-          busy={busy === 'biz'} action={biz ? 'Ändern' : 'Auswählen'} onClick={pickBiz} icon2={FolderOpen}
-          extra={!biz ? <a href={DOWNLOADS.bizhawk} target="_blank" rel="noreferrer" className="text-[11px] font-bold text-pk-red hover:underline inline-flex items-center gap-1"><Download className="w-3.5 h-3.5" /> BizHawk herunterladen</a> : null} />
+          desc="Der Emulator, in dem dein Pokémon läuft — SoulLink richtet ihn automatisch ein."
+          busy={busy === 'biz'} action={biz ? 'Ändern' : 'Selbst wählen'} onClick={pickBiz} icon2={FolderOpen}
+          extra={!biz ? (
+            bizInstall ? (
+              bizInstall.state === 'error' ? (
+                <div className="text-[11px]">
+                  <span className="text-amber-400">Einrichtung fehlgeschlagen: {bizInstall.error}</span>
+                  <button onClick={autoInstallBiz} className="ml-2 font-bold text-pk-red hover:underline">Erneut versuchen</button>
+                </div>
+              ) : (
+                <div className="w-full">
+                  <div className="flex items-center justify-between text-[11px] font-bold mb-1">
+                    <span className="text-slate-300 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> {bizInstall.state === 'extracting' ? 'Entpacken…' : 'BizHawk wird geladen…'}</span>
+                    <span className="text-slate-500">{bizInstall.percent}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-[#2a2a35] overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${bizInstall.percent}%`, background: '#CC0000' }} /></div>
+                </div>
+              )
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={autoInstallBiz} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold text-white" style={{ background: '#CC0000' }}><Sparkles className="w-3.5 h-3.5" /> Automatisch einrichten</button>
+                <span className="text-[11px] text-slate-500">lädt BizHawk ~65 MB · empfohlen</span>
+              </div>
+            )
+          ) : null} />
 
         {/* Standard-Spielregeln */}
         <div className="rounded-2xl border border-[#2e2e42] bg-[#16161f] p-4">

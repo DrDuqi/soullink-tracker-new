@@ -4,7 +4,7 @@
 // responses. The HTTP helpers stay as the "web transport"; a future CompanionBridge
 // will implement the same interface over IPC instead.
 
-import { USES_COMPANION, companionHealth, companionConfig, saveCompanionConfig, pickCompanionFile, validateRomHttp, randomizerStatusHttp, randomizeHttp, openRandomizerHttp } from '../lib/companion'
+import { USES_COMPANION, companionHealth, companionConfig, saveCompanionConfig, pickCompanionFile, validateRomHttp, randomizerStatusHttp, randomizeHttp, openRandomizerHttp, installBizhawkHttp, bizhawkStatusHttp } from '../lib/companion'
 import { findFile, launchEmulator } from '../lib/emulatorSettings'
 import { fetchProfiles, createProfileHttp, updateProfileHttp, deleteProfileHttp, duplicateProfileHttp, setActiveProfileHttp, prepareRunHttp, getLocalRunHttp, listLocalRunsHttp, archiveRunHttp, deleteRunHttp } from '../lib/profiles'
 import { fetchPresets, importPresetHttp, renamePresetHttp, deletePresetHttp, grabRulesHttp } from '../lib/presets'
@@ -27,6 +27,8 @@ export const webBridge: PlatformBridge = {
   setActiveProfile: (id) => setActiveProfileHttp(id),
   validateRom: (path) => validateRomHttp(path),
   randomizerStatus: () => randomizerStatusHttp(),
+  installBizhawk: () => installBizhawkHttp(),
+  bizhawkStatus: () => bizhawkStatusHttp(),
   randomize: (input) => randomizeHttp(input),
   prepareRun: (input) => prepareRunHttp(input),
   getLocalRun: (runId) => getLocalRunHttp(runId),

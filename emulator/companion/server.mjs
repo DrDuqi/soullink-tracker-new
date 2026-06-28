@@ -33,6 +33,7 @@ import { validateRom } from './roms.mjs'
 import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs } from './presets.mjs'
 import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun, runIdForRom } from './runs.mjs'
 import { ensureRunBizhawkConfig } from './runConfig.mjs'
+import { installBizhawk, bizhawkInstallState } from './bizhawk.mjs'
 
 // Real running version. NEVER hardcoded — the Electron host passes app.getVersion()
 // (which CI bumps from the release tag) to startCompanion; CLI falls back to the
@@ -787,6 +788,22 @@ function handleRequest(req, res) {
       }
       sendJson(res, { ok: true, runId, outputRom, seed, presetId, presetData, baseRom, edition: profile.edition || null, bizhawk: paths.bizhawk, players: profile.players || [] })
     })
+    return
+  }
+  // bizhawk/install: download + extract a pinned BizHawk into the managed folder so
+  // the player never installs an emulator by hand. Kicks off async; the client polls
+  // /api/bizhawk/status. On success we remember the path in the config.
+  if (path === '/api/bizhawk/install' && req.method === 'POST') {
+    const st = bizhawkInstallState()
+    if (st.state === 'downloading' || st.state === 'extracting') { sendJson(res, { ok: true, state: st }); return }
+    const targetDir = join(APPDATA_DIR, 'BizHawk')
+    installBizhawk({ targetDir, onDone: (exe) => { try { saveConfig({ bizhawk: exe }) } catch { /* ignore */ } } })
+      .catch((e) => console.error('[bizhawk] install:', e?.message || e))
+    sendJson(res, { ok: true, state: bizhawkInstallState() })
+    return
+  }
+  if (path === '/api/bizhawk/status') {
+    sendJson(res, { ok: true, ...bizhawkInstallState() })
     return
   }
   // run/local: is this run set up on THIS PC? → its ROM/seed/preset for relaunch.

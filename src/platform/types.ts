@@ -9,14 +9,14 @@
 // This is the abstraction that lets "Setup + Spielen" move into a native Companion
 // window later (the agreed Hybrid architecture) without rebuilding the wizard.
 
-import type { CompanionConfig, RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult } from '../lib/companion'
+import type { CompanionConfig, RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult, BizhawkStatus } from '../lib/companion'
 import type { EmulatorSettings, LaunchResult } from '../lib/emulatorSettings'
 import type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult, LocalRun } from '../lib/profiles'
 import type { Preset, ImportPresetInput } from '../lib/presets'
 
 export type { CompanionConfig, EmulatorSettings, LaunchResult }
 export type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult, LocalRun }
-export type { RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult }
+export type { RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult, BizhawkStatus }
 export type { Preset, ImportPresetInput }
 
 export type PlatformKind = 'web' | 'companion'
@@ -68,6 +68,10 @@ export interface PlatformBridge {
   validateRom(path: string): Promise<RomInfo | null>
   /** Is FVX available (bundled / configured / detected)? */
   randomizerStatus(): Promise<RandomizerStatus | null>
+  /** Start the automatic BizHawk download+extract (no manual install). */
+  installBizhawk(): Promise<boolean>
+  /** Poll the BizHawk auto-install progress. */
+  bizhawkStatus(): Promise<BizhawkStatus | null>
   /** Run FVX to produce a randomized ROM (long-running). */
   randomize(input: RandomizeInput): Promise<RandomizeResult>
   /** Prepare a new SoulLink: randomize the profile's ROM into a per-run file. */
