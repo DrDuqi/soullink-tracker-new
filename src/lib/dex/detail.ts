@@ -6,7 +6,7 @@
 import { cacheGet, cacheSet } from './dexCache'
 
 export interface DexAbility { de: string; en: string; hidden: boolean }
-export interface DexMove { level: number; de: string; en: string; type: string }
+export interface DexMove { id: number; level: number; de: string; en: string; type: string }
 export interface DexEvo { id: number; de: string; en: string; from: number | null; level: number | null; trigger: string | null; item: string | null; happiness: number | null; time: string | null }
 export interface DexEncounter { version: { de: string; en: string }; location: { de: string; en: string }; min: number; max: number; chance: number }
 export interface DexMeta { height: number; weight: number; baseExp: number; captureRate: number; baseHappiness: number; genderRate: number; hatchCounter: number; growth: string; legendary: boolean; mythical: boolean; baby: boolean }
@@ -27,7 +27,7 @@ const QUERY = `query D($id: Int!) {
     height weight base_experience
     pokemon_v2_pokemonabilities { is_hidden pokemon_v2_ability { pokemon_v2_abilitynames${L} { name language_id } } }
     pokemon_v2_pokemonmoves(where: {pokemon_v2_movelearnmethod: {name: {_eq: "level-up"}}}, distinct_on: move_id, order_by: [{move_id: asc}, {level: asc}]) {
-      level pokemon_v2_move { pokemon_v2_type { name } pokemon_v2_movenames${L} { name language_id } }
+      level move_id pokemon_v2_move { pokemon_v2_type { name } pokemon_v2_movenames${L} { name language_id } }
     }
     pokemon_v2_encounters {
       min_level max_level
@@ -56,7 +56,7 @@ const nm = (a: Named[] = []) => ({ de: a.find((n) => n.language_id === 6)?.name 
 const clean = (t?: string) => (t || '').replace(/[\f\n\r­]/g, ' ').replace(/\s+/g, ' ').trim()
 
 export async function getDexDetail(id: number): Promise<DexDetail | null> {
-  const ck = `detail:v2:${id}`
+  const ck = `detail:v3:${id}`
   const cached = await cacheGet<DexDetail>(ck)
   if (cached) return cached
   try {
@@ -84,7 +84,7 @@ export async function getDexDetail(id: number): Promise<DexDetail | null> {
       abilities: (p.pokemon_v2_pokemonabilities || []).map((a: any) => ({ ...nm(a.pokemon_v2_ability?.pokemon_v2_abilitynames), hidden: a.is_hidden })),
       eggGroups: (spec?.pokemon_v2_pokemonegggroups || []).map((g: any) => nm(g.pokemon_v2_egggroup?.pokemon_v2_egggroupnames)),
       flavor: { de: clean(ft.find((x: any) => x.language_id === 6)?.flavor_text), en: clean(ft.find((x: any) => x.language_id === 9)?.flavor_text) },
-      moves: (p.pokemon_v2_pokemonmoves || []).map((m: any) => ({ level: m.level, ...nm(m.pokemon_v2_move?.pokemon_v2_movenames), type: m.pokemon_v2_move?.pokemon_v2_type?.name || 'normal' })).sort((a: DexMove, b: DexMove) => a.level - b.level || a.en.localeCompare(b.en)),
+      moves: (p.pokemon_v2_pokemonmoves || []).map((m: any) => ({ id: m.move_id, level: m.level, ...nm(m.pokemon_v2_move?.pokemon_v2_movenames), type: m.pokemon_v2_move?.pokemon_v2_type?.name || 'normal' })).sort((a: DexMove, b: DexMove) => a.level - b.level || a.en.localeCompare(b.en)),
       evo: (spec?.pokemon_v2_evolutionchain?.pokemon_v2_pokemonspecies || []).map((s: any) => {
         const ev = s.pokemon_v2_pokemonevolutions?.[0]
         const item = ev?.pokemon_v2_item ? nm(ev.pokemon_v2_item.pokemon_v2_itemnames) : null

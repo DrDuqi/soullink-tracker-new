@@ -237,17 +237,18 @@ function AbilitiesEgg({ data, lang, t }: { data: DexDetail; lang: 'de' | 'en'; t
 }
 
 function Moves({ data, lang, t }: { data: DexDetail; lang: 'de' | 'en'; t: (de: string, en: string) => string }) {
+  const navigate = useNavigate()
   const mName = (de: string, en: string) => (lang === 'de' ? de || en : en || de)
   return (
     <Section title={t('Attacken (Level-Up)', 'Moves (level-up)')}>
-      <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
+      <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
         {data.moves.map((m, i) => (
-          <div key={i} className="flex items-center gap-2.5 text-sm py-0.5">
+          <button key={i} onClick={() => navigate(`/moves/${m.id}`)} className="flex items-center gap-2.5 text-sm py-1 px-1 -mx-1 rounded-lg hover:bg-white/[0.05] transition-colors text-left">
             <span className="font-mono text-xs text-slate-500 w-9 text-right shrink-0">{m.level > 0 ? m.level : '—'}</span>
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: typeColor(m.type) }} />
             <span className="text-slate-200 truncate">{mName(m.de, m.en)}</span>
             <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-wide shrink-0">{typeLabel(m.type, lang)}</span>
-          </div>
+          </button>
         ))}
       </div>
     </Section>

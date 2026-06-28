@@ -24,6 +24,10 @@ const CompanionSettings = lazy(() => import('./pages/companion/SettingsPage'))
 const MeinSetupPage = lazy(() => import('./pages/companion/MeinSetupPage'))
 const DexPage = lazy(() => import('./pages/dex/DexPage'))
 const DexEntryPage = lazy(() => import('./pages/dex/DexEntryPage'))
+const MovesPage = lazy(() => import('./pages/dex/MovesPage'))
+const MoveEntryPage = lazy(() => import('./pages/dex/MoveEntryPage'))
+const ItemsPage = lazy(() => import('./pages/dex/ItemsPage'))
+const ItemEntryPage = lazy(() => import('./pages/dex/ItemEntryPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
@@ -57,6 +61,10 @@ export default function App() {
                     <Route path="/mysetup" element={<MeinSetupPage />} />
                     <Route path="/dex" element={<DexPage />} />
                     <Route path="/dex/pokemon/:id" element={<DexEntryPage />} />
+                    <Route path="/moves" element={<MovesPage />} />
+                    <Route path="/moves/:id" element={<MoveEntryPage />} />
+                    <Route path="/items" element={<ItemsPage />} />
+                    <Route path="/items/:id" element={<ItemEntryPage />} />
                     <Route path="/presets" element={<PresetsPage />} />
                     <Route path="/setup" element={<SetupPage />} />
                     <Route path="/profiles" element={<ProfilesPage />} />
@@ -73,6 +81,10 @@ export default function App() {
                   <Route path="/" element={<HomePage />} />
                   <Route path="/dex" element={<DexPage />} />
                   <Route path="/dex/pokemon/:id" element={<DexEntryPage />} />
+                  <Route path="/moves" element={<MovesPage />} />
+                  <Route path="/moves/:id" element={<MoveEntryPage />} />
+                  <Route path="/items" element={<ItemsPage />} />
+                  <Route path="/items/:id" element={<ItemEntryPage />} />
                   <Route path="/run/:runId" element={<RunPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
