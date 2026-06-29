@@ -1,265 +1,1568 @@
 {
   "80": [
-    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
-    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+    {
+      "how": "ground",
+      "loc": "Naturzone",
+      "ed": [
+        "swsh"
+      ]
+    },
+    {
+      "how": "shop",
+      "npc": "Delibird Presents",
+      "ed": [
+        "sv"
+      ]
+    }
   ],
   "81": [
-    { "how": "ground", "loc": "Mond-Berg", "ed": ["rby", "frlg"] },
-    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
-    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+    {
+      "how": "ground",
+      "loc": "Mond-Berg",
+      "ed": [
+        "rby",
+        "frlg"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Naturzone",
+      "ed": [
+        "swsh"
+      ]
+    },
+    {
+      "how": "shop",
+      "npc": "Delibird Presents",
+      "ed": [
+        "sv"
+      ]
+    }
   ],
   "82": [
-    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
-    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+    {
+      "how": "ground",
+      "loc": "Naturzone",
+      "ed": [
+        "swsh"
+      ]
+    },
+    {
+      "how": "shop",
+      "npc": "Delibird Presents",
+      "ed": [
+        "sv"
+      ]
+    }
   ],
   "83": [
-    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
-    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+    {
+      "how": "ground",
+      "loc": "Naturzone",
+      "ed": [
+        "swsh"
+      ]
+    },
+    {
+      "how": "shop",
+      "npc": "Delibird Presents",
+      "ed": [
+        "sv"
+      ]
+    }
   ],
   "84": [
-    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
-    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+    {
+      "how": "ground",
+      "loc": "Naturzone",
+      "ed": [
+        "swsh"
+      ]
+    },
+    {
+      "how": "shop",
+      "npc": "Delibird Presents",
+      "ed": [
+        "sv"
+      ]
+    }
   ],
   "85": [
-    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
-    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
-  ],
-  "107": [
-    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
-    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
-  ],
-  "108": [
-    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
-    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
-  ],
-  "109": [
-    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
-    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
-  ],
-  "110": [
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] },
-    { "how": "ground", "loc": "Naturzone & Routen", "ed": ["swsh"] }
-  ],
-  "885": [
-    { "how": "ground", "loc": "Naturzone (See des Zorns)", "ed": ["swsh"] },
-    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
-  ],
-  "198": [
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] },
-    { "how": "pickup", "loc": "von wilden Pokémon getragen (z. B. Quaputzi, Hariyama)", "ed": ["all"], "note": "in vielen Editionen auch als Fund" }
-  ],
-  "203": [
-    { "how": "pickup", "loc": "von wildem Perlu getragen", "ed": ["rse", "oras"] },
-    { "how": "ground", "loc": "Fund (u. a. Schädelhöhle)", "ed": ["bw", "b2w2"] }
-  ],
-  "204": [
-    { "how": "pickup", "loc": "von wildem Perlu getragen", "ed": ["rse", "oras"] },
-    { "how": "ground", "loc": "Fund (u. a. Schädelhöhle)", "ed": ["bw", "b2w2"] }
-  ],
-  "210": [
-    { "how": "pickup", "loc": "von wildem Magnetilo/Stahlos getragen", "ed": ["all"] },
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] }
-  ],
-  "212": [
-    { "how": "pickup", "loc": "von wildem Seemon/Seedrake getragen", "ed": ["all"] },
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] }
-  ],
-  "229": [
-    { "how": "gift", "loc": "Silph Co. (Geschenk)", "ed": ["gsc", "hgss"] },
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] }
-  ],
-  "298": [
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz); Route 228", "ed": ["dppt", "bdsp"] }
-  ],
-  "299": [
-    { "how": "pickup", "loc": "von wildem Elektek getragen", "ed": ["all"] },
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] }
-  ],
-  "300": [
-    { "how": "pickup", "loc": "von wildem Magmar getragen", "ed": ["all"] },
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] }
-  ],
-  "301": [
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz); Galaktik-Gebäude", "ed": ["dppt", "bdsp"] }
-  ],
-  "302": [
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz); Umkehrhöhle", "ed": ["dppt", "bdsp"] }
-  ],
-  "303": [
-    { "how": "pickup", "loc": "von wildem Sniebel getragen", "ed": ["all"] },
-    { "how": "ground", "loc": "Sinnoh-Untergrund; Route 224", "ed": ["dppt", "bdsp"] }
-  ],
-  "304": [
-    { "how": "pickup", "loc": "von wildem Skorgla getragen", "ed": ["all"] },
-    { "how": "ground", "loc": "Route 214 / Kampfzone", "ed": ["dppt", "bdsp"] }
-  ],
-  "580": [
-    { "how": "pickup", "loc": "von wildem Liebiskus getragen", "ed": ["bw", "b2w2", "xy"] },
-    { "how": "ground", "loc": "Fund (diverse Routen)", "ed": ["all"] }
-  ],
-  "686": [
-    { "how": "gift", "loc": "in mehreren Editionen als Fund/Belohnung", "ed": ["xy", "swsh", "sv"], "note": "für die Tausch-Entwicklung von Pummeluff-Linien" }
-  ],
-  "687": [
-    { "how": "gift", "loc": "in mehreren Editionen als Fund/Belohnung", "ed": ["xy", "swsh", "sv"] }
-  ],
-  "1174": [
-    { "how": "shop", "loc": "Hammerlocke", "npc": "Apfel-Händler", "ed": ["swsh"] }
-  ],
-  "1175": [
-    { "how": "shop", "loc": "Hammerlocke", "npc": "Apfel-Händler", "ed": ["swsh"] }
-  ],
-  "1311": [
-    { "how": "shop", "loc": "Hammerlocke", "npc": "Antik-Händler", "ed": ["swsh"], "note": "günstige Variante; die seltene Form entwickelt die Antik-Form" }
-  ],
-  "1633": [
-    { "how": "craft", "loc": "Rüstungsinsel (NPC, aus Galarnüssen)", "ed": ["swsh"], "note": "DLC: Rüstungsinsel" }
-  ],
-  "1643": [
-    { "how": "craft", "loc": "Kronen-Schneeland (NPC, aus Galarnüssen)", "ed": ["swsh"], "note": "DLC: Kronen-Schneeland" }
-  ],
-  "1677": [
-    { "how": "gift", "loc": "Zapapico", "npc": "NPC-Tausch gegen gesammelte Materialien", "ed": ["sv"], "note": "v. a. Purpur" }
-  ],
-  "2045": [
-    { "how": "gift", "loc": "Zapapico", "npc": "NPC-Tausch gegen Bronzel-Fragmente", "ed": ["sv"], "note": "v. a. Karmesin" }
-  ],
-  "10001": [
-    { "how": "ground", "loc": "Hisui-Region (diverse Fundorte)", "ed": ["la"] }
-  ],
-  "10002": [
-    { "how": "ground", "loc": "Karmin-Sumpfland (Hisui)", "ed": ["la"] }
+    {
+      "how": "ground",
+      "loc": "Naturzone",
+      "ed": [
+        "swsh"
+      ]
+    },
+    {
+      "how": "shop",
+      "npc": "Delibird Presents",
+      "ed": [
+        "sv"
+      ]
+    }
   ],
   "99": [
-    { "how": "ground", "loc": "Route 111 (Wüste, Wundersäule)", "ed": ["rse", "oras"], "note": "nur eines pro Spiel; Wiederbelebung bei Devon Corp → Liliep" }
+    {
+      "how": "ground",
+      "loc": "Route 111 (Wüste, Wundersäule)",
+      "ed": [
+        "rse",
+        "oras"
+      ],
+      "note": "nur eines pro Spiel; Wiederbelebung bei Devon Corp → Liliep"
+    }
   ],
   "100": [
-    { "how": "ground", "loc": "Route 111 (Wüste, Wundersäule)", "ed": ["rse", "oras"], "note": "nur eines pro Spiel; Wiederbelebung bei Devon Corp → Anorith" }
+    {
+      "how": "ground",
+      "loc": "Route 111 (Wüste, Wundersäule)",
+      "ed": [
+        "rse",
+        "oras"
+      ],
+      "note": "nur eines pro Spiel; Wiederbelebung bei Devon Corp → Anorith"
+    }
   ],
   "101": [
-    { "how": "ground", "loc": "Mond-Berg (Auswahl)", "ed": ["rby", "frlg"], "note": "Wiederbelebung im Labor (Zinnober-Insel) → Amonitas" }
+    {
+      "how": "ground",
+      "loc": "Mond-Berg (Auswahl)",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "Wiederbelebung im Labor (Zinnober-Insel) → Amonitas"
+    }
   ],
   "102": [
-    { "how": "ground", "loc": "Mond-Berg (Auswahl)", "ed": ["rby", "frlg"], "note": "Wiederbelebung im Labor → Kabuto" }
+    {
+      "how": "ground",
+      "loc": "Mond-Berg (Auswahl)",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "Wiederbelebung im Labor → Kabuto"
+    }
   ],
   "103": [
-    { "how": "ground", "loc": "Museum in Marmoria City", "ed": ["rby", "frlg"], "note": "Wiederbelebung im Labor → Aerodactyl" }
+    {
+      "how": "ground",
+      "loc": "Museum in Marmoria City",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "Wiederbelebung im Labor → Aerodactyl"
+    }
   ],
   "104": [
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabung)", "ed": ["dppt", "bdsp"], "note": "Wiederbelebung im Museum Erzelingen → Schilterus" }
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabung)",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ],
+      "note": "Wiederbelebung im Museum Erzelingen → Schilterus"
+    }
   ],
   "105": [
-    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabung)", "ed": ["dppt", "bdsp"], "note": "Wiederbelebung im Museum Erzelingen → Koknodon" }
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabung)",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ],
+      "note": "Wiederbelebung im Museum Erzelingen → Koknodon"
+    }
   ],
-  "613": [
-    { "how": "gift", "loc": "Wüstenrast", "npc": "Rucksacktourist", "ed": ["bw", "b2w2"], "note": "Wiederbelebung im Museum Rosaria City → Galapaflos" }
+  "107": [
+    {
+      "how": "ground",
+      "loc": "Naturzone",
+      "ed": [
+        "swsh"
+      ]
+    },
+    {
+      "how": "shop",
+      "npc": "Delibird Presents",
+      "ed": [
+        "sv"
+      ]
+    }
   ],
-  "614": [
-    { "how": "gift", "loc": "Wüstenrast", "npc": "Rucksacktourist", "ed": ["bw", "b2w2"], "note": "Wiederbelebung im Museum Rosaria City → Flapteryx" }
+  "108": [
+    {
+      "how": "ground",
+      "loc": "Naturzone",
+      "ed": [
+        "swsh"
+      ]
+    },
+    {
+      "how": "shop",
+      "npc": "Delibird Presents",
+      "ed": [
+        "sv"
+      ]
+    }
   ],
-  "729": [
-    { "how": "gift", "loc": "Marmola City", "npc": "Fossil-Fan", "ed": ["xy"], "note": "Wiederbelebung → Balgoras" }
+  "109": [
+    {
+      "how": "ground",
+      "loc": "Naturzone",
+      "ed": [
+        "swsh"
+      ]
+    },
+    {
+      "how": "shop",
+      "npc": "Delibird Presents",
+      "ed": [
+        "sv"
+      ]
+    }
   ],
-  "730": [
-    { "how": "gift", "loc": "Marmola City", "npc": "Fossil-Fan", "ed": ["xy"], "note": "Wiederbelebung → Amarino" }
+  "110": [
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabungsschatz)",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Naturzone & Routen",
+      "ed": [
+        "swsh"
+      ]
+    }
   ],
-  "1163": [
-    { "how": "ground", "loc": "Naturzone (Grabe-Brüder) & Fund", "ed": ["swsh"], "note": "Oberteil; mit einem Unterteil-Fossil bei der Forscherin (Route 6) kombinieren" }
+  "198": [
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabungsschatz)",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    },
+    {
+      "how": "pickup",
+      "loc": "von wilden Pokémon getragen (z. B. Quaputzi, Hariyama)",
+      "ed": [
+        "all"
+      ],
+      "note": "in vielen Editionen auch als Fund"
+    }
   ],
-  "1164": [
-    { "how": "ground", "loc": "Naturzone (Grabe-Brüder) & Fund", "ed": ["swsh"], "note": "Unterteil; mit einem Oberteil-Fossil bei der Forscherin (Route 6) kombinieren" }
+  "203": [
+    {
+      "how": "pickup",
+      "loc": "von wildem Perlu getragen",
+      "ed": [
+        "rse",
+        "oras"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Fund (u. a. Schädelhöhle)",
+      "ed": [
+        "bw",
+        "b2w2"
+      ]
+    }
   ],
-  "1165": [
-    { "how": "ground", "loc": "Naturzone (Grabe-Brüder) & Fund", "ed": ["swsh"], "note": "Unterteil; mit einem Oberteil-Fossil bei der Forscherin (Route 6) kombinieren" }
+  "204": [
+    {
+      "how": "pickup",
+      "loc": "von wildem Perlu getragen",
+      "ed": [
+        "rse",
+        "oras"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Fund (u. a. Schädelhöhle)",
+      "ed": [
+        "bw",
+        "b2w2"
+      ]
+    }
   ],
-  "1166": [
-    { "how": "ground", "loc": "Naturzone (Grabe-Brüder) & Fund", "ed": ["swsh"], "note": "Oberteil; mit einem Unterteil-Fossil bei der Forscherin (Route 6) kombinieren" }
+  "210": [
+    {
+      "how": "pickup",
+      "loc": "von wildem Magnetilo/Stahlos getragen",
+      "ed": [
+        "all"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabungsschatz)",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    }
+  ],
+  "212": [
+    {
+      "how": "pickup",
+      "loc": "von wildem Seemon/Seedrake getragen",
+      "ed": [
+        "all"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabungsschatz)",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    }
+  ],
+  "229": [
+    {
+      "how": "gift",
+      "loc": "Silph Co. (Geschenk)",
+      "ed": [
+        "gsc",
+        "hgss"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabungsschatz)",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    }
   ],
   "231": [
-    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["rse", "dppt", "all"], "note": "Boostet Wasser-Attacken; Zucht: Marill/Azumarill mit Seerauch → Azurill-Ei" }
+    {
+      "how": "ground",
+      "loc": "Fund/Shop in mehreren Editionen",
+      "ed": [
+        "rse",
+        "dppt",
+        "all"
+      ],
+      "note": "Boostet Wasser-Attacken; Zucht: Marill/Azumarill mit Seerauch → Azurill-Ei"
+    }
   ],
   "232": [
-    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["rse", "dppt", "all"], "note": "Senkt Genauigkeit gegnerischer Attacken; Zucht: Woingenau mit Laxrauch → Isso-Ei" }
+    {
+      "how": "ground",
+      "loc": "Fund/Shop in mehreren Editionen",
+      "ed": [
+        "rse",
+        "dppt",
+        "all"
+      ],
+      "note": "Senkt Genauigkeit gegnerischer Attacken; Zucht: Woingenau mit Laxrauch → Isso-Ei"
+    }
   ],
   "291": [
-    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Boostet Psycho-Attacken; Zucht: Pantimos mit Schrägrauch → Pantimimi" }
+    {
+      "how": "ground",
+      "loc": "Fund/Shop in mehreren Editionen",
+      "ed": [
+        "dppt",
+        "all"
+      ],
+      "note": "Boostet Psycho-Attacken; Zucht: Pantimos mit Schrägrauch → Pantimimi"
+    }
   ],
   "292": [
-    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Boostet Gesteins-Attacken; Zucht: Mogelbaum mit Steinrauch → Mobai" }
+    {
+      "how": "ground",
+      "loc": "Fund/Shop in mehreren Editionen",
+      "ed": [
+        "dppt",
+        "all"
+      ],
+      "note": "Boostet Gesteins-Attacken; Zucht: Mogelbaum mit Steinrauch → Mobai"
+    }
   ],
   "293": [
-    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Zieht im Kampf später; Zucht: Relaxo mit Lahmrauch → Mampfaxo" }
+    {
+      "how": "ground",
+      "loc": "Fund/Shop in mehreren Editionen",
+      "ed": [
+        "dppt",
+        "all"
+      ],
+      "note": "Zieht im Kampf später; Zucht: Relaxo mit Lahmrauch → Mampfaxo"
+    }
   ],
   "294": [
-    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Boostet Wasser-Attacken; Zucht: Mantax mit Wellenrauch → Mantirps" }
+    {
+      "how": "ground",
+      "loc": "Fund/Shop in mehreren Editionen",
+      "ed": [
+        "dppt",
+        "all"
+      ],
+      "note": "Boostet Wasser-Attacken; Zucht: Mantax mit Wellenrauch → Mantirps"
+    }
   ],
   "295": [
-    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Boostet Pflanzen-Attacken; Zucht: Roselia/Roserade mit Rosenrauch → Knospi" }
+    {
+      "how": "ground",
+      "loc": "Fund/Shop in mehreren Editionen",
+      "ed": [
+        "dppt",
+        "all"
+      ],
+      "note": "Boostet Pflanzen-Attacken; Zucht: Roselia/Roserade mit Rosenrauch → Knospi"
+    }
   ],
   "296": [
-    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Verdoppelt das Preisgeld nach Kämpfen; Zucht: Chaneira mit Glücksrauch → Wonneproppen" }
+    {
+      "how": "ground",
+      "loc": "Fund/Shop in mehreren Editionen",
+      "ed": [
+        "dppt",
+        "all"
+      ],
+      "note": "Verdoppelt das Preisgeld nach Kämpfen; Zucht: Chaneira mit Glücksrauch → Wonneproppen"
+    }
   ],
   "297": [
-    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Senkt die Rate wilder Begegnungen; Zucht: Palimpalim mit Scheuchrauch → Klingplim" }
+    {
+      "how": "ground",
+      "loc": "Fund/Shop in mehreren Editionen",
+      "ed": [
+        "dppt",
+        "all"
+      ],
+      "note": "Senkt die Rate wilder Begegnungen; Zucht: Palimpalim mit Scheuchrauch → Klingplim"
+    }
   ],
-  "543": [
-    { "how": "ground", "loc": "Vista City (Pokémon-Markt)", "ed": ["rby", "frlg"], "note": "an Prof. Eich übergeben (Story-Start)" }
+  "298": [
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabungsschatz); Route 228",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    }
+  ],
+  "299": [
+    {
+      "how": "pickup",
+      "loc": "von wildem Elektek getragen",
+      "ed": [
+        "all"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabungsschatz)",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    }
+  ],
+  "300": [
+    {
+      "how": "pickup",
+      "loc": "von wildem Magmar getragen",
+      "ed": [
+        "all"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabungsschatz)",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    }
+  ],
+  "301": [
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabungsschatz); Galaktik-Gebäude",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    }
+  ],
+  "302": [
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund (Grabungsschatz); Umkehrhöhle",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    }
+  ],
+  "303": [
+    {
+      "how": "pickup",
+      "loc": "von wildem Sniebel getragen",
+      "ed": [
+        "all"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Sinnoh-Untergrund; Route 224",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    }
+  ],
+  "304": [
+    {
+      "how": "pickup",
+      "loc": "von wildem Skorgla getragen",
+      "ed": [
+        "all"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Route 214 / Kampfzone",
+      "ed": [
+        "dppt",
+        "bdsp"
+      ]
+    }
   ],
   "419": [
-    { "how": "gift", "loc": "Alabastia (Haus des Rivalen)", "npc": "Schwester des Rivalen", "ed": ["rby", "frlg"] }
-  ],
-  "544": [
-    { "how": "gift", "loc": "Lavandia", "npc": "Mr. Fuji", "ed": ["rby", "frlg"], "note": "nach dem Pokémon-Turm; weckt Snorlax/Relaxo" }
-  ],
-  "545": [
-    { "how": "gift", "loc": "Orania City (Pokémon-Fanclub)", "npc": "Fanclub-Vorsitzender", "ed": ["rby", "frlg"], "note": "gegen das Fahrrad in Azuria City eintauschen" }
-  ],
-  "427": [
-    { "how": "gift", "loc": "Azuria City (Fahrradladen)", "ed": ["rby", "frlg"], "note": "gegen den Rad-Coupon" }
-  ],
-  "422": [
-    { "how": "gift", "loc": "Orania City", "npc": "Angel-Guru", "ed": ["rby", "frlg"] }
-  ],
-  "423": [
-    { "how": "gift", "loc": "Route 12", "npc": "Angler", "ed": ["rby", "frlg"] }
-  ],
-  "424": [
-    { "how": "gift", "loc": "Fuchsania City", "npc": "Bruder des Angel-Gurus", "ed": ["rby", "frlg"] }
-  ],
-  "433": [
-    { "how": "gift", "loc": "Route 25", "npc": "Bill", "ed": ["rby", "frlg"], "note": "nach Hilfe in Bills Haus; öffnet die M.S. Anne" }
-  ],
-  "421": [
-    { "how": "gift", "loc": "Prismania City (Restaurant)", "ed": ["rby", "frlg"], "note": "für das Spielcasino" }
-  ],
-  "548": [
-    { "how": "reward", "loc": "Rocket-Versteck unter dem Spielcasino (Prismania City)", "ed": ["rby", "frlg"], "note": "deckt die Geister im Pokémon-Turm auf" }
-  ],
-  "547": [
-    { "how": "ground", "loc": "Rocket-Versteck (Prismania City)", "ed": ["rby", "frlg"] }
-  ],
-  "475": [
-    { "how": "ground", "loc": "Silph Co., 5. Etage (Saffronia City)", "ed": ["rby", "frlg"] }
-  ],
-  "445": [
-    { "how": "ground", "loc": "Pokémon-Villa (Zinnober-Insel)", "ed": ["rby", "frlg"], "note": "öffnet das Fitnessstudio von Zinnober" }
-  ],
-  "546": [
-    { "how": "ground", "loc": "Safari-Zone (Fuchsania City)", "ed": ["rby", "frlg"], "note": "an den Aufseher zurückgeben → VM05 Stärke" }
-  ],
-  "465": [
-    { "how": "gift", "loc": "Route 11", "npc": "Oaks Forschungshelfer", "ed": ["frlg"], "note": "ab einer Mindestzahl gefangener Pokémon" }
+    {
+      "how": "gift",
+      "loc": "Alabastia (Haus des Rivalen)",
+      "npc": "Schwester des Rivalen",
+      "ed": [
+        "rby",
+        "frlg"
+      ]
+    }
   ],
   "420": [
-    { "how": "gift", "loc": "Route 11", "npc": "Oaks Forschungshelfer", "ed": ["frlg"], "note": "spürt erneut auftauchende Trainer auf" }
+    {
+      "how": "gift",
+      "loc": "Route 11",
+      "npc": "Oaks Forschungshelfer",
+      "ed": [
+        "frlg"
+      ],
+      "note": "spürt erneut auftauchende Trainer auf"
+    }
   ],
-  "562": [
-    { "how": "event", "loc": "Verteilungs-Event", "ed": ["frlg"], "note": "führt zur Insel von Mew" }
+  "421": [
+    {
+      "how": "gift",
+      "loc": "Prismania City (Restaurant)",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "für das Spielcasino"
+    }
+  ],
+  "422": [
+    {
+      "how": "gift",
+      "loc": "Orania City",
+      "npc": "Angel-Guru",
+      "ed": [
+        "rby",
+        "frlg"
+      ]
+    }
+  ],
+  "423": [
+    {
+      "how": "gift",
+      "loc": "Route 12",
+      "npc": "Angler",
+      "ed": [
+        "rby",
+        "frlg"
+      ]
+    }
+  ],
+  "424": [
+    {
+      "how": "gift",
+      "loc": "Fuchsania City",
+      "npc": "Bruder des Angel-Gurus",
+      "ed": [
+        "rby",
+        "frlg"
+      ]
+    }
+  ],
+  "427": [
+    {
+      "how": "gift",
+      "loc": "Azuria City (Fahrradladen)",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "gegen den Rad-Coupon"
+    }
+  ],
+  "433": [
+    {
+      "how": "gift",
+      "loc": "Route 25",
+      "npc": "Bill",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "nach Hilfe in Bills Haus; öffnet die M.S. Anne"
+    }
+  ],
+  "445": [
+    {
+      "how": "ground",
+      "loc": "Pokémon-Villa (Zinnober-Insel)",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "öffnet das Fitnessstudio von Zinnober"
+    }
+  ],
+  "465": [
+    {
+      "how": "gift",
+      "loc": "Route 11",
+      "npc": "Oaks Forschungshelfer",
+      "ed": [
+        "frlg"
+      ],
+      "note": "ab einer Mindestzahl gefangener Pokémon"
+    }
+  ],
+  "475": [
+    {
+      "how": "ground",
+      "loc": "Silph Co., 5. Etage (Saffronia City)",
+      "ed": [
+        "rby",
+        "frlg"
+      ]
+    }
   ],
   "527": [
-    { "how": "gift", "loc": "Malvenfroh City (Fahrradladen)", "ed": ["rse", "oras"], "note": "Wahl zwischen Eil- und Kunstrad; jederzeit tauschbar" }
+    {
+      "how": "gift",
+      "loc": "Malvenfroh City (Fahrradladen)",
+      "ed": [
+        "rse",
+        "oras"
+      ],
+      "note": "Wahl zwischen Eil- und Kunstrad; jederzeit tauschbar"
+    }
   ],
   "528": [
-    { "how": "gift", "loc": "Malvenfroh City (Fahrradladen)", "ed": ["rse", "oras"], "note": "Wahl zwischen Eil- und Kunstrad; jederzeit tauschbar" }
+    {
+      "how": "gift",
+      "loc": "Malvenfroh City (Fahrradladen)",
+      "ed": [
+        "rse",
+        "oras"
+      ],
+      "note": "Wahl zwischen Eil- und Kunstrad; jederzeit tauschbar"
+    }
+  ],
+  "543": [
+    {
+      "how": "ground",
+      "loc": "Vista City (Pokémon-Markt)",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "an Prof. Eich übergeben (Story-Start)"
+    }
+  ],
+  "544": [
+    {
+      "how": "gift",
+      "loc": "Lavandia",
+      "npc": "Mr. Fuji",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "nach dem Pokémon-Turm; weckt Snorlax/Relaxo"
+    }
+  ],
+  "545": [
+    {
+      "how": "gift",
+      "loc": "Orania City (Pokémon-Fanclub)",
+      "npc": "Fanclub-Vorsitzender",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "gegen das Fahrrad in Azuria City eintauschen"
+    }
+  ],
+  "546": [
+    {
+      "how": "ground",
+      "loc": "Safari-Zone (Fuchsania City)",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "an den Aufseher zurückgeben → VM05 Stärke"
+    }
+  ],
+  "547": [
+    {
+      "how": "ground",
+      "loc": "Rocket-Versteck (Prismania City)",
+      "ed": [
+        "rby",
+        "frlg"
+      ]
+    }
+  ],
+  "548": [
+    {
+      "how": "reward",
+      "loc": "Rocket-Versteck unter dem Spielcasino (Prismania City)",
+      "ed": [
+        "rby",
+        "frlg"
+      ],
+      "note": "deckt die Geister im Pokémon-Turm auf"
+    }
+  ],
+  "562": [
+    {
+      "how": "event",
+      "loc": "Verteilungs-Event",
+      "ed": [
+        "frlg"
+      ],
+      "note": "führt zur Insel von Mew"
+    }
+  ],
+  "580": [
+    {
+      "how": "pickup",
+      "loc": "von wildem Liebiskus getragen",
+      "ed": [
+        "bw",
+        "b2w2",
+        "xy"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Fund (diverse Routen)",
+      "ed": [
+        "all"
+      ]
+    }
+  ],
+  "613": [
+    {
+      "how": "gift",
+      "loc": "Wüstenrast",
+      "npc": "Rucksacktourist",
+      "ed": [
+        "bw",
+        "b2w2"
+      ],
+      "note": "Wiederbelebung im Museum Rosaria City → Galapaflos"
+    }
+  ],
+  "614": [
+    {
+      "how": "gift",
+      "loc": "Wüstenrast",
+      "npc": "Rucksacktourist",
+      "ed": [
+        "bw",
+        "b2w2"
+      ],
+      "note": "Wiederbelebung im Museum Rosaria City → Flapteryx"
+    }
+  ],
+  "686": [
+    {
+      "how": "gift",
+      "loc": "in mehreren Editionen als Fund/Belohnung",
+      "ed": [
+        "xy",
+        "swsh",
+        "sv"
+      ],
+      "note": "für die Tausch-Entwicklung von Pummeluff-Linien"
+    }
+  ],
+  "687": [
+    {
+      "how": "gift",
+      "loc": "in mehreren Editionen als Fund/Belohnung",
+      "ed": [
+        "xy",
+        "swsh",
+        "sv"
+      ]
+    }
+  ],
+  "695": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "696": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "697": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "698": [
+    {
+      "how": "gift",
+      "loc": "Illumina City",
+      "npc": "Prof. Platan",
+      "ed": [
+        "xy"
+      ],
+      "note": "Geschenk zum gewählten Kanto-Starter"
+    },
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "699": [
+    {
+      "how": "gift",
+      "loc": "Illumina City",
+      "npc": "Prof. Platan",
+      "ed": [
+        "xy"
+      ],
+      "note": "Geschenk zum gewählten Kanto-Starter"
+    },
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "700": [
+    {
+      "how": "gift",
+      "loc": "Illumina City",
+      "npc": "Prof. Platan",
+      "ed": [
+        "xy"
+      ],
+      "note": "Geschenk zum gewählten Kanto-Starter"
+    },
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "701": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "702": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "703": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "704": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "705": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "706": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "707": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "708": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "709": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "710": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "711": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "712": [
+    {
+      "how": "gift",
+      "loc": "Yantara City",
+      "npc": "Connie (Arenaleiterin)",
+      "ed": [
+        "xy"
+      ]
+    },
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "713": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "714": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "715": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "716": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "717": [
+    {
+      "how": "gift",
+      "loc": "Illumina City",
+      "npc": "Prof. Platan",
+      "ed": [
+        "xy"
+      ],
+      "note": "Geschenk zum gewählten Kanto-Starter"
+    },
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "718": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "719": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "720": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "721": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "722": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "729": [
+    {
+      "how": "gift",
+      "loc": "Marmola City",
+      "npc": "Fossil-Fan",
+      "ed": [
+        "xy"
+      ],
+      "note": "Wiederbelebung → Balgoras"
+    }
+  ],
+  "730": [
+    {
+      "how": "gift",
+      "loc": "Marmola City",
+      "npc": "Fossil-Fan",
+      "ed": [
+        "xy"
+      ],
+      "note": "Wiederbelebung → Amarino"
+    }
+  ],
+  "760": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "761": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "793": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "794": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "795": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "796": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "797": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "798": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "799": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "800": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "801": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "802": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "803": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "804": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "805": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "808": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "809": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "810": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "811": [
+    {
+      "how": "ground",
+      "loc": "Mit dem Mega-Ring findbar – XY: nach dem Liga-Sieg im Overworld (20–21 Uhr); ORAS: nach der Delta-Episode an festen Orten",
+      "ed": [
+        "xy",
+        "oras"
+      ],
+      "note": "Ermöglicht die Mega-Entwicklung des zugehörigen Pokémon."
+    }
+  ],
+  "885": [
+    {
+      "how": "ground",
+      "loc": "Naturzone (See des Zorns)",
+      "ed": [
+        "swsh"
+      ]
+    },
+    {
+      "how": "shop",
+      "npc": "Delibird Presents",
+      "ed": [
+        "sv"
+      ]
+    }
+  ],
+  "1163": [
+    {
+      "how": "ground",
+      "loc": "Naturzone (Grabe-Brüder) & Fund",
+      "ed": [
+        "swsh"
+      ],
+      "note": "Oberteil; mit einem Unterteil-Fossil bei der Forscherin (Route 6) kombinieren"
+    }
+  ],
+  "1164": [
+    {
+      "how": "ground",
+      "loc": "Naturzone (Grabe-Brüder) & Fund",
+      "ed": [
+        "swsh"
+      ],
+      "note": "Unterteil; mit einem Oberteil-Fossil bei der Forscherin (Route 6) kombinieren"
+    }
+  ],
+  "1165": [
+    {
+      "how": "ground",
+      "loc": "Naturzone (Grabe-Brüder) & Fund",
+      "ed": [
+        "swsh"
+      ],
+      "note": "Unterteil; mit einem Oberteil-Fossil bei der Forscherin (Route 6) kombinieren"
+    }
+  ],
+  "1166": [
+    {
+      "how": "ground",
+      "loc": "Naturzone (Grabe-Brüder) & Fund",
+      "ed": [
+        "swsh"
+      ],
+      "note": "Oberteil; mit einem Unterteil-Fossil bei der Forscherin (Route 6) kombinieren"
+    }
+  ],
+  "1174": [
+    {
+      "how": "shop",
+      "loc": "Hammerlocke",
+      "npc": "Apfel-Händler",
+      "ed": [
+        "swsh"
+      ]
+    }
+  ],
+  "1175": [
+    {
+      "how": "shop",
+      "loc": "Hammerlocke",
+      "npc": "Apfel-Händler",
+      "ed": [
+        "swsh"
+      ]
+    }
+  ],
+  "1311": [
+    {
+      "how": "shop",
+      "loc": "Hammerlocke",
+      "npc": "Antik-Händler",
+      "ed": [
+        "swsh"
+      ],
+      "note": "günstige Variante; die seltene Form entwickelt die Antik-Form"
+    }
+  ],
+  "1633": [
+    {
+      "how": "craft",
+      "loc": "Rüstungsinsel (NPC, aus Galarnüssen)",
+      "ed": [
+        "swsh"
+      ],
+      "note": "DLC: Rüstungsinsel"
+    }
+  ],
+  "1643": [
+    {
+      "how": "craft",
+      "loc": "Kronen-Schneeland (NPC, aus Galarnüssen)",
+      "ed": [
+        "swsh"
+      ],
+      "note": "DLC: Kronen-Schneeland"
+    }
+  ],
+  "1677": [
+    {
+      "how": "gift",
+      "loc": "Zapapico",
+      "npc": "NPC-Tausch gegen gesammelte Materialien",
+      "ed": [
+        "sv"
+      ],
+      "note": "v. a. Purpur"
+    }
+  ],
+  "2045": [
+    {
+      "how": "gift",
+      "loc": "Zapapico",
+      "npc": "NPC-Tausch gegen Bronzel-Fragmente",
+      "ed": [
+        "sv"
+      ],
+      "note": "v. a. Karmesin"
+    }
+  ],
+  "10001": [
+    {
+      "how": "ground",
+      "loc": "Hisui-Region (diverse Fundorte)",
+      "ed": [
+        "la"
+      ]
+    }
+  ],
+  "10002": [
+    {
+      "how": "ground",
+      "loc": "Karmin-Sumpfland (Hisui)",
+      "ed": [
+        "la"
+      ]
+    }
   ]
 }
