@@ -1,3 +1,5 @@
+import { resolveEdition } from './edition'
+
 export const GAME_LIST = [
   'Rot', 'Blau', 'Gelb',
   'Gold', 'Silber', 'Kristall',
@@ -109,8 +111,12 @@ const ROUTE_MAP: Record<string, string[]> = {
   'PokéMMO': POKEMMO_ROUTES,
 }
 
+// Resolve the run's edition centrally, then return ONLY that edition's official routes
+// (+ the always-available custom option). No silent cross-edition fallback: an
+// unresolved game yields just the custom entry, never another game's routes.
 export function getRoutesForGame(game: string): string[] {
-  const routes = ROUTE_MAP[game] ?? KANTO_ROUTES
+  const key = resolveEdition(game)
+  const routes = key ? ROUTE_MAP[key] ?? [] : []
   return [...new Set(routes), 'Eigene Route...']
 }
 
@@ -137,39 +143,9 @@ export function routeMismatchesEdition(location: string | null | undefined, game
   return allOfficialRoutes().has(location)
 }
 
-// Emulator game codes (Lua CONFIG.game, lowercase English) → run edition label (German).
-const EMU_GAME_TO_LABEL: Record<string, string> = {
-  red: 'Rot', blue: 'Blau', yellow: 'Gelb',
-  gold: 'Gold', silver: 'Silber', crystal: 'Kristall',
-  ruby: 'Rubin', sapphire: 'Saphir', emerald: 'Smaragd',
-  firered: 'Feuerrot', leafgreen: 'Blattgrün',
-  diamond: 'Diamant', pearl: 'Perl', platinum: 'Platin',
-  heartgold: 'HeartGold', soulsilver: 'SoulSilver',
-  black: 'Schwarz', white: 'Weiß', black2: 'Schwarz 2', white2: 'Weiß 2',
-}
-
-/** Map an emulator game code (e.g. "platinum") to the run-edition label (e.g. "Platin"). */
-export function emulatorGameLabel(emuGame: string | null | undefined): string | null {
-  if (!emuGame) return null
-  return EMU_GAME_TO_LABEL[emuGame.toLowerCase()] ?? null
-}
-
-/** True only when we are SURE the emulator game does not match the run edition.
- *  Unknown emulator codes or PokéMMO (multi-region) never count as a mismatch.
- *  Tolerant to how the run edition is stored: an emulator code ("platinum"), the
- *  German label ("Platin") or a "Pokémon Platin" display string all match — so a
- *  Platinum run on a Platinum emulator is never flagged. Still distinguishes the
- *  paired editions (Schwarz ≠ Schwarz 2). */
-export function isGameMismatch(runGame: string | null | undefined, emuGame: string | null | undefined): boolean {
-  if (!runGame || !emuGame) return false
-  if (runGame === 'PokéMMO') return false
-  const emuLabel = EMU_GAME_TO_LABEL[emuGame.toLowerCase()]
-  if (!emuLabel) return false                                  // unknown emu code → never a mismatch
-  if (runGame.toLowerCase() === emuGame.toLowerCase()) return false   // both the same code
-  const stripped = runGame.replace(/^pok[eé]mon\s+/i, '').trim().toLowerCase()
-  if (stripped === emuLabel.toLowerCase()) return false        // label / "Pokémon <Label>"
-  return true
-}
+// Emulator-code → edition label + run/emulator mismatch now live in the central edition
+// registry (lib/edition.ts). Re-exported here so existing import sites keep working.
+export { emulatorGameLabel, isGameMismatch } from './edition'
 
 // Normalize a location label for tolerant comparison (case/spaces/diacritics/punct).
 function normalizeLoc(s: string): string {
