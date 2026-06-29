@@ -36,8 +36,98 @@
     { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
     { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
   ],
+  "110": [
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] },
+    { "how": "ground", "loc": "Naturzone & Routen", "ed": ["swsh"] }
+  ],
   "885": [
     { "how": "ground", "loc": "Naturzone (See des Zorns)", "ed": ["swsh"] },
     { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+  ],
+  "198": [
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] },
+    { "how": "pickup", "loc": "von wilden Pokémon getragen (z. B. Quaputzi, Hariyama)", "ed": ["all"], "note": "in vielen Editionen auch als Fund" }
+  ],
+  "203": [
+    { "how": "pickup", "loc": "von wildem Perlu getragen", "ed": ["rse", "oras"] },
+    { "how": "ground", "loc": "Fund (u. a. Schädelhöhle)", "ed": ["bw", "b2w2"] }
+  ],
+  "204": [
+    { "how": "pickup", "loc": "von wildem Perlu getragen", "ed": ["rse", "oras"] },
+    { "how": "ground", "loc": "Fund (u. a. Schädelhöhle)", "ed": ["bw", "b2w2"] }
+  ],
+  "210": [
+    { "how": "pickup", "loc": "von wildem Magnetilo/Stahlos getragen", "ed": ["all"] },
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] }
+  ],
+  "212": [
+    { "how": "pickup", "loc": "von wildem Seemon/Seedrake getragen", "ed": ["all"] },
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] }
+  ],
+  "229": [
+    { "how": "gift", "loc": "Silph Co. (Geschenk)", "ed": ["gsc", "hgss"] },
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] }
+  ],
+  "298": [
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz); Route 228", "ed": ["dppt", "bdsp"] }
+  ],
+  "299": [
+    { "how": "pickup", "loc": "von wildem Elektek getragen", "ed": ["all"] },
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] }
+  ],
+  "300": [
+    { "how": "pickup", "loc": "von wildem Magmar getragen", "ed": ["all"] },
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz)", "ed": ["dppt", "bdsp"] }
+  ],
+  "301": [
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz); Galaktik-Gebäude", "ed": ["dppt", "bdsp"] }
+  ],
+  "302": [
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabungsschatz); Umkehrhöhle", "ed": ["dppt", "bdsp"] }
+  ],
+  "303": [
+    { "how": "pickup", "loc": "von wildem Sniebel getragen", "ed": ["all"] },
+    { "how": "ground", "loc": "Sinnoh-Untergrund; Route 224", "ed": ["dppt", "bdsp"] }
+  ],
+  "304": [
+    { "how": "pickup", "loc": "von wildem Skorgla getragen", "ed": ["all"] },
+    { "how": "ground", "loc": "Route 214 / Kampfzone", "ed": ["dppt", "bdsp"] }
+  ],
+  "580": [
+    { "how": "pickup", "loc": "von wildem Liebiskus getragen", "ed": ["bw", "b2w2", "xy"] },
+    { "how": "ground", "loc": "Fund (diverse Routen)", "ed": ["all"] }
+  ],
+  "686": [
+    { "how": "gift", "loc": "in mehreren Editionen als Fund/Belohnung", "ed": ["xy", "swsh", "sv"], "note": "für die Tausch-Entwicklung von Pummeluff-Linien" }
+  ],
+  "687": [
+    { "how": "gift", "loc": "in mehreren Editionen als Fund/Belohnung", "ed": ["xy", "swsh", "sv"] }
+  ],
+  "1174": [
+    { "how": "shop", "loc": "Hammerlocke", "npc": "Apfel-Händler", "ed": ["swsh"] }
+  ],
+  "1175": [
+    { "how": "shop", "loc": "Hammerlocke", "npc": "Apfel-Händler", "ed": ["swsh"] }
+  ],
+  "1311": [
+    { "how": "shop", "loc": "Hammerlocke", "npc": "Antik-Händler", "ed": ["swsh"], "note": "günstige Variante; die seltene Form entwickelt die Antik-Form" }
+  ],
+  "1633": [
+    { "how": "craft", "loc": "Rüstungsinsel (NPC, aus Galarnüssen)", "ed": ["swsh"], "note": "DLC: Rüstungsinsel" }
+  ],
+  "1643": [
+    { "how": "craft", "loc": "Kronen-Schneeland (NPC, aus Galarnüssen)", "ed": ["swsh"], "note": "DLC: Kronen-Schneeland" }
+  ],
+  "1677": [
+    { "how": "gift", "loc": "Zapapico", "npc": "NPC-Tausch gegen gesammelte Materialien", "ed": ["sv"], "note": "v. a. Purpur" }
+  ],
+  "2045": [
+    { "how": "gift", "loc": "Zapapico", "npc": "NPC-Tausch gegen Bronzel-Fragmente", "ed": ["sv"], "note": "v. a. Karmesin" }
+  ],
+  "10001": [
+    { "how": "ground", "loc": "Hisui-Region (diverse Fundorte)", "ed": ["la"] }
+  ],
+  "10002": [
+    { "how": "ground", "loc": "Karmin-Sumpfland (Hisui)", "ed": ["la"] }
   ]
 }
