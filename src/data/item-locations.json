@@ -201,5 +201,65 @@
   ],
   "297": [
     { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Senkt die Rate wilder Begegnungen; Zucht: Palimpalim mit Scheuchrauch → Klingplim" }
+  ],
+  "543": [
+    { "how": "ground", "loc": "Vista City (Pokémon-Markt)", "ed": ["rby", "frlg"], "note": "an Prof. Eich übergeben (Story-Start)" }
+  ],
+  "419": [
+    { "how": "gift", "loc": "Alabastia (Haus des Rivalen)", "npc": "Schwester des Rivalen", "ed": ["rby", "frlg"] }
+  ],
+  "544": [
+    { "how": "gift", "loc": "Lavandia", "npc": "Mr. Fuji", "ed": ["rby", "frlg"], "note": "nach dem Pokémon-Turm; weckt Snorlax/Relaxo" }
+  ],
+  "545": [
+    { "how": "gift", "loc": "Orania City (Pokémon-Fanclub)", "npc": "Fanclub-Vorsitzender", "ed": ["rby", "frlg"], "note": "gegen das Fahrrad in Azuria City eintauschen" }
+  ],
+  "427": [
+    { "how": "gift", "loc": "Azuria City (Fahrradladen)", "ed": ["rby", "frlg"], "note": "gegen den Rad-Coupon" }
+  ],
+  "422": [
+    { "how": "gift", "loc": "Orania City", "npc": "Angel-Guru", "ed": ["rby", "frlg"] }
+  ],
+  "423": [
+    { "how": "gift", "loc": "Route 12", "npc": "Angler", "ed": ["rby", "frlg"] }
+  ],
+  "424": [
+    { "how": "gift", "loc": "Fuchsania City", "npc": "Bruder des Angel-Gurus", "ed": ["rby", "frlg"] }
+  ],
+  "433": [
+    { "how": "gift", "loc": "Route 25", "npc": "Bill", "ed": ["rby", "frlg"], "note": "nach Hilfe in Bills Haus; öffnet die M.S. Anne" }
+  ],
+  "421": [
+    { "how": "gift", "loc": "Prismania City (Restaurant)", "ed": ["rby", "frlg"], "note": "für das Spielcasino" }
+  ],
+  "548": [
+    { "how": "reward", "loc": "Rocket-Versteck unter dem Spielcasino (Prismania City)", "ed": ["rby", "frlg"], "note": "deckt die Geister im Pokémon-Turm auf" }
+  ],
+  "547": [
+    { "how": "ground", "loc": "Rocket-Versteck (Prismania City)", "ed": ["rby", "frlg"] }
+  ],
+  "475": [
+    { "how": "ground", "loc": "Silph Co., 5. Etage (Saffronia City)", "ed": ["rby", "frlg"] }
+  ],
+  "445": [
+    { "how": "ground", "loc": "Pokémon-Villa (Zinnober-Insel)", "ed": ["rby", "frlg"], "note": "öffnet das Fitnessstudio von Zinnober" }
+  ],
+  "546": [
+    { "how": "ground", "loc": "Safari-Zone (Fuchsania City)", "ed": ["rby", "frlg"], "note": "an den Aufseher zurückgeben → VM05 Stärke" }
+  ],
+  "465": [
+    { "how": "gift", "loc": "Route 11", "npc": "Oaks Forschungshelfer", "ed": ["frlg"], "note": "ab einer Mindestzahl gefangener Pokémon" }
+  ],
+  "420": [
+    { "how": "gift", "loc": "Route 11", "npc": "Oaks Forschungshelfer", "ed": ["frlg"], "note": "spürt erneut auftauchende Trainer auf" }
+  ],
+  "562": [
+    { "how": "event", "loc": "Verteilungs-Event", "ed": ["frlg"], "note": "führt zur Insel von Mew" }
+  ],
+  "527": [
+    { "how": "gift", "loc": "Malvenfroh City (Fahrradladen)", "ed": ["rse", "oras"], "note": "Wahl zwischen Eil- und Kunstrad; jederzeit tauschbar" }
+  ],
+  "528": [
+    { "how": "gift", "loc": "Malvenfroh City (Fahrradladen)", "ed": ["rse", "oras"], "note": "Wahl zwischen Eil- und Kunstrad; jederzeit tauschbar" }
   ]
 }
