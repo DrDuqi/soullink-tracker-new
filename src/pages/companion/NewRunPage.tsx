@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Dices, Play, Loader2, Check, AlertTriangle, Settings } from 'lucide-react'
 import { useProfiles } from '../../hooks/useProfiles'
 import { getPlatform } from '../../platform'
@@ -8,6 +8,7 @@ import { createRun } from '../../lib/createRun'
 import { saveRunRecipe } from '../../lib/runRecipe'
 import { derivePlayerSeed } from '../../lib/randomizerSync'
 import { EDITION_OPTIONS, editionLabel, resolveEdition, type EditionKey } from '../../lib/edition'
+import { companionConfig } from '../../lib/companion'
 import { useRunStore } from '../../store/runStore'
 import { useMyRuns } from '../../hooks/useMyRuns'
 import type { Preset } from '../../lib/presets'
@@ -39,6 +40,10 @@ export default function NewRunPage() {
   const platform = getPlatform()
   const { user, profile } = useAuth()
   const { profiles, active, loading } = useProfiles()
+  const [params] = useSearchParams()
+  // BizHawk is GLOBAL (one install for all editions) — read it from the companion config.
+  const [globalBiz, setGlobalBiz] = useState<string | null>(null)
+  useEffect(() => { companionConfig().then((c) => setGlobalBiz(c?.config.bizhawk || c?.detected.bizhawk || null)) }, [])
   const { data: myRuns = [] } = useMyRuns()
   const setCurrentRun = useRunStore((s) => s.setCurrentRun)
   // Recent partners (derived from past runs) → 1-click "Mit wem?", newest first.
@@ -60,10 +65,15 @@ export default function NewRunPage() {
   const [step, setStep] = useState<Step>('idle')
   const [err, setErr] = useState<string | null>(null)
 
-  // ① Edition is the central choice. Default to the active profile's edition.
-  const [editionKey, setEditionKey] = useState<EditionKey>(() => resolveEdition(active?.edition) || EDITION_OPTIONS[0].key)
-  useEffect(() => { const k = resolveEdition(active?.edition); if (k) setEditionKey(k) }, [active?.edition])
-  // The profile that holds the ROM/emulator for the chosen edition (one per edition).
+  // ① Edition is the central choice. Default: the edition passed from "Mein Setup"
+  //   (?edition=) → the last-used edition → first option. NEVER hardcoded to Platin and
+  //   never silently overridden by some active profile.
+  const [editionKey, setEditionKey] = useState<EditionKey>(() => {
+    let last: string | null = null; try { last = localStorage.getItem('soullink:lastEdition') } catch { /* ignore */ }
+    return resolveEdition(params.get('edition')) || resolveEdition(last) || EDITION_OPTIONS[0].key
+  })
+  useEffect(() => { try { localStorage.setItem('soullink:lastEdition', editionKey) } catch { /* ignore */ } }, [editionKey])
+  // The profile that holds the ROM for the chosen edition (one per edition); BizHawk is global.
   const editionProfile = profiles.find((p) => resolveEdition(p.edition) === editionKey) ?? null
 
   // Presets are edition-bound: load for the chosen edition, reset selection on change.
@@ -77,7 +87,7 @@ export default function NewRunPage() {
     return () => { cancel = true }
   }, [platform, editionKey, editionProfile?.edition, editionProfile?.presetId])
 
-  const romReady = !!(editionProfile && editionProfile.paths.originalRom && editionProfile.paths.bizhawk)
+  const romReady = !!(editionProfile && editionProfile.paths.originalRom && globalBiz)
   const ready = !!(romReady && presetId)
   const busy = step === 'creating' || step === 'randomizing' || step === 'launching'
 

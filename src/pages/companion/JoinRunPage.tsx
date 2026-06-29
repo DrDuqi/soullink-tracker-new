@@ -22,7 +22,9 @@ export default function JoinRunPage() {
   const [err, setErr] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
 
-  const ready = !!(active && active.paths.originalRom && active.paths.bizhawk)
+  // The partner needs a profile with their own ROM; BizHawk is global (the setup wizard
+  // installs/validates it). Don't gate the join on a per-edition emulator path.
+  const ready = !!(active && active.paths.originalRom)
 
   async function join() {
     if (!user || !active || !code.trim()) return

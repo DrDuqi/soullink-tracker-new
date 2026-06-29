@@ -777,7 +777,10 @@ function handleRequest(req, res) {
       if (!profile) { sendJson(res, { ok: false, error: 'profile_not_found' }, 404); return }
       const paths = profile.paths || {}
       if (!paths.originalRom || !existsSync(paths.originalRom)) { sendJson(res, { ok: false, error: 'original_rom_missing' }, 400); return }
-      if (!paths.bizhawk || !existsSync(paths.bizhawk)) { sendJson(res, { ok: false, error: 'bizhawk_missing' }, 400); return }
+      // BizHawk is a GLOBAL component (installed once), not per-edition. Resolve it from
+      // the companion config/detection — never from the per-edition profile.
+      const bizhawk = effectiveConfig().config.bizhawk
+      if (!bizhawk || !existsSync(bizhawk)) { sendJson(res, { ok: false, error: 'bizhawk_missing' }, 400); return }
       // Preset (rules) is chosen per run: explicit presetId → profile's preset →
       const runId = b.runId ? String(b.runId) : null
       const seed = (b.seed === undefined || b.seed === null || b.seed === '') ? Math.floor(Math.random() * 1_000_000_000) : b.seed
@@ -787,7 +790,11 @@ function handleRequest(req, res) {
       // (NDS/SaveRAM/<basename>.SaveRAM) by it, so each run gets its own save and a
       // re-open loads exactly that save. The run id fragment guarantees uniqueness.
       const tag = runId ? '_' + runId.slice(0, 8) : ''
-      const outName = `${safe(profile.edition || 'ROM') || 'ROM'}_${players.join('-') || 'Solo'}_Seed_${seed}${tag}.nds`
+      // Output ROM keeps the ORIGINAL platform's extension (.gba/.nds/.gbc/.gb) so GBA
+      // editions produce a .gba and DS editions a .nds — never a wrong/fixed extension.
+      const em = String(paths.originalRom).toLowerCase().match(/\.(nds|gba|gbc|gb)$/)
+      const romExt = em ? `.${em[1]}` : '.nds'
+      const outName = `${safe(profile.edition || 'ROM') || 'ROM'}_${players.join('-') || 'Solo'}_Seed_${seed}${tag}${romExt}`
       const outDir = runId ? runFolder(runId) : join(dirname(CONFIG_FILE), 'ROMs', 'Randomized')
       try { mkdirSync(outDir, { recursive: true }) } catch { /* ignore */ }
       const outputRom = join(outDir, outName)
@@ -819,12 +826,12 @@ function handleRequest(req, res) {
       // Register the run locally so "Weiterspielen" later relaunches the exact ROM
       // (⇒ same savegame). saveName = the BizHawk SaveRAM key for backups.
       if (runId) {
-        const saveName = outName.replace(/\.nds$/i, '') + '.SaveRAM'
-        try { recordLocalRun(runId, { romPath: outputRom, bizhawk: paths.bizhawk, seed, presetId, edition: profile.edition || null, profileId: profile.id, saveName }) } catch { /* non-fatal */ }
+        const saveName = outName.replace(/\.(nds|gba|gbc|gb)$/i, '') + '.SaveRAM'
+        try { recordLocalRun(runId, { romPath: outputRom, bizhawk, seed, presetId, edition: profile.edition || null, profileId: profile.id, saveName }) } catch { /* non-fatal */ }
         // Self-describing folder (survives loss of the central registry).
         try { writeRunMetadata(runId, { name: b.runName || null, romFile: outName, seed, presetId, edition: profile.edition || null, baseRom, saveName, players: profile.players || [], createdAt: new Date().toISOString() }) } catch { /* non-fatal */ }
       }
-      sendJson(res, { ok: true, runId, outputRom, seed, presetId, presetData, baseRom, edition: profile.edition || null, bizhawk: paths.bizhawk, players: profile.players || [] })
+      sendJson(res, { ok: true, runId, outputRom, seed, presetId, presetData, baseRom, edition: profile.edition || null, bizhawk, players: profile.players || [] })
     })
     return
   }

@@ -5,6 +5,7 @@ import { useProfiles } from '../../hooks/useProfiles'
 import { useCompanion } from '../../hooks/useCompanion'
 import { getPlatform } from '../../platform'
 import { EDITION_OPTIONS, editionLabel, editionRomExts, editionPlatformLabel, resolveEdition, type EditionKey } from '../../lib/edition'
+import { companionConfig, saveCompanionConfig } from '../../lib/companion'
 import type { RomInfo } from '../../lib/companion'
 import type { Preset } from '../../lib/presets'
 
@@ -36,6 +37,15 @@ export default function MeinSetupPage() {
   }, [available, loading, ed, editionKey, create])
   useEffect(() => { setRomInfo(null) }, [editionKey])
   useEffect(() => { platform.listPresets(editionKey).then((l) => setPresets(l ?? [])) }, [platform, editionKey])
+  // Remember the last edition so "Neuer SoulLink" opens with it (never jumps to Platin).
+  useEffect(() => { try { localStorage.setItem('soullink:lastEdition', editionKey) } catch { /* ignore */ } }, [editionKey])
+
+  // BizHawk is a GLOBAL component (installed once for ALL editions) — stored in the
+  // companion config, never per-edition. Detected installs count too, so we never
+  // re-ask when it's already there.
+  const [globalBiz, setGlobalBiz] = useState<string | null>(null)
+  const reloadBiz = async () => { const c = await companionConfig(); setGlobalBiz(c?.config.bizhawk || c?.detected.bizhawk || null) }
+  useEffect(() => { reloadBiz() }, [])
 
   async function pickRom() {
     if (!ed) return
@@ -49,9 +59,8 @@ export default function MeinSetupPage() {
     setBusy(null)
   }
   async function pickBiz() {
-    if (!ed) return
     setBusy('biz'); const r = await platform.pickFile('biz')
-    if (r.path) await update(ed.id, { paths: { bizhawk: r.path } })
+    if (r.path) { await saveCompanionConfig({ bizhawk: r.path }); await reloadBiz() }   // global, not per-edition
     setBusy(null)
   }
   async function setRules(presetId: string) { if (ed) await update(ed.id, { presetId }) }
@@ -69,9 +78,9 @@ export default function MeinSetupPage() {
       const st = await platform.bizhawkStatus()
       if (!st) return
       setBizInstall({ state: st.state, percent: st.percent, error: st.error })
-      if (st.state === 'done' && st.exe && ed) {
+      if (st.state === 'done' && st.exe) {
         if (pollRef.current) clearInterval(pollRef.current)
-        await update(ed.id, { paths: { bizhawk: st.exe } })
+        await reloadBiz()   // server already saved config.bizhawk (global); just refresh
         setBizInstall(null)
       } else if (st.state === 'error') {
         if (pollRef.current) clearInterval(pollRef.current)
@@ -92,35 +101,20 @@ export default function MeinSetupPage() {
   }
 
   const rom = ed?.paths.originalRom
-  const biz = ed?.paths.bizhawk
+  const biz = globalBiz   // GLOBAL emulator — same for every edition
   const presetId = ed?.presetId || presets.find((p) => p.builtin)?.id || ''
   const fname = (p?: string | null): string | null => (p ? (p.split(/[\\/]/).pop() ?? null) : null)
 
   return (
     <div className="max-w-2xl mx-auto px-8 py-10">
       <h1 className="text-white font-black text-3xl tracking-tight">Mein Setup</h1>
-      <p className="text-slate-400 mt-1.5">Wähle die Edition — jede Edition hat ihr eigenes Setup (ROM, Emulator, Regeln).</p>
+      <p className="text-slate-400 mt-1.5">Der Emulator ist global (einmal für alles). ROM &amp; Regeln verwaltest du pro Edition.</p>
 
-      {/* Edition — bestimmt ROM-Typ, Validierung und Presets */}
-      <div className="mt-7 rounded-2xl border border-pk-red/30 bg-[#16161f] p-4">
-        <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">Edition</label>
-        <select value={editionKey} onChange={(e) => setEditionKey(e.target.value as EditionKey)}
-          className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3 py-2.5 text-sm text-white">
-          {EDITION_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-        </select>
-        <p className="text-slate-500 text-[11px] mt-2">Benötigt eine <b className="text-slate-300">{editionRomExts(editionKey).join('/')}</b>-ROM ({editionPlatformLabel(editionKey)}). Jede Edition speichert ihre ROM/Einstellungen unabhängig.</p>
-      </div>
-
-      <div className="mt-3 space-y-3">
-        {/* Original-ROM */}
-        <Row icon={Gamepad2} title="Original-ROM" done={!!rom}
-          value={fname(rom)} hint={romInfo?.message} hintOk={romInfo?.valid}
-          desc={`Deine originale ${editionLabel(editionKey)}-ROM (${editionRomExts(editionKey).join('/')}). Die randomisierten ROMs erzeugt SoulLink selbst.`}
-          busy={busy === 'rom'} action={rom ? 'Ändern' : 'Auswählen'} onClick={pickRom} icon2={FolderOpen} />
-
-        {/* Emulator */}
+      {/* GLOBAL — Companion/Emulator/Java/FVX/Update existieren genau EINMAL */}
+      <div className="mt-7 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-4">
+        <div className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Global · einmal für alle Editionen</div>
         <Row icon={Cpu} title="Emulator (BizHawk)" done={!!biz} value={fname(biz)}
-          desc="Der Emulator, in dem dein Pokémon läuft — SoulLink richtet ihn automatisch ein."
+          desc="Wird genau EINMAL eingerichtet und gilt für jede Edition (GBA &amp; DS). Java &amp; Randomizer richtet SoulLink automatisch ein."
           busy={busy === 'biz'} action={biz ? 'Ändern' : 'Selbst wählen'} onClick={pickBiz} icon2={FolderOpen}
           extra={
             bizInstall ? (
@@ -138,13 +132,33 @@ export default function MeinSetupPage() {
                   <div className="h-1.5 rounded-full bg-[#2a2a35] overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${bizInstall.percent}%`, background: '#CC0000' }} /></div>
                 </div>
               )
+            ) : biz ? (
+              <span className="text-[11px] text-green-400 inline-flex items-center gap-1"><Check className="w-3 h-3" /> Emulator vorhanden — gilt für alle Editionen.</span>
             ) : (
               <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={autoInstallBiz} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold text-white" style={{ background: '#CC0000' }}><Sparkles className="w-3.5 h-3.5" /> Automatisch einrichten</button>
-                <span className="text-[11px] text-slate-500">{biz ? 'lädt eine frische, verwaltete BizHawk-Kopie (~65 MB)' : 'lädt BizHawk ~65 MB · empfohlen'}</span>
+                <span className="text-[11px] text-slate-500">lädt BizHawk ~65 MB · empfohlen</span>
               </div>
             )
           } />
+      </div>
+
+      {/* Edition — bestimmt ROM-Typ, Validierung und Presets */}
+      <div className="mt-4 rounded-2xl border border-pk-red/30 bg-[#16161f] p-4">
+        <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">Edition</label>
+        <select value={editionKey} onChange={(e) => setEditionKey(e.target.value as EditionKey)}
+          className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3 py-2.5 text-sm text-white">
+          {EDITION_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+        <p className="text-slate-500 text-[11px] mt-2">Benötigt eine <b className="text-slate-300">{editionRomExts(editionKey).join('/')}</b>-ROM ({editionPlatformLabel(editionKey)}). Jede Edition speichert ihre ROM/Regeln unabhängig.</p>
+      </div>
+
+      <div className="mt-3 space-y-3">
+        {/* Original-ROM (pro Edition) */}
+        <Row icon={Gamepad2} title="Original-ROM" done={!!rom}
+          value={fname(rom)} hint={romInfo?.message} hintOk={romInfo?.valid}
+          desc={`Deine originale ${editionLabel(editionKey)}-ROM (${editionRomExts(editionKey).join('/')}). Die randomisierten ROMs erzeugt SoulLink selbst.`}
+          busy={busy === 'rom'} action={rom ? 'Ändern' : 'Auswählen'} onClick={pickRom} icon2={FolderOpen} />
 
         {/* Standard-Spielregeln */}
         <div className="rounded-2xl border border-[#2e2e42] bg-[#16161f] p-4">
@@ -166,8 +180,8 @@ export default function MeinSetupPage() {
       </div>
 
       {rom && biz && (
-        <button onClick={() => navigate('/new')} className="mt-6 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-white" style={{ background: '#CC0000' }}>
-          Fertig — neuen SoulLink starten <ChevronRight className="w-5 h-5" />
+        <button onClick={() => navigate(`/new?edition=${encodeURIComponent(editionKey)}`)} className="mt-6 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-white" style={{ background: '#CC0000' }}>
+          Fertig — {editionLabel(editionKey)} starten <ChevronRight className="w-5 h-5" />
         </button>
       )}
       {companion.usesCompanion && <div className="mt-4 text-center text-slate-600 text-[11px]">Java &amp; Randomizer richtet SoulLink automatisch ein.</div>}
