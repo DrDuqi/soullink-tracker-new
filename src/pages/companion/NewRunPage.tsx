@@ -7,21 +7,16 @@ import { useAuth } from '../../contexts/AuthContext'
 import { createRun } from '../../lib/createRun'
 import { saveRunRecipe } from '../../lib/runRecipe'
 import { derivePlayerSeed } from '../../lib/randomizerSync'
+import { EDITION_OPTIONS, editionLabel, resolveEdition, type EditionKey } from '../../lib/edition'
 import { useRunStore } from '../../store/runStore'
 import { useMyRuns } from '../../hooks/useMyRuns'
 import type { Preset } from '../../lib/presets'
 
-// The end-to-end flow that closes the loop: create a real Supabase run → randomize
-// the profile's ROM into a per-run file (own savegame) → launch BizHawk → open the
-// existing RunPage. Everything except the seed is automatic.
+// The end-to-end flow that closes the loop: pick the EDITION (the central choice) →
+// resolve its profile/ROM → choose preset → randomize into a per-run file → launch
+// BizHawk → open the RunPage. The edition drives presets, ROM, run game and everything
+// downstream (routes/checklist/dex via resolveEdition).
 type Step = 'idle' | 'creating' | 'randomizing' | 'launching' | 'error'
-
-const EDITIONS: Record<string, string> = {
-  platinum: 'Pokémon Platin', diamond: 'Pokémon Diamant', pearl: 'Pokémon Perl',
-  heartgold: 'Pokémon HeartGold', soulsilver: 'Pokémon SoulSilver',
-  black: 'Pokémon Schwarz', white: 'Pokémon Weiß', black2: 'Pokémon Schwarz 2', white2: 'Pokémon Weiß 2',
-}
-function editionLabel(e: string): string { return EDITIONS[e] || e }
 
 const ERR: Record<string, string> = {
   profile_not_found: 'Einrichtung nicht gefunden.',
@@ -43,7 +38,7 @@ export default function NewRunPage() {
   const navigate = useNavigate()
   const platform = getPlatform()
   const { user, profile } = useAuth()
-  const { active, loading } = useProfiles()
+  const { profiles, active, loading } = useProfiles()
   const { data: myRuns = [] } = useMyRuns()
   const setCurrentRun = useRunStore((s) => s.setCurrentRun)
   // Recent partners (derived from past runs) → 1-click "Mit wem?", newest first.
@@ -65,23 +60,29 @@ export default function NewRunPage() {
   const [step, setStep] = useState<Step>('idle')
   const [err, setErr] = useState<string | null>(null)
 
-  // Load presets for the profile's edition; default to the profile's last preset or
-  // the first available (SoulLink Standard) so beginners just click "Run starten".
+  // ① Edition is the central choice. Default to the active profile's edition.
+  const [editionKey, setEditionKey] = useState<EditionKey>(() => resolveEdition(active?.edition) || EDITION_OPTIONS[0].key)
+  useEffect(() => { const k = resolveEdition(active?.edition); if (k) setEditionKey(k) }, [active?.edition])
+  // The profile that holds the ROM/emulator for the chosen edition (one per edition).
+  const editionProfile = profiles.find((p) => resolveEdition(p.edition) === editionKey) ?? null
+
+  // Presets are edition-bound: load for the chosen edition, reset selection on change.
   useEffect(() => {
     let cancel = false
-    platform.listPresets(active?.edition || undefined).then((list) => {
-      if (cancel || !list) return
-      setPresets(list)
-      setPresetId((cur) => cur || active?.presetId || list[0]?.id || '')
+    platform.listPresets(editionProfile?.edition || editionKey).then((list) => {
+      if (cancel) return
+      setPresets(list ?? [])
+      setPresetId(editionProfile?.presetId && (list ?? []).some((p) => p.id === editionProfile.presetId) ? editionProfile.presetId : (list?.[0]?.id || ''))
     })
     return () => { cancel = true }
-  }, [platform, active?.edition, active?.presetId])
+  }, [platform, editionKey, editionProfile?.edition, editionProfile?.presetId])
 
-  const ready = !!(active && active.paths.originalRom && active.paths.bizhawk && presetId)
+  const romReady = !!(editionProfile && editionProfile.paths.originalRom && editionProfile.paths.bizhawk)
+  const ready = !!(romReady && presetId)
   const busy = step === 'creating' || step === 'randomizing' || step === 'launching'
 
   async function start() {
-    if (!active || !user) return
+    if (!editionProfile || !user) return
     setErr(null)
     // 1) Create the real Supabase run (so it persists + appears in the dashboard).
     setStep('creating')
@@ -91,7 +92,7 @@ export default function NewRunPage() {
     try {
       const created = await createRun({
         name: runName,
-        game: active.edition || 'platinum',
+        game: editionProfile.edition || editionKey,
         ownerUserId: user.id,
         username: profile?.username || profile?.display_name || 'Spieler',
       })
@@ -103,7 +104,7 @@ export default function NewRunPage() {
     setStep('randomizing')
     const hostSeed = sameWorld ? seed : derivePlayerSeed(seed, 0)
     const fvxVersion = (await platform.randomizerStatus())?.version ?? null
-    const r = await platform.prepareRun({ runId: run.id, profileId: active.id, presetId, seed: hostSeed })
+    const r = await platform.prepareRun({ runId: run.id, profileId: editionProfile.id, presetId, seed: hostSeed })
     if (!r.ok) { setErr(ERR[r.error || ''] || r.error || 'Fehler'); setStep('error'); return }
 
     // Store the shared recipe so partners reproduce the SAME rules/edition/FVX version
@@ -125,22 +126,30 @@ export default function NewRunPage() {
   return (
     <div className="max-w-2xl mx-auto px-8 py-10">
       <h1 className="text-white font-black text-3xl tracking-tight">Neuer SoulLink</h1>
-      <p className="text-slate-400 mt-1.5">Seed wählen, der Rest passiert automatisch.</p>
+      <p className="text-slate-400 mt-1.5">Wähle zuerst deine Edition — alles Weitere passt sich automatisch an.</p>
 
-      {!ready ? (
-        <div className="mt-7 rounded-2xl border border-amber-700/40 bg-amber-950/15 p-6">
-          <div className="flex items-center gap-2 text-amber-300 font-black"><AlertTriangle className="w-5 h-5" /> Fast bereit</div>
-          <p className="text-slate-300 text-sm mt-2">
-            Richte einmal deine <b className="text-white">Original-ROM</b> und den Emulator ein — danach übernimmt SoulLink alles automatisch.
-          </p>
+      {/* ① Edition — die zentrale Auswahl des gesamten Setups */}
+      <div className="mt-7 rounded-2xl border border-pk-red/30 bg-[#16161f] p-5">
+        <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">① Edition</label>
+        <select value={editionKey} disabled={busy} onChange={(e) => setEditionKey(e.target.value as EditionKey)}
+          className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3.5 py-2.5 text-sm text-white">
+          {EDITION_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+        <p className="text-slate-500 text-[11px] mt-2">Bestimmt Routen, Encounter-Checkliste, Presets, ROM-Validierung, Emulator & Randomizer — überall automatisch.</p>
+      </div>
+
+      {!romReady ? (
+        <div className="mt-4 rounded-2xl border border-amber-700/40 bg-amber-950/15 p-6">
+          <div className="flex items-center gap-2 text-amber-300 font-black"><AlertTriangle className="w-5 h-5" /> Für {editionLabel(editionKey)} noch nicht eingerichtet</div>
+          <p className="text-slate-300 text-sm mt-2">Für diese Edition ist noch keine <b className="text-white">Original-ROM</b> bzw. kein Emulator hinterlegt. Einmal einrichten — danach läuft alles automatisch.</p>
           <button onClick={() => navigate('/mysetup')} className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
-            <Settings className="w-4 h-4" /> Jetzt einrichten
+            <Settings className="w-4 h-4" /> {editionLabel(editionKey)} einrichten
           </button>
         </div>
       ) : (
         <>
-          <div className="mt-7 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
-            <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">Mit wem spielst du?</label>
+          <div className="mt-4 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
+            <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">② Mit wem spielst du?</label>
             <input value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Name deines Freundes (oder leer = allein)"
               className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3.5 py-2.5 text-sm text-white disabled:opacity-100" />
             {recentPartners.length > 0 && (
@@ -169,19 +178,21 @@ export default function NewRunPage() {
 
           <div className="mt-4 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
             <div className="flex items-center justify-between gap-2 mb-2">
-              <label className="text-slate-400 text-xs font-black uppercase tracking-widest">Spielregeln</label>
+              <label className="text-slate-400 text-xs font-black uppercase tracking-widest">③ Regel-Preset</label>
               <button onClick={() => navigate('/presets')} className="text-[11px] font-bold text-slate-400 hover:text-white underline underline-offset-2">Regeln bearbeiten</button>
             </div>
-            <select value={presetId} onChange={(e) => setPresetId(e.target.value)} disabled={busy}
-              className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3.5 py-2.5 text-sm text-white">
-              {presets.length === 0 && <option value="">Keine Regeln verfügbar</option>}
+            <select value={presetId} onChange={(e) => setPresetId(e.target.value)} disabled={busy || presets.length === 0}
+              className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3.5 py-2.5 text-sm text-white disabled:opacity-60">
+              {presets.length === 0 && <option value="">— keine —</option>}
               {presets.map((p) => <option key={p.id} value={p.id}>{p.name}{p.builtin ? '' : ' (eigene)'}</option>)}
             </select>
-            <p className="text-slate-500 text-[11px] mt-2">Bestimmt, wie randomisiert wird (Pokémon, Trainer, Items …).</p>
+            {presets.length === 0
+              ? <p className="text-amber-300/90 text-[11px] mt-2">Für {editionLabel(editionKey)} existieren noch keine Regel-Presets. <button onClick={() => navigate('/presets')} className="font-bold underline underline-offset-2">Eigene Regeln erstellen</button>.</p>
+              : <p className="text-slate-500 text-[11px] mt-2">Nur Presets für {editionLabel(editionKey)} — bestimmt, wie randomisiert wird (Pokémon, Trainer, Items …).</p>}
           </div>
 
           <div className="mt-4 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
-            <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">Seed</label>
+            <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">④ Seed &amp; ⑤ Welt</label>
             <div className="flex items-center gap-2">
               <input type="number" value={seed} disabled={busy} onChange={(e) => setSeed(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
                 className="flex-1 rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3.5 py-2.5 text-sm text-white font-mono" />
@@ -199,12 +210,12 @@ export default function NewRunPage() {
             </label>
           </div>
 
-          <button onClick={start} disabled={busy} className="mt-5 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-white disabled:opacity-60" style={{ background: '#CC0000' }}>
+          <button onClick={start} disabled={busy || !ready} className="mt-5 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-white disabled:opacity-60" style={{ background: '#CC0000' }}>
             {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
             {step === 'creating' ? 'Run wird erstellt …'
               : step === 'randomizing' ? 'Randomisiere … (kann ~1 Min dauern)'
               : step === 'launching' ? 'BizHawk wird gestartet …'
-              : 'SoulLink erstellen & starten'}
+              : '⑥ SoulLink erstellen & starten'}
           </button>
 
           {busy && (

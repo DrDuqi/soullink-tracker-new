@@ -44,6 +44,30 @@ export const EDITIONS: Record<EditionKey, Edition> = {
   PokéMMO: { key: 'PokéMMO', region: 'multi', gen: 0, emuCodes: [] },
 }
 
+// Display labels + the ordered option list every edition picker should use (single
+// source — no more per-component edition maps). New games: add to EDITIONS + here.
+export const EDITION_LABEL: Record<EditionKey, string> = {
+  Rot: 'Pokémon Rot', Blau: 'Pokémon Blau', Gelb: 'Pokémon Gelb',
+  Gold: 'Pokémon Gold', Silber: 'Pokémon Silber', Kristall: 'Pokémon Kristall',
+  Feuerrot: 'Pokémon Feuerrot', Blattgrün: 'Pokémon Blattgrün',
+  Rubin: 'Pokémon Rubin', Saphir: 'Pokémon Saphir', Smaragd: 'Pokémon Smaragd',
+  Diamant: 'Pokémon Diamant', Perl: 'Pokémon Perl', Platin: 'Pokémon Platin',
+  HeartGold: 'Pokémon HeartGold', SoulSilver: 'Pokémon SoulSilver',
+  Schwarz: 'Pokémon Schwarz', Weiß: 'Pokémon Weiß', 'Schwarz 2': 'Pokémon Schwarz 2', 'Weiß 2': 'Pokémon Weiß 2',
+  PokéMMO: 'PokéMMO',
+}
+export const editionLabel = (game: string | null | undefined): string => { const k = resolveEdition(game); return k ? EDITION_LABEL[k] : (game || 'Pokémon') }
+
+export interface EditionOption { key: EditionKey; label: string }
+// Picker order (newest-friendly grouping); PokéMMO excluded — it's multi-region.
+const OPTION_ORDER: EditionKey[] = [
+  'Feuerrot', 'Blattgrün', 'Rubin', 'Saphir', 'Smaragd',
+  'Diamant', 'Perl', 'Platin', 'HeartGold', 'SoulSilver',
+  'Schwarz', 'Weiß', 'Schwarz 2', 'Weiß 2',
+  'Rot', 'Blau', 'Gelb', 'Gold', 'Silber', 'Kristall',
+]
+export const EDITION_OPTIONS: EditionOption[] = OPTION_ORDER.map((key) => ({ key, label: EDITION_LABEL[key] }))
+
 const KEYS = Object.keys(EDITIONS) as EditionKey[]
 const norm = (s: string) => s.normalize('NFC').replace(/^pok[eé]mon\s+/i, '').trim().toLowerCase()
 const code = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '')
