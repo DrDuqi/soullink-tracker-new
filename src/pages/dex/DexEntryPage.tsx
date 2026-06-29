@@ -239,6 +239,7 @@ function EvoLine({ evo, lang, t }: { evo: DexEvo[]; lang: 'de' | 'en'; t: (de: s
 }
 
 function AbilityItem({ a, lang, t }: { a: DexAbility; lang: 'de' | 'en'; t: (de: string, en: string) => string }) {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const name = lang === 'de' ? a.de || a.en : a.en || a.de
   const effect = lang === 'de' ? a.effectDe || a.effectEn : a.effectEn || a.effectDe
@@ -249,7 +250,12 @@ function AbilityItem({ a, lang, t }: { a: DexAbility; lang: 'de' | 'en'; t: (de:
         {a.hidden && <span className="text-[10px] font-bold rounded px-1.5 py-0.5" style={{ background: '#7c5cff22', color: '#b9a8ff' }}>{t('versteckt', 'hidden')}</span>}
         <ChevronRight className={`w-4 h-4 text-slate-500 ml-auto transition-transform ${open ? 'rotate-90' : ''}`} />
       </button>
-      {open && <p className="px-3 pb-2.5 text-xs text-slate-400 leading-relaxed">{effect || t('Keine Beschreibung verfügbar.', 'No description available.')}</p>}
+      {open && (
+        <div className="px-3 pb-2.5">
+          <p className="text-xs text-slate-400 leading-relaxed">{effect || t('Keine Beschreibung verfügbar.', 'No description available.')}</p>
+          {a.id != null && <button onClick={() => navigate(`/abilities/${a.id}`)} className="text-[11px] font-bold text-pk-red hover:underline mt-1.5">{t('Zur Fähigkeit-Seite →', 'Open ability page →')}</button>}
+        </div>
+      )}
     </div>
   )
 }
