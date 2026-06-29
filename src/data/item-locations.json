@@ -129,5 +129,77 @@
   ],
   "10002": [
     { "how": "ground", "loc": "Karmin-Sumpfland (Hisui)", "ed": ["la"] }
+  ],
+  "99": [
+    { "how": "ground", "loc": "Route 111 (Wüste, Wundersäule)", "ed": ["rse", "oras"], "note": "nur eines pro Spiel; Wiederbelebung bei Devon Corp → Liliep" }
+  ],
+  "100": [
+    { "how": "ground", "loc": "Route 111 (Wüste, Wundersäule)", "ed": ["rse", "oras"], "note": "nur eines pro Spiel; Wiederbelebung bei Devon Corp → Anorith" }
+  ],
+  "101": [
+    { "how": "ground", "loc": "Mond-Berg (Auswahl)", "ed": ["rby", "frlg"], "note": "Wiederbelebung im Labor (Zinnober-Insel) → Amonitas" }
+  ],
+  "102": [
+    { "how": "ground", "loc": "Mond-Berg (Auswahl)", "ed": ["rby", "frlg"], "note": "Wiederbelebung im Labor → Kabuto" }
+  ],
+  "103": [
+    { "how": "ground", "loc": "Museum in Marmoria City", "ed": ["rby", "frlg"], "note": "Wiederbelebung im Labor → Aerodactyl" }
+  ],
+  "104": [
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabung)", "ed": ["dppt", "bdsp"], "note": "Wiederbelebung im Museum Erzelingen → Schilterus" }
+  ],
+  "105": [
+    { "how": "ground", "loc": "Sinnoh-Untergrund (Grabung)", "ed": ["dppt", "bdsp"], "note": "Wiederbelebung im Museum Erzelingen → Koknodon" }
+  ],
+  "613": [
+    { "how": "gift", "loc": "Wüstenrast", "npc": "Rucksacktourist", "ed": ["bw", "b2w2"], "note": "Wiederbelebung im Museum Rosaria City → Galapaflos" }
+  ],
+  "614": [
+    { "how": "gift", "loc": "Wüstenrast", "npc": "Rucksacktourist", "ed": ["bw", "b2w2"], "note": "Wiederbelebung im Museum Rosaria City → Flapteryx" }
+  ],
+  "729": [
+    { "how": "gift", "loc": "Marmola City", "npc": "Fossil-Fan", "ed": ["xy"], "note": "Wiederbelebung → Balgoras" }
+  ],
+  "730": [
+    { "how": "gift", "loc": "Marmola City", "npc": "Fossil-Fan", "ed": ["xy"], "note": "Wiederbelebung → Amarino" }
+  ],
+  "1163": [
+    { "how": "ground", "loc": "Naturzone (Grabe-Brüder) & Fund", "ed": ["swsh"], "note": "Oberteil; mit einem Unterteil-Fossil bei der Forscherin (Route 6) kombinieren" }
+  ],
+  "1164": [
+    { "how": "ground", "loc": "Naturzone (Grabe-Brüder) & Fund", "ed": ["swsh"], "note": "Unterteil; mit einem Oberteil-Fossil bei der Forscherin (Route 6) kombinieren" }
+  ],
+  "1165": [
+    { "how": "ground", "loc": "Naturzone (Grabe-Brüder) & Fund", "ed": ["swsh"], "note": "Unterteil; mit einem Oberteil-Fossil bei der Forscherin (Route 6) kombinieren" }
+  ],
+  "1166": [
+    { "how": "ground", "loc": "Naturzone (Grabe-Brüder) & Fund", "ed": ["swsh"], "note": "Oberteil; mit einem Unterteil-Fossil bei der Forscherin (Route 6) kombinieren" }
+  ],
+  "231": [
+    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["rse", "dppt", "all"], "note": "Boostet Wasser-Attacken; Zucht: Marill/Azumarill mit Seerauch → Azurill-Ei" }
+  ],
+  "232": [
+    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["rse", "dppt", "all"], "note": "Senkt Genauigkeit gegnerischer Attacken; Zucht: Woingenau mit Laxrauch → Isso-Ei" }
+  ],
+  "291": [
+    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Boostet Psycho-Attacken; Zucht: Pantimos mit Schrägrauch → Pantimimi" }
+  ],
+  "292": [
+    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Boostet Gesteins-Attacken; Zucht: Mogelbaum mit Steinrauch → Mobai" }
+  ],
+  "293": [
+    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Zieht im Kampf später; Zucht: Relaxo mit Lahmrauch → Mampfaxo" }
+  ],
+  "294": [
+    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Boostet Wasser-Attacken; Zucht: Mantax mit Wellenrauch → Mantirps" }
+  ],
+  "295": [
+    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Boostet Pflanzen-Attacken; Zucht: Roselia/Roserade mit Rosenrauch → Knospi" }
+  ],
+  "296": [
+    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Verdoppelt das Preisgeld nach Kämpfen; Zucht: Chaneira mit Glücksrauch → Wonneproppen" }
+  ],
+  "297": [
+    { "how": "ground", "loc": "Fund/Shop in mehreren Editionen", "ed": ["dppt", "all"], "note": "Senkt die Rate wilder Begegnungen; Zucht: Palimpalim mit Scheuchrauch → Klingplim" }
   ]
 }
