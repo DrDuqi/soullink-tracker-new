@@ -4,7 +4,7 @@ import { ChevronLeft, Loader2, Coins, Sparkles, MapPin, ExternalLink } from 'luc
 import { useSettings } from '../../store/settingsStore'
 import { itemEntry, itemName, catLabel } from '../../lib/dex/items'
 import { getItemDetail } from '../../lib/dex/itemDetail'
-import { getItemLocations, HOW_LABEL, HOW_COLOR, editionLabel, sourceUrl } from '../../lib/dex/itemLocations'
+import { getItemLocations, HOW_LABEL, HOW_COLOR, editionLabel, sourceUrl, categoryUse, categoryAcq } from '../../lib/dex/itemLocations'
 import { dexEntry, dexName, spriteUrl } from '../../lib/dex/dex'
 import ItemSprite from '../../components/ItemSprite'
 
@@ -73,7 +73,14 @@ function ItemExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: st
         )}
       </section>
 
-      <Acquisition id={id} lang={lang} t={t} cost={data.cost} />
+      {categoryUse(data.category, lang) && (
+        <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
+          <h2 className="text-white font-bold text-sm mb-2">{t('Verwendung', 'Usage')}</h2>
+          <p className="text-slate-300 text-sm leading-relaxed">{categoryUse(data.category, lang)}</p>
+        </section>
+      )}
+
+      <Acquisition id={id} lang={lang} t={t} cost={data.cost} category={data.category} />
 
       {data.evolves.length > 0 && <PokeUsers title={t('Diese Pokémon entwickeln sich damit', 'Pokémon that evolve with this item')} ids={data.evolves} lang={lang} navigate={navigate} />}
       {data.holders.length > 0 && <PokeUsers title={t('Wird in der Wildnis getragen von', 'Held in the wild by')} ids={data.holders} lang={lang} navigate={navigate} />}
@@ -97,11 +104,12 @@ function ItemExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: st
   )
 }
 
-function Acquisition({ id, lang, t, cost }: { id: number; lang: 'de' | 'en'; t: (de: string, en: string) => string; cost: number }) {
+function Acquisition({ id, lang, t, cost, category }: { id: number; lang: 'de' | 'en'; t: (de: string, en: string) => string; cost: number; category: string }) {
   const entries = getItemLocations(id)
   const e = itemEntry(id)
   const src = e ? sourceUrl(lang === 'de' ? e.de || e.en : e.en || e.de, lang) : null
   const buyable = cost > 0 && !entries.some((x) => x.how === 'shop')
+  const catHint = categoryAcq(category, lang)
   return (
     <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
       <h2 className="text-white font-bold text-sm mb-3 flex items-center gap-1.5"><MapPin className="w-4 h-4 text-pk-red" /> {t('Wo & wie bekomme ich es?', 'Where & how to get it')}</h2>
@@ -119,11 +127,16 @@ function Acquisition({ id, lang, t, cost }: { id: number; lang: 'de' | 'en'; t: 
               </div>
             </div>
           ))}
+          {buyable && <p className="text-slate-400 text-sm">{t('Außerdem in Shops kaufbar.', 'Also buyable in shops.')}</p>}
+        </div>
+      ) : catHint ? (
+        <div>
+          <p className="text-slate-300 text-sm">{catHint}{buyable ? t(' · in Shops kaufbar.', ' · buyable in shops.') : ''}</p>
+          <p className="text-slate-500 text-xs mt-1.5">{t('Allgemein für diese Item-Kategorie – exakte Fundorte variieren je Edition.', 'Typical for this category — exact locations vary by game.')}</p>
         </div>
       ) : (
         <p className="text-slate-400 text-sm">{buyable ? t('In Shops kaufbar.', 'Buyable in shops.') : t('Für dieses Item sind noch keine Fundorte erfasst.', 'No acquisition data recorded yet for this item.')}</p>
       )}
-      {entries.length > 0 && buyable && <p className="text-slate-400 text-sm mt-2.5">{t('Außerdem in Shops kaufbar.', 'Also buyable in shops.')}</p>}
       {src && (
         <a href={src} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white mt-3">
           <ExternalLink className="w-3.5 h-3.5" /> {t('Alle Fundorte', 'All locations')}: {lang === 'de' ? 'PokéWiki' : 'Bulbapedia'}
