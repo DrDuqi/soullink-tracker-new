@@ -11,7 +11,7 @@
 // reworking the flow: the list is generation-aware and presets are content-addressable
 // by id.
 
-import { existsSync, readFileSync, readdirSync, writeFileSync, renameSync, copyFileSync, mkdirSync, unlinkSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, writeFileSync, renameSync, copyFileSync, mkdirSync, unlinkSync, statSync, watch } from 'node:fs'
 import { join, basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
@@ -137,4 +137,48 @@ export function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene Regeln'
   for (const root of roots) if (root) scan(root, 1)
   if (!best) return null
   return importPreset({ name: name || basename(best).replace(/\.rnqs$/i, ''), edition, sourceFile: best })
+}
+
+// ── Real-time, location-INDEPENDENT capture ──────────────────────────────────
+// Watching the user's home recursively catches a .rnqs the instant FVX writes it —
+// no matter which folder the dialog happened to open in (FVX folder, Desktop, OneDrive,
+// a sub-folder …). The session is short-lived (started when the editor opens, stopped on
+// the first hit or after a timeout) and import COPIES the file into the managed Presets
+// folder, so the user truly never thinks about location or filename. Best-effort: if
+// recursive watch isn't available, the polling scan above still works as a fallback.
+let WATCH = null   // { since, name, edition, found, watchers:[], timer }
+export function stopRnqsWatch() {
+  if (!WATCH) return
+  for (const w of WATCH.watchers) { try { w.close() } catch { /* ignore */ } }
+  if (WATCH.timer) { try { clearTimeout(WATCH.timer) } catch { /* ignore */ } }
+  WATCH = null
+}
+export function pollRnqsWatch() { return WATCH?.found || null }
+
+/** Start (or keep) a recursive watch for the newest .rnqs after `sinceMs`. Idempotent
+ *  per `sinceMs` so repeated polls don't restart it. `roots` should be high-level dirs
+ *  (home, FVX folder) — recursion covers everything beneath. Auto-stops after 5 min. */
+export function startRnqsWatch({ sinceMs = 0, name = 'Eigene Regeln', edition = null, roots = [] } = {}) {
+  if (WATCH && WATCH.since === sinceMs) return WATCH.found
+  stopRnqsWatch()
+  const state = { since: sinceMs, name, edition, found: null, watchers: [], timer: null }
+  const seen = new Set()
+  for (const root of roots) {
+    if (!root || !existsSync(root)) continue
+    try {
+      const w = watch(root, { recursive: true }, (_ev, file) => {
+        if (state.found || !file || !/\.rnqs$/i.test(String(file))) return
+        const p = join(root, String(file))
+        if (seen.has(p)) return; seen.add(p)
+        try {
+          const t = statSync(p).mtimeMs
+          if (t > state.since) { const preset = importPreset({ name: state.name, edition: state.edition, sourceFile: p }); if (preset) { state.found = preset; stopRnqsWatch() } }
+        } catch { /* file mid-write / vanished — ignore */ }
+      })
+      state.watchers.push(w)
+    } catch { /* recursive watch unsupported on this root — fallback scan covers it */ }
+  }
+  state.timer = setTimeout(() => stopRnqsWatch(), 5 * 60 * 1000)
+  WATCH = state
+  return null
 }

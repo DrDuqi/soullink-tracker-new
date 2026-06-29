@@ -30,7 +30,7 @@ import { spawn, exec } from 'node:child_process'
 import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile, getProfile, recordRun } from './profiles.mjs'
 import { initRandomizer, randomizerStatus, randomize, openRandomizer, installFvx, fvxInstallState } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
-import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs, presetInbox } from './presets.mjs'
+import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs, presetInbox, startRnqsWatch, pollRnqsWatch, stopRnqsWatch } from './presets.mjs'
 import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun, runIdForRom } from './runs.mjs'
 import { ensureRunBizhawkConfig } from './runConfig.mjs'
 import { installBizhawk, bizhawkInstallState } from './bizhawk.mjs'
@@ -732,7 +732,16 @@ function handleRequest(req, res) {
       const since = Number(url.searchParams.get('since') || 0)
       const name = url.searchParams.get('name') || 'Eigene Regeln'
       const edition = url.searchParams.get('edition') || null
-      const p = grabLatestRnqs({ sinceMs: since, roots: [...roots], name, edition })
+      // Primary: a recursive real-time watch over high-level roots (home covers Desktop/
+      // Documents/Downloads/OneDrive/sub-folders; + the FVX folder) → catches the .rnqs
+      // wherever the dialog saved it, instantly. Started on first poll, idempotent.
+      const watchRoots = [home, process.env.USERPROFILE, fvx?.dir, fvx?.dir && dirname(fvx.dir), presetInbox()].filter(Boolean)
+      startRnqsWatch({ sinceMs: since, name, edition, roots: watchRoots })
+      let p = pollRnqsWatch()
+      if (p) stopRnqsWatch()
+      // Fallback: the shallow scan over the explicit folder list (covers the rare case
+      // where recursive watch is unavailable).
+      if (!p) p = grabLatestRnqs({ sinceMs: since, roots: [...roots], name, edition })
       sendJson(res, { ok: true, found: !!p, preset: p })
     } catch { sendJson(res, { ok: false }, 500) }
     return

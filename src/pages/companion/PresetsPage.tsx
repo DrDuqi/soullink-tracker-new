@@ -36,7 +36,7 @@ export default function PresetsPage() {
     setNotice(null)
     const r = await platform.openRandomizer()
     if (!r.ok) { setNotice(r.error === 'fvx_not_found' ? 'Der Regel-Editor wurde noch nicht eingerichtet.' : 'Der Editor konnte nicht geöffnet werden.'); return }
-    setNotice('Der Regel-Editor öffnet sich. Stelle deine Regeln ein und klicke „Save Settings". Speichere am besten unter Dokumente → SoulLink → Presets (dieser Ordner liegt schon bereit) — der Ordner und der Dateiname sind aber egal, SoulLink findet und übernimmt die Datei automatisch.')
+    setNotice('Der Regel-Editor öffnet sich. Stelle deine Regeln ein und klicke „Save Settings" — speichere einfach an dem Ort, den FVX vorschlägt, und klicke „Speichern". Ordner und Dateiname sind völlig egal: SoulLink erkennt die Datei automatisch in Sekunden und übernimmt sie als Preset.')
     const since = Date.now() - 3000
     const name = presetName.trim() || 'Eigene Regeln'
     let elapsed = 0
