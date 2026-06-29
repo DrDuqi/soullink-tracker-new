@@ -13,8 +13,11 @@
 
 import { existsSync, readFileSync, readdirSync, writeFileSync, renameSync, copyFileSync, mkdirSync, unlinkSync, statSync, watch } from 'node:fs'
 import { join, basename } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import { homedir } from 'node:os'
+
+// Content hash of a .rnqs → identity for idempotent imports (same rules = same preset).
+function rnqsHash(p) { try { return createHash('sha1').update(readFileSync(p)).digest('hex') } catch { return null } }
 
 let BUILTIN_DIR = null
 let CUSTOM_DIR = null
@@ -90,14 +93,27 @@ const safe = (s) => String(s ?? 'preset').replace(/[^\w-]+/g, '_').slice(0, 60) 
 export function importPreset({ name, edition = null, sourceFile }) {
   if (!CUSTOM_DIR || !sourceFile || !existsSync(sourceFile)) return null
   try {
+    const ed = edition || null
+    const hash = rnqsHash(sourceFile)
+    const reg = loadReg()
+    // IDEMPOTENT: identical rules (same content + edition) → update the existing preset
+    // instead of creating a duplicate. This makes repeated file-watcher/poll events and
+    // re-saving the same file a no-op (or a name/refresh), never a new entry.
+    const existing = hash ? reg.find((r) => r.hash === hash && (r.edition || null) === ed) : null
+    if (existing) {
+      if (name) existing.name = String(name).slice(0, 60)
+      if (ed) existing.edition = ed
+      try { mkdirSync(CUSTOM_DIR, { recursive: true }); copyFileSync(sourceFile, join(CUSTOM_DIR, existing.file)) } catch { /* keep old file */ }
+      saveReg(reg)
+      return { id: existing.id, name: existing.name, edition: existing.edition || null, builtin: false }
+    }
     const id = 'user-' + randomUUID()
     const fileName = `${safe(name)}-${id.slice(-6)}.rnqs`
     mkdirSync(CUSTOM_DIR, { recursive: true })
     copyFileSync(sourceFile, join(CUSTOM_DIR, fileName))
-    const reg = loadReg()
-    reg.push({ id, name: String(name || 'Eigenes Preset').slice(0, 60), edition: edition || null, file: fileName, createdAt: new Date().toISOString() })
+    reg.push({ id, name: String(name || 'Eigenes Preset').slice(0, 60), edition: ed, file: fileName, hash, createdAt: new Date().toISOString() })
     saveReg(reg)
-    return { id, name: String(name || 'Eigenes Preset').slice(0, 60), edition: edition || null, builtin: false }
+    return { id, name: String(name || 'Eigenes Preset').slice(0, 60), edition: ed, builtin: false }
   } catch { return null }
 }
 export function renamePreset(id, name) {

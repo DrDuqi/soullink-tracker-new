@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Dices, Plus, Upload, Trash2, Pencil, Check, X, Loader2, ExternalLink } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Dices, Plus, Upload, Trash2, Pencil, Check, X, Loader2, ExternalLink, ArrowLeft, Star } from 'lucide-react'
 import { getPlatform } from '../../platform'
+import { useProfiles } from '../../hooks/useProfiles'
 import { EDITION_OPTIONS, editionLabel, resolveEdition, type EditionKey } from '../../lib/edition'
 import type { Preset } from '../../lib/presets'
 
-// Preset management: built-in (shipped, read-only) + custom presets. Custom presets
-// are created in the FVX editor (Stufe 1) — open FVX, set rules, "Save Settings",
-// then import the .rnqs here — or imported/renamed/deleted directly. The own in-app
-// editor (Stufe 2) can replace the FVX step later without changing this page.
+// Preset management: built-in (shipped, read-only) + custom presets, STRICTLY per edition.
+// Custom presets are created in the FVX editor (open FVX, set rules, "Save Settings"),
+// auto-imported, then selectable as this edition's default. Back button so you never get
+// stuck in this detail page.
 export default function PresetsPage() {
   const platform = getPlatform()
+  const navigate = useNavigate()
+  const { profiles, update } = useProfiles()
   const [presets, setPresets] = useState<Preset[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -73,8 +77,15 @@ export default function PresetsPage() {
   }
   async function doDelete(id: string) { await platform.deletePreset(id); setConfirmDelete(null); await reload() }
 
+  // STRICTLY the chosen edition's presets, and which one is this edition's default.
+  const editionProfile = profiles.find((p) => resolveEdition(p.edition) === editionKey) ?? null
+  const activePresetId = editionProfile?.presetId ?? null
+  const visible = presets.filter((p) => resolveEdition(p.edition) === editionKey)
+  async function setDefault(id: string) { if (editionProfile) await update(editionProfile.id, { presetId: id }) }
+
   return (
     <div className="max-w-3xl mx-auto px-8 py-10">
+      <button onClick={() => navigate(-1)} className="text-slate-400 hover:text-white inline-flex items-center gap-1.5 text-sm font-bold mb-4"><ArrowLeft className="w-4 h-4" /> Zurück</button>
       <h1 className="text-white font-black text-3xl tracking-tight">Spielregeln</h1>
       <p className="text-slate-400 mt-1.5">Deine Regeln bestimmen, <i>wie</i> randomisiert wird (z. B. Pokémon, Trainer, Items zufällig). Der Seed bestimmt das konkrete Ergebnis.</p>
 
@@ -113,11 +124,13 @@ export default function PresetsPage() {
       <div className="mt-6 space-y-2.5">
         {loading ? (
           <div className="flex items-center gap-2 text-slate-400 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Spielregeln werden geladen…</div>
-        ) : presets.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#2e2e42] bg-[#16161f] p-6 text-center text-slate-400 text-sm">Noch keine Regeln vorhanden.</div>
-        ) : presets.map((p) => (
-          <div key={p.id} className="rounded-2xl border border-[#2e2e42] bg-[#16161f] p-4 flex items-center gap-3">
-            <Dices className="w-5 h-5 text-slate-400 shrink-0" />
+        ) : visible.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#2e2e42] bg-[#16161f] p-6 text-center text-slate-400 text-sm">Für {editionLabel(editionKey)} gibt es noch keine Regeln. Lege oben welche an.</div>
+        ) : visible.map((p) => {
+          const isActive = p.id === activePresetId
+          return (
+          <div key={p.id} className="rounded-2xl border bg-[#16161f] p-4 flex items-center gap-3" style={{ borderColor: isActive ? 'rgba(74,222,128,0.5)' : '#2e2e42' }}>
+            <Dices className="w-5 h-5 shrink-0" style={{ color: isActive ? '#4ade80' : '#94a3b8' }} />
             <div className="min-w-0 flex-1">
               {editingId === p.id ? (
                 <div className="flex items-center gap-2">
@@ -138,6 +151,10 @@ export default function PresetsPage() {
               )}
               {p.description && editingId !== p.id && <p className="text-slate-500 text-xs mt-0.5">{p.description}</p>}
             </div>
+            {editingId !== p.id && (isActive
+              ? <span className="inline-flex items-center gap-1 text-[11px] font-black text-green-400 shrink-0"><Star className="w-3.5 h-3.5" style={{ fill: '#4ade80' }} /> Aktiv</span>
+              : <button onClick={() => setDefault(p.id)} disabled={!editionProfile} title={editionProfile ? 'Als Standard für diese Edition' : 'Edition zuerst in „Mein Setup“ einrichten'} className="text-[11px] font-bold text-white px-2.5 py-1.5 rounded-lg shrink-0 disabled:opacity-40" style={{ background: 'var(--color-pk-red)' }}>Auswählen</button>
+            )}
             {!p.builtin && editingId !== p.id && (
               confirmDelete === p.id ? (
                 <span className="flex items-center gap-1.5 shrink-0">
@@ -152,7 +169,8 @@ export default function PresetsPage() {
               )
             )}
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

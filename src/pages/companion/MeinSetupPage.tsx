@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Gamepad2, Cpu, Dices, Check, Loader2, ChevronRight, FolderOpen, Sparkles } from 'lucide-react'
+import { Gamepad2, Cpu, Dices, Check, Loader2, ChevronRight, FolderOpen, Sparkles, ArrowLeft } from 'lucide-react'
 import { useProfiles } from '../../hooks/useProfiles'
 import { useCompanion } from '../../hooks/useCompanion'
 import { getPlatform } from '../../platform'
@@ -108,6 +108,7 @@ export default function MeinSetupPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-8 py-10">
+      <button onClick={() => navigate(-1)} className="text-slate-400 hover:text-white inline-flex items-center gap-1.5 text-sm font-bold mb-4"><ArrowLeft className="w-4 h-4" /> Zurück</button>
       <h1 className="text-white font-black text-3xl tracking-tight">Mein Setup</h1>
       <p className="text-slate-400 mt-1.5">Der Emulator ist global (einmal für alles). ROM &amp; Regeln verwaltest du pro Edition.</p>
 
