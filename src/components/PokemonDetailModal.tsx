@@ -253,7 +253,10 @@ export default function PokemonDetailModal({ encounter, linkedEncounter, linkedP
               ))}
             </div>
             {encounter.pokemon_id && (
-              <button onClick={() => openQuickLook({ kind: 'pokemon', key: encounter.pokemon_id! })}
+              <button onClick={() => openQuickLook({ kind: 'pokemon', key: encounter.pokemon_id!, context: {
+                moves, status: encounter.status, location: encounter.location, nickname: encounter.nickname,
+                soulLink: linkedEncounter ? `${linkedPlayerName ?? 'Partner'}: ${linkedEncounter.nickname ?? linkedEncounter.pokemon_name}` : null,
+              } })}
                 className="inline-flex items-center gap-1.5 mt-2.5 text-xs font-bold text-pk-red hover:underline">
                 <Sparkles className="w-3.5 h-3.5" /> SoulDex-Quick-Look
               </button>
