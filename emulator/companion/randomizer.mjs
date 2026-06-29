@@ -11,9 +11,11 @@
 // what makes a multiplayer SoulLink reproducible (every player randomizes their own
 // original ROM with the shared settings+seed and gets the exact same world).
 
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, createWriteStream, mkdirSync, rmSync } from 'node:fs'
 import { join, basename } from 'node:path'
-import { spawn } from 'node:child_process'
+import { spawn, exec } from 'node:child_process'
+import { get as httpsGet } from 'node:https'
+import { tmpdir } from 'node:os'
 
 let BUNDLED = null      // resources/randomizer in the packaged app
 let ROOTS = []          // folders to scan for a user-installed FVX
@@ -73,6 +75,68 @@ export function randomizerStatus() {
   const fvx = resolveFvx()
   if (!fvx) return { found: false }
   return { found: true, source: fvx.source, version: versionFromDir(fvx.dir), dir: fvx.dir }
+}
+
+// ── Auto-install FVX (so the user never hunts for the randomizer) ─────────────
+// Mirrors the BizHawk auto-install: download the PINNED FVX Windows bundle (which ships
+// its OWN JRE → also covers Java), extract it and verify jar+java are present. The
+// release URL is overridable via SOULLINK_FVX_URL (config) so the version is easy to
+// bump without an app update. Never throws; the client polls fvxInstallState() for a bar.
+const FVX_URL = process.env.SOULLINK_FVX_URL || ''
+let INSTALL = { state: 'idle', percent: 0, dir: null, error: null }
+export function fvxInstallState() { return INSTALL }
+
+function fvxDownload(url, dest, onProgress, redirects = 0) {
+  return new Promise((resolve, reject) => {
+    if (redirects > 6) { reject(new Error('Zu viele Weiterleitungen')); return }
+    const req = httpsGet(url, { headers: { 'User-Agent': 'SoulLink-Companion' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { res.resume(); resolve(fvxDownload(res.headers.location, dest, onProgress, redirects + 1)); return }
+      if (res.statusCode !== 200) { res.resume(); reject(new Error('HTTP ' + res.statusCode)); return }
+      const total = parseInt(res.headers['content-length'] || '0', 10)
+      let got = 0
+      const out = createWriteStream(dest)
+      res.on('data', (c) => { got += c.length; if (total) onProgress(got / total) })
+      res.pipe(out); out.on('finish', () => out.close(() => resolve())); out.on('error', reject)
+    })
+    req.on('error', reject)
+  })
+}
+function fvxUnzip(zip, dir) {
+  return new Promise((resolve, reject) => {
+    const cmd = `powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath '${zip}' -DestinationPath '${dir}' -Force"`
+    exec(cmd, { windowsHide: true, maxBuffer: 1 << 24 }, (err) => err ? reject(err) : resolve())
+  })
+}
+// FVX may extract at the root or one level down (e.g. UPR_FVX-v1_5_3-Windows/).
+function findFvxDir(root) {
+  const direct = fvxFromDir(root); if (direct) return direct.dir
+  try { for (const e of readdirSync(root, { withFileTypes: true })) if (e.isDirectory() && fvxFromDir(join(root, e.name))) return join(root, e.name) } catch { /* ignore */ }
+  return null
+}
+
+/** Download + extract the pinned FVX into targetDir. onDone(dir) fires once verified so
+ *  the server can persist config.fvxDir → resolveFvx() then finds it. */
+export async function installFvx({ targetDir, onDone } = {}) {
+  if (INSTALL.state === 'downloading' || INSTALL.state === 'extracting') return INSTALL
+  if (!FVX_URL) { INSTALL = { state: 'error', percent: 0, dir: null, error: 'fvx_url_unconfigured' }; return INSTALL }
+  INSTALL = { state: 'downloading', percent: 0, dir: null, error: null }
+  const zip = join(tmpdir(), 'soullink-fvx.zip')
+  try {
+    try { mkdirSync(targetDir, { recursive: true }) } catch { /* ignore */ }
+    await fvxDownload(FVX_URL, zip, (p) => { INSTALL.percent = Math.round(p * 95) })
+    INSTALL = { ...INSTALL, state: 'extracting', percent: 96 }
+    await fvxUnzip(zip, targetDir)
+    try { rmSync(zip, { force: true }) } catch { /* ignore */ }
+    const dir = findFvxDir(targetDir)
+    if (!dir) throw new Error('FVX-Ordner nach dem Entpacken unvollständig (UPR-FVX.jar oder Java fehlt).')
+    INSTALL = { state: 'done', percent: 100, dir, error: null }
+    if (typeof onDone === 'function') { try { onDone(dir) } catch { /* ignore */ } }
+    return INSTALL
+  } catch (e) {
+    try { rmSync(zip, { force: true }) } catch { /* ignore */ }
+    INSTALL = { state: 'error', percent: 0, dir: null, error: (e && e.message) || String(e) }
+    return INSTALL
+  }
 }
 
 // Open the FVX GUI (Stufe-1 preset editor): the user loads a ROM, sets rules and

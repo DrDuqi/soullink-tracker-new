@@ -27,8 +27,14 @@ const ERR: Record<string, string> = {
   original_rom_missing: 'Deine Original-ROM fehlt oder wurde verschoben — in den Einstellungen erneut auswählen.',
   bizhawk_missing: 'Der Emulator (BizHawk) ist noch nicht eingerichtet — in den Einstellungen festlegen.',
   preset_missing: 'Es sind noch keine Spielregeln gesetzt.',
-  randomize_failed: 'Die Randomisierung ist fehlgeschlagen.',
-  fvx_not_found: 'Der Randomizer wurde noch nicht eingerichtet.',
+  randomize_failed: 'Die Randomisierung ist fehlgeschlagen (FVX-Ausgabe). Prüfe ROM & Preset.',
+  fvx_not_found: 'Der Randomizer (FVX) ist noch nicht eingerichtet — in „Mein Setup" automatisch einrichten.',
+  fvx_url_unconfigured: 'Automatische FVX-Installation ist nicht konfiguriert — FVX-Ordner in „Mein Setup" auswählen.',
+  rom_not_found: 'Die ausgewählte Original-ROM wurde nicht gefunden.',
+  settings_missing: 'Das gewählte Preset/Regelwerk fehlt.',
+  no_output_path: 'Kein Ziel für die randomisierte ROM — interner Fehler.',
+  output_missing: 'Die randomisierte ROM wurde nicht erzeugt.',
+  spawn_failed: 'FVX/Java konnte nicht gestartet werden — Java-Laufzeit prüfen.',
   unreachable: 'Companion nicht erreichbar.',
 }
 

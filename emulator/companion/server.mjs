@@ -28,7 +28,7 @@ import { homedir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawn, exec } from 'node:child_process'
 import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile, getProfile, recordRun } from './profiles.mjs'
-import { initRandomizer, randomizerStatus, randomize, openRandomizer } from './randomizer.mjs'
+import { initRandomizer, randomizerStatus, randomize, openRandomizer, installFvx, fvxInstallState } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
 import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs } from './presets.mjs'
 import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun, runIdForRom } from './runs.mjs'
@@ -647,6 +647,22 @@ function handleRequest(req, res) {
   // ── randomizer (FVX): status + run ──────────────────────────────────────────
   if (path === '/api/randomizer/detect') {
     try { sendJson(res, { ok: true, ...randomizerStatus() }) } catch { sendJson(res, { ok: false }, 500) }
+    return
+  }
+  // randomizer/install: download + extract the pinned FVX (with its own JRE) into the
+  // managed folder, then remember it in config.fvxDir → resolveFvx() finds it. Async;
+  // the client polls /api/randomizer/install-status. URL via SOULLINK_FVX_URL.
+  if (path === '/api/randomizer/install' && req.method === 'POST') {
+    const st = fvxInstallState()
+    if (st.state === 'downloading' || st.state === 'extracting') { sendJson(res, { ok: true, state: st }); return }
+    const targetDir = join(APPDATA_DIR, 'Randomizer')
+    installFvx({ targetDir, onDone: (dir) => { try { saveConfig({ fvxDir: dir }) } catch { /* ignore */ } } })
+      .catch((e) => console.error('[fvx] install:', e?.message || e))
+    sendJson(res, { ok: true, state: fvxInstallState() })
+    return
+  }
+  if (path === '/api/randomizer/install-status') {
+    sendJson(res, { ok: true, ...fvxInstallState() })
     return
   }
   if (path === '/api/randomizer/open' && req.method === 'POST') {
