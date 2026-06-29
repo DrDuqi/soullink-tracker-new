@@ -8,6 +8,12 @@ export interface MoveEntry { id: number; de: string; en: string; t: string; c: M
 export const MOVES = raw as MoveEntry[]
 const byId = new Map(MOVES.map((m) => [m.id, m]))
 export const moveEntry = (id: number): MoveEntry | null => byId.get(id) || null
+
+// Resolve a move NAME (DE or EN, case-insensitive) → move id (run surfaces store names).
+const normName = (s: string) => s.toLowerCase().trim()
+const NAME_TO_ID = new Map<string, number>()
+for (const m of MOVES) { NAME_TO_ID.set(normName(m.de), m.id); NAME_TO_ID.set(normName(m.en), m.id) }
+export const moveIdByName = (name: string | null | undefined): number | null => (name ? NAME_TO_ID.get(normName(name)) ?? null : null)
 export const moveName = (m: MoveEntry, lang: 'de' | 'en') => (lang === 'de' ? m.de || m.en : m.en || m.de)
 
 export const MOVE_CATS: MoveCat[] = ['physical', 'special', 'status']

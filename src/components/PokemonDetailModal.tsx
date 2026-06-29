@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, ChevronLeft, ChevronRight, Skull, Heart, Box, HelpCircle, Zap, Shield, Swords, Wifi } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Skull, Heart, Box, HelpCircle, Zap, Shield, Swords, Wifi, Sparkles } from 'lucide-react'
 import {
   getOfficialArtUrl,
   getSpriteUrl,
@@ -13,6 +13,8 @@ import {
 } from '../lib/pokemon-api'
 import { useUpdateEncounter, useUpdateMoves } from '../hooks/useEncounters'
 import { useToastStore } from '../store/toastStore'
+import { useQuickLook } from '../store/quickLookStore'
+import { moveIdByName } from '../lib/dex/moves'
 import { isLiveSynced, editPermissions, LIVE_SYNC_NOTICE, LIVE_SYNC_DETAIL } from '../lib/liveSync'
 import type { Encounter } from '../types/database'
 import type { PokemonDetails, EvolutionStage, MoveDetail } from '../lib/pokemon-api'
@@ -49,6 +51,7 @@ const STAT_LABELS: Record<string, { short: string; icon: React.ReactNode; color:
 const STAT_KEYS = ['hp','attack','defense','specialAttack','specialDefense','speed'] as const
 
 export default function PokemonDetailModal({ encounter, linkedEncounter, linkedPlayerName, myEncounter, onClose }: Props) {
+  const openQuickLook = useQuickLook((s) => s.open)
   const [details, setDetails] = useState<PokemonDetails | null>(null)
   const [evolutionChain, setEvolutionChain] = useState<EvolutionStage[]>([])
   const [loading, setLoading] = useState(true)
@@ -240,14 +243,21 @@ export default function PokemonDetailModal({ encounter, linkedEncounter, linkedP
               <p className="text-slate-400 text-sm capitalize">{encounter.pokemon_name}</p>
             )}
 
-            {/* Types */}
+            {/* Types — click for a SoulDex type Quick-Look */}
             <div className="flex gap-1.5 mt-2">
               {types.map((t) => (
-                <span key={t} className="px-2.5 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: getTypeColor(t) }}>
+                <button key={t} className="px-2.5 py-0.5 rounded-full text-xs font-bold text-white hover:opacity-80" style={{ background: getTypeColor(t) }}
+                  title="Quick-Look" onClick={() => openQuickLook({ kind: 'type', key: t })}>
                   {TYPE_NAMES_DE[t] ?? t}
-                </span>
+                </button>
               ))}
             </div>
+            {encounter.pokemon_id && (
+              <button onClick={() => openQuickLook({ kind: 'pokemon', key: encounter.pokemon_id! })}
+                className="inline-flex items-center gap-1.5 mt-2.5 text-xs font-bold text-pk-red hover:underline">
+                <Sparkles className="w-3.5 h-3.5" /> SoulDex-Quick-Look
+              </button>
+            )}
 
             {/* Status + location */}
             <div className="flex items-center gap-2 mt-2.5">
@@ -390,6 +400,9 @@ export default function PokemonDetailModal({ encounter, linkedEncounter, linkedP
                         {det.accuracy != null && <span className="text-slate-500 text-[9px] font-mono">🎯{det.accuracy}%</span>}
                       </div>
                     )}
+                    {(() => { const mid = moveIdByName(moves[idx]); return mid ? (
+                      <button onClick={() => openQuickLook({ kind: 'move', key: mid })} className="text-[9px] font-bold text-pk-red hover:underline mt-1">Quick-Look ↗</button>
+                    ) : null })()}
                   </div>
                 )
               })}

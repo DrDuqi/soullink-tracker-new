@@ -30,6 +30,7 @@ import TypeEffectChart from '../components/TypeEffectChart'
 import RouteChecklist from '../components/RouteChecklist'
 import TeamAnalysisPanel from '../components/TeamAnalysisPanel'
 import PokemonDetailModal from '../components/PokemonDetailModal'
+import QuickLook from '../components/QuickLook'
 import SlotPickerModal from '../components/SlotPickerModal'
 import UserMenu from '../components/UserMenu'
 import EmulatorLivePanel from '../components/EmulatorLivePanel'
@@ -1202,6 +1203,7 @@ export default function RunPage() {
           onClose={() => setSlotPickerEncounter(null)}
         />
       )}
+      <QuickLook />
     </>
   )
 }

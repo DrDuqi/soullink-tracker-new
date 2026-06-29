@@ -4,6 +4,7 @@ import { getSpriteUrl, getTypeColor } from '../lib/pokemon-api'
 import { routeMismatchesEdition } from '../lib/routes'
 import { useUpdateEncounterStatus, useDeleteEncounter } from '../hooks/useEncounters'
 import ConfirmDialog from './ConfirmDialog'
+import { useQuickLook } from '../store/quickLookStore'
 import type { Encounter, PokemonStatus } from '../types/database'
 
 const STATUS_CFG: Record<PokemonStatus, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
@@ -47,6 +48,7 @@ export default function EncounterCard({
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const openQuickLook = useQuickLook((s) => s.open)
   const updateStatus = useUpdateEncounterStatus()
   const deleteEncounter = useDeleteEncounter()
   const cfg = STATUS_CFG[encounter.status]
@@ -228,7 +230,8 @@ export default function EncounterCard({
             {encounter.types && encounter.types.length > 0 && (
               <div className="flex gap-1.5 mt-2">
                 {encounter.types.map((t) => (
-                  <span key={t} className="type-badge" style={{ background: getTypeColor(t) }}>{t}</span>
+                  <button key={t} className="type-badge cursor-pointer hover:opacity-80" style={{ background: getTypeColor(t) }}
+                    title="Quick-Look" onClick={(e) => { e.stopPropagation(); openQuickLook({ kind: 'type', key: t }) }}>{t}</button>
                 ))}
               </div>
             )}

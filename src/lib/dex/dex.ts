@@ -17,6 +17,13 @@ export const DEX = RAW as DexEntry[]
 const BY_ID = new Map(DEX.map((e) => [e.id, e]))
 export function dexEntry(id: number): DexEntry | undefined { return BY_ID.get(id) }
 
+// Resolve a species NAME (DE or EN, case-insensitive) → national-dex id. Lets run
+// surfaces that only store a name (encounters) open the right Quick-Look/SoulDex page.
+const normName = (s: string) => s.toLowerCase().trim()
+const NAME_TO_ID = new Map<string, number>()
+for (const e of DEX) { NAME_TO_ID.set(normName(e.de), e.id); NAME_TO_ID.set(normName(e.en), e.id) }
+export const dexIdByName = (name: string | null | undefined): number | null => (name ? NAME_TO_ID.get(normName(name)) ?? null : null)
+
 export type Lang = 'de' | 'en'
 export function dexName(e: DexEntry, lang: Lang): string { return lang === 'de' ? e.de : e.en }
 export const STAT_LABEL: Record<Lang, string[]> = {
