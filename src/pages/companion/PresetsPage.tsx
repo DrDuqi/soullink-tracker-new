@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Dices, Plus, Upload, Trash2, Pencil, Check, X, Loader2, ExternalLink } from 'lucide-react'
 import { getPlatform } from '../../platform'
+import { EDITION_OPTIONS, editionLabel, resolveEdition, type EditionKey } from '../../lib/edition'
 import type { Preset } from '../../lib/presets'
 
 // Preset management: built-in (shipped, read-only) + custom presets. Custom presets
@@ -17,6 +18,12 @@ export default function PresetsPage() {
   const [editName, setEditName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [presetName, setPresetName] = useState('Eigene Regeln')
+  // Presets are edition-bound — created presets are tagged so they only appear for their
+  // edition. Default to the last edition the player worked with.
+  const [editionKey, setEditionKey] = useState<EditionKey>(() => {
+    let last: string | null = null; try { last = localStorage.getItem('soullink:lastEdition') } catch { /* ignore */ }
+    return resolveEdition(last) || EDITION_OPTIONS[0].key
+  })
 
   const [watching, setWatching] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -43,8 +50,8 @@ export default function PresetsPage() {
     stopWatch(); setWatching(true)
     pollRef.current = setInterval(async () => {
       elapsed += 3000
-      const p = await platform.grabRules(since, { name })
-      if (p) { stopWatch(); setNotice(`Deine Regeln „${p.name}" wurden automatisch übernommen.`); await reload() }
+      const p = await platform.grabRules(since, { name, edition: editionKey })
+      if (p) { stopWatch(); setNotice(`Deine Regeln „${p.name}" für ${editionLabel(editionKey)} wurden automatisch übernommen.`); await reload() }
       else if (elapsed >= 240000) { stopWatch() }   // give up after 4 min
     }, 3000)
   }
@@ -53,7 +60,7 @@ export default function PresetsPage() {
     const picked = await platform.pickFile('preset')
     if (picked.path) {
       const base = picked.path.split(/[\\/]/).pop()?.replace(/\.rnqs$/i, '') || 'Eigene Regeln'
-      const p = await platform.importPreset({ name: base, sourceFile: picked.path })
+      const p = await platform.importPreset({ name: base, edition: editionKey, sourceFile: picked.path })
       setNotice(p ? `Regeln „${p.name}" importiert.` : 'Import fehlgeschlagen.')
       await reload()
     }
@@ -71,12 +78,21 @@ export default function PresetsPage() {
       <h1 className="text-white font-black text-3xl tracking-tight">Spielregeln</h1>
       <p className="text-slate-400 mt-1.5">Deine Regeln bestimmen, <i>wie</i> randomisiert wird (z. B. Pokémon, Trainer, Items zufällig). Der Seed bestimmt das konkrete Ergebnis.</p>
 
-      <div className="mt-5">
-        <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Name der Regeln</label>
-        <input value={presetName} onChange={(e) => setPresetName(e.target.value)} disabled={watching}
-          placeholder="z. B. Pokémon Platin – LeonValon"
-          className="mt-1 w-full max-w-md rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3 py-2 text-sm text-white" />
+      <div className="mt-5 flex flex-col sm:flex-row gap-3 max-w-2xl">
+        <div className="sm:w-56">
+          <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Edition</label>
+          <select value={editionKey} disabled={watching} onChange={(e) => setEditionKey(e.target.value as EditionKey)}
+            className="mt-1 w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3 py-2 text-sm text-white">
+            {EDITION_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
+        </div>
+        <div className="flex-1">
+          <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Name der Regeln</label>
+          <input value={presetName} onChange={(e) => setPresetName(e.target.value)} disabled={watching}
+            placeholder="z. B. Hardcore" className="mt-1 w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3 py-2 text-sm text-white" />
+        </div>
       </div>
+      <p className="text-slate-500 text-[11px] mt-1.5">Diese Regeln werden <b className="text-slate-300">{editionLabel(editionKey)}</b> zugeordnet und erscheinen nur dort.</p>
       <div className="flex items-center gap-2.5 mt-3">
         <button onClick={openEditor} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
           <Plus className="w-4 h-4" /> Eigene Regeln erstellen
@@ -117,7 +133,7 @@ export default function PresetsPage() {
                   {p.builtin
                     ? <span className="text-[10px] font-black uppercase tracking-wide text-pk-yellow bg-pk-yellow/10 px-1.5 py-0.5 rounded">Standard</span>
                     : <span className="text-[10px] font-black uppercase tracking-wide text-slate-400 bg-white/5 px-1.5 py-0.5 rounded">eigenes</span>}
-                  {p.edition && <span className="text-[11px] text-slate-500">{p.edition}</span>}
+                  {p.edition && <span className="text-[11px] text-slate-500">{editionLabel(p.edition)}</span>}
                 </div>
               )}
               {p.description && editingId !== p.id && <p className="text-slate-500 text-xs mt-0.5">{p.description}</p>}

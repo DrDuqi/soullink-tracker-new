@@ -39,7 +39,7 @@ export default function NewRunPage() {
   const navigate = useNavigate()
   const platform = getPlatform()
   const { user, profile } = useAuth()
-  const { profiles, active, loading } = useProfiles()
+  const { profiles, loading } = useProfiles()
   const [params] = useSearchParams()
   // BizHawk is GLOBAL (one install for all editions) — read it from the companion config.
   const [globalBiz, setGlobalBiz] = useState<string | null>(null)
@@ -76,16 +76,21 @@ export default function NewRunPage() {
   // The profile that holds the ROM for the chosen edition (one per edition); BizHawk is global.
   const editionProfile = profiles.find((p) => resolveEdition(p.edition) === editionKey) ?? null
 
-  // Presets are edition-bound: load for the chosen edition, reset selection on change.
+  // Presets are STRICTLY edition-bound. We fetch all and filter by canonical edition
+  // (resolveEdition normalises 'platinum'↔'Platin'; untagged presets never leak across
+  // editions). Both the list and the selection reset fully on every edition change.
   useEffect(() => {
     let cancel = false
-    platform.listPresets(editionProfile?.edition || editionKey).then((list) => {
+    setPresets([]); setPresetId('')
+    platform.listPresets().then((all) => {
       if (cancel) return
-      setPresets(list ?? [])
-      setPresetId(editionProfile?.presetId && (list ?? []).some((p) => p.id === editionProfile.presetId) ? editionProfile.presetId : (list?.[0]?.id || ''))
+      const list = (all ?? []).filter((p) => resolveEdition(p.edition) === editionKey)
+      setPresets(list)
+      const want = editionProfile?.presetId && list.some((p) => p.id === editionProfile.presetId) ? editionProfile.presetId : (list[0]?.id || '')
+      setPresetId(want)
     })
     return () => { cancel = true }
-  }, [platform, editionKey, editionProfile?.edition, editionProfile?.presetId])
+  }, [platform, editionKey, editionProfile?.id, editionProfile?.presetId])
 
   const romReady = !!(editionProfile && editionProfile.paths.originalRom && globalBiz)
   const ready = !!(romReady && presetId)
@@ -180,15 +185,8 @@ export default function NewRunPage() {
           </div>
 
           <div className="mt-4 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
-            <div className="text-slate-400 text-xs font-black uppercase tracking-widest mb-2">Edition</div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-white font-black text-lg">{active!.edition ? editionLabel(active!.edition) : 'Pokémon'}</span>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-[#2e2e42] bg-[#16161f] p-5">
             <div className="flex items-center justify-between gap-2 mb-2">
-              <label className="text-slate-400 text-xs font-black uppercase tracking-widest">③ Regel-Preset</label>
+              <label className="text-slate-400 text-xs font-black uppercase tracking-widest">③ Regel-Preset · {editionLabel(editionKey)}</label>
               <button onClick={() => navigate('/presets')} className="text-[11px] font-bold text-slate-400 hover:text-white underline underline-offset-2">Regeln bearbeiten</button>
             </div>
             <select value={presetId} onChange={(e) => setPresetId(e.target.value)} disabled={busy || presets.length === 0}

@@ -36,7 +36,8 @@ export default function MeinSetupPage() {
     }
   }, [available, loading, ed, editionKey, create])
   useEffect(() => { setRomInfo(null) }, [editionKey])
-  useEffect(() => { platform.listPresets(editionKey).then((l) => setPresets(l ?? [])) }, [platform, editionKey])
+  // Strictly edition-bound presets (resolveEdition normalises 'platinum'↔'Platin').
+  useEffect(() => { setPresets([]); platform.listPresets().then((all) => setPresets((all ?? []).filter((p) => resolveEdition(p.edition) === editionKey))) }, [platform, editionKey])
   // Remember the last edition so "Neuer SoulLink" opens with it (never jumps to Platin).
   useEffect(() => { try { localStorage.setItem('soullink:lastEdition', editionKey) } catch { /* ignore */ } }, [editionKey])
 
