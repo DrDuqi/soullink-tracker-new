@@ -4,6 +4,7 @@ import { ChevronLeft, Loader2, Coins, Sparkles } from 'lucide-react'
 import { useSettings } from '../../store/settingsStore'
 import { itemEntry, itemName, catLabel } from '../../lib/dex/items'
 import { getItemDetail } from '../../lib/dex/itemDetail'
+import { dexEntry, dexName, spriteUrl } from '../../lib/dex/dex'
 import ItemSprite from '../../components/ItemSprite'
 
 // SoulDex → Item-Detail. Name/category/sprite are instant/offline; effect, flavour,
@@ -48,6 +49,7 @@ export default function ItemEntryPage() {
 }
 
 function ItemExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: string, en: string) => string }) {
+  const navigate = useNavigate()
   const { data, isLoading, isError } = useQuery({ queryKey: ['item-detail', id], queryFn: () => getItemDetail(id), staleTime: Infinity, gcTime: 60 * 60 * 1000, retry: 1 })
   if (isLoading) return <div className="mt-4 flex items-center gap-2 text-slate-400 text-sm px-1"><Loader2 className="w-4 h-4 animate-spin" /> {t('Lädt Details …', 'Loading details …')}</div>
   if (isError || !data) return <div className="mt-4 text-slate-500 text-sm px-1">{t('Weitere Details konnten nicht geladen werden (offline?).', 'Could not load further details (offline?).')}</div>
@@ -69,20 +71,43 @@ function ItemExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: st
           <p className="text-slate-400 text-sm">{t('Für dieses Item sind keine weiteren Informationen verfügbar.', 'No further information is available for this item.')}</p>
         )}
       </section>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
-        <div className="rounded-xl border border-white/[0.06] px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)' }}>
+
+      {data.evolves.length > 0 && <PokeUsers title={t('Diese Pokémon entwickeln sich damit', 'Pokémon that evolve with this item')} ids={data.evolves} lang={lang} navigate={navigate} />}
+      {data.holders.length > 0 && <PokeUsers title={t('Wird in der Wildnis getragen von', 'Held in the wild by')} ids={data.holders} lang={lang} navigate={navigate} />}
+
+      {/* Preise & Schleuder — sekundär, daher unten und kompakt. */}
+      <div className="grid grid-cols-3 gap-3 mt-4">
+        <div className="rounded-xl border border-white/[0.06] px-3 py-2" style={{ background: 'rgba(255,255,255,0.02)' }}>
           <div className="text-[11px] text-slate-500 flex items-center gap-1"><Coins className="w-3 h-3" /> {t('Kaufpreis', 'Buy')}</div>
-          <div className="text-slate-100 font-bold text-sm mt-0.5">{data.cost > 0 ? `${data.cost} ₽` : '—'}</div>
+          <div className="text-slate-200 font-bold text-sm mt-0.5">{data.cost > 0 ? `${data.cost} ₽` : '—'}</div>
         </div>
-        <div className="rounded-xl border border-white/[0.06] px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)' }}>
+        <div className="rounded-xl border border-white/[0.06] px-3 py-2" style={{ background: 'rgba(255,255,255,0.02)' }}>
           <div className="text-[11px] text-slate-500">{t('Verkaufspreis', 'Sell')}</div>
-          <div className="text-slate-100 font-bold text-sm mt-0.5">{data.cost > 0 ? `${sell} ₽` : '—'}</div>
+          <div className="text-slate-200 font-bold text-sm mt-0.5">{data.cost > 0 ? `${sell} ₽` : '—'}</div>
         </div>
-        <div className="rounded-xl border border-white/[0.06] px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)' }}>
-          <div className="text-[11px] text-slate-500">{t('Schleuder-Stärke', 'Fling power')}</div>
-          <div className="text-slate-100 font-bold text-sm mt-0.5">{data.fling != null ? data.fling : '—'}</div>
+        <div className="rounded-xl border border-white/[0.06] px-3 py-2" style={{ background: 'rgba(255,255,255,0.02)' }}>
+          <div className="text-[11px] text-slate-500">{t('Schleuder', 'Fling')}</div>
+          <div className="text-slate-200 font-bold text-sm mt-0.5">{data.fling != null ? data.fling : '—'}</div>
         </div>
       </div>
     </>
+  )
+}
+
+function PokeUsers({ title, ids, lang, navigate }: { title: string; ids: number[]; lang: 'de' | 'en'; navigate: (to: string) => void }) {
+  const list = ids.map((id) => dexEntry(id)).filter((e): e is NonNullable<typeof e> => !!e)
+  if (!list.length) return null
+  return (
+    <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
+      <h2 className="text-white font-bold text-sm mb-3">{title} <span className="text-slate-500 font-mono">({list.length})</span></h2>
+      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))' }}>
+        {list.map((e) => (
+          <button key={e.id} onClick={() => navigate(`/dex/pokemon/${e.id}`)} className="flex flex-col items-center rounded-xl px-1 py-1.5 hover:bg-white/[0.06] transition-colors" style={{ contentVisibility: 'auto', containIntrinsicSize: '76px' } as React.CSSProperties}>
+            <img src={spriteUrl(e.id)} alt="" loading="lazy" draggable={false} className="w-12 h-12 object-contain" style={{ imageRendering: 'pixelated' }} />
+            <span className="text-[11px] font-bold text-slate-300 truncate max-w-full">{dexName(e, lang)}</span>
+          </button>
+        ))}
+      </div>
+    </section>
   )
 }
