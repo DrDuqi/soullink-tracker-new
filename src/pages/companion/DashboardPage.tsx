@@ -170,7 +170,7 @@ export default function DashboardPage() {
     try {
       const created = await createRun({ name: `${vm.run.name} (Kopie)`, game: vm.run.game, ownerUserId: user.id, username: profile?.username || name })
       const recipe = await fetchRunRecipe(vm.run.id)
-      if (recipe) await saveRunRecipe(created.run.id, { presetData: recipe.preset_data, edition: recipe.edition, baseRom: recipe.base_rom, worldSeed: recipe.world_seed })
+      if (recipe) await saveRunRecipe(created.run.id, { presetData: recipe.preset_data, edition: recipe.edition, baseRom: recipe.base_rom, masterSeed: recipe.world_seed, sameWorld: recipe.same_world, fvxVersion: recipe.fvx_version })
       await refetch()
     } catch (e) { alert(e instanceof Error ? e.message : 'Duplizieren fehlgeschlagen') }
     setBusyId(null)

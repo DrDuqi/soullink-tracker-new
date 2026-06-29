@@ -6,6 +6,7 @@ import { getPlatform } from '../../platform'
 import { useAuth } from '../../contexts/AuthContext'
 import { createRun } from '../../lib/createRun'
 import { saveRunRecipe } from '../../lib/runRecipe'
+import { derivePlayerSeed } from '../../lib/randomizerSync'
 import { useRunStore } from '../../store/runStore'
 import { useMyRuns } from '../../hooks/useMyRuns'
 import type { Preset } from '../../lib/presets'
@@ -97,14 +98,17 @@ export default function NewRunPage() {
       run = created.run; player = created.player
     } catch (e) { setErr(e instanceof Error ? e.message : 'Run konnte nicht erstellt werden.'); setStep('error'); return }
 
-    // 2) Randomize this run's ROM into its own per-run file (own savegame).
+    // 2) Randomize this run's ROM with THIS player's seed. `seed` is the run master
+    //    seed; the host is slot 0 → derives its own seed (unless "Gleiche Welt").
     setStep('randomizing')
-    const r = await platform.prepareRun({ runId: run.id, profileId: active.id, presetId, seed })
+    const hostSeed = sameWorld ? seed : derivePlayerSeed(seed, 0)
+    const fvxVersion = (await platform.randomizerStatus())?.version ?? null
+    const r = await platform.prepareRun({ runId: run.id, profileId: active.id, presetId, seed: hostSeed })
     if (!r.ok) { setErr(ERR[r.error || ''] || r.error || 'Fehler'); setStep('error'); return }
 
-    // Store the shared recipe on the run so a partner reproduces the rules (and the
-    // world too, if "Gleiche Welt" is on → shared seed). Non-fatal if it fails.
-    try { await saveRunRecipe(run.id, { presetData: r.presetData, edition: r.edition, baseRom: r.baseRom, worldSeed: sameWorld ? r.seed : null }) } catch { /* ignore */ }
+    // Store the shared recipe so partners reproduce the SAME rules/edition/FVX version
+    // but derive their OWN per-slot seed from the run master seed. Non-fatal if it fails.
+    try { await saveRunRecipe(run.id, { presetData: r.presetData, edition: r.edition, baseRom: r.baseRom, masterSeed: seed, sameWorld, fvxVersion }) } catch { /* ignore */ }
 
     // 3) Launch BizHawk with the randomized ROM + live-sync.
     setStep('launching')

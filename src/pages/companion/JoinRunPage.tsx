@@ -6,6 +6,7 @@ import { getPlatform } from '../../platform'
 import { useAuth } from '../../contexts/AuthContext'
 import { joinRunByCode } from '../../lib/joinRun'
 import { fetchRunRecipe } from '../../lib/runRecipe'
+import { seedForPlayer } from '../../lib/randomizerSync'
 import { useRunStore } from '../../store/runStore'
 
 // Join a friend's SoulLink by code: claim the slot (join_run) → read the shared
@@ -30,26 +31,34 @@ export default function JoinRunPage() {
   const [code, setCode] = useState('')
   const [step, setStep] = useState<Step>('idle')
   const [err, setErr] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
 
   const ready = !!(active && active.paths.originalRom && active.paths.bizhawk)
   const busy = step === 'joining' || step === 'randomizing' || step === 'launching'
 
   async function join() {
     if (!user || !active || !code.trim()) return
-    setErr(null); setStep('joining')
+    setErr(null); setInfo(null); setStep('joining')
     let joined
     try { joined = await joinRunByCode(code, user.id) } catch (e) { setErr(e instanceof Error ? e.message : 'Beitritt fehlgeschlagen.'); setStep('error'); return }
 
+    // ── Validation: refuse to start with the wrong rules/edition/FVX version ───────
     const recipe = await fetchRunRecipe(joined.run.id)
     if (!recipe?.preset_data) { setErr('Dieser Run wurde noch nicht vorbereitet. Bitte warte, bis dein Freund den SoulLink gestartet hat.'); setStep('error'); return }
     if (recipe.edition && active.edition && recipe.edition !== active.edition) {
       setErr(`Dieser SoulLink ist für „${recipe.edition}", dein Profil für „${active.edition}". Bitte ein passendes Profil/ROM wählen.`); setStep('error'); return
     }
+    const localFvx = (await platform.randomizerStatus())?.version ?? null
+    if (recipe.fvx_version && localFvx && recipe.fvx_version !== localFvx) {
+      setErr(`Der Host nutzte FVX ${recipe.fvx_version}, du hast ${localFvx}. Für identische Regeln muss die FVX-Version übereinstimmen.`); setStep('error'); return
+    }
 
-    // Reproduce locally: shared rules (preset) + shared seed only in "Gleiche Welt"
-    // (world_seed) — otherwise the Companion picks this player's own seed.
+    // Adopt the host's rules, but derive THIS player's own deterministic seed from the
+    // run master seed + slot → same world rules, different (reproducible) world.
+    const { seed: mySeed, slot } = seedForPlayer({ masterSeed: recipe.world_seed, sameWorld: !!recipe.same_world, players: joined.players, playerId: joined.myPlayerId })
+    setInfo(`✓ Host-Regeln übernommen · Spieler-Slot ${slot + 1} · eigener Seed #${mySeed}${recipe.same_world ? ' · Gleiche Welt' : ''} · ROM wird separat randomisiert`)
     setStep('randomizing')
-    const r = await platform.prepareRun({ runId: joined.run.id, profileId: active.id, presetData: recipe.preset_data, seed: recipe.world_seed ?? undefined })
+    const r = await platform.prepareRun({ runId: joined.run.id, profileId: active.id, presetData: recipe.preset_data, seed: recipe.world_seed != null ? mySeed : undefined })
     if (!r.ok) { setErr(ERR[r.error || ''] || r.error || 'Fehler'); setStep('error'); return }
 
     setStep('launching')
@@ -86,6 +95,9 @@ export default function JoinRunPage() {
             {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
             {step === 'joining' ? 'Trete bei …' : step === 'randomizing' ? 'Randomisiere … (~1 Min)' : step === 'launching' ? 'BizHawk wird gestartet …' : 'Beitreten & starten'}
           </button>
+          {info && !err && (
+            <div className="mt-4 rounded-xl border border-green-800/40 bg-green-950/20 px-3.5 py-2.5 text-green-300 text-xs leading-relaxed">{info}</div>
+          )}
           {err && <p className="mt-4 text-red-300 text-sm flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {err}</p>}
         </>
       )}
