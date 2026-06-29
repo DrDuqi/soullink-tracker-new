@@ -1,0 +1,43 @@
+{
+  "80": [
+    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
+    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+  ],
+  "81": [
+    { "how": "ground", "loc": "Mond-Berg", "ed": ["rby", "frlg"] },
+    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
+    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+  ],
+  "82": [
+    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
+    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+  ],
+  "83": [
+    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
+    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+  ],
+  "84": [
+    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
+    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+  ],
+  "85": [
+    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
+    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+  ],
+  "107": [
+    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
+    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+  ],
+  "108": [
+    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
+    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+  ],
+  "109": [
+    { "how": "ground", "loc": "Naturzone", "ed": ["swsh"] },
+    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+  ],
+  "885": [
+    { "how": "ground", "loc": "Naturzone (See des Zorns)", "ed": ["swsh"] },
+    { "how": "shop", "npc": "Delibird Presents", "ed": ["sv"] }
+  ]
+}

@@ -1,9 +1,10 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, Loader2, Coins, Sparkles } from 'lucide-react'
+import { ChevronLeft, Loader2, Coins, Sparkles, MapPin, ExternalLink } from 'lucide-react'
 import { useSettings } from '../../store/settingsStore'
 import { itemEntry, itemName, catLabel } from '../../lib/dex/items'
 import { getItemDetail } from '../../lib/dex/itemDetail'
+import { getItemLocations, HOW_LABEL, HOW_COLOR, editionLabel, sourceUrl } from '../../lib/dex/itemLocations'
 import { dexEntry, dexName, spriteUrl } from '../../lib/dex/dex'
 import ItemSprite from '../../components/ItemSprite'
 
@@ -72,6 +73,8 @@ function ItemExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: st
         )}
       </section>
 
+      <Acquisition id={id} lang={lang} t={t} cost={data.cost} />
+
       {data.evolves.length > 0 && <PokeUsers title={t('Diese Pokémon entwickeln sich damit', 'Pokémon that evolve with this item')} ids={data.evolves} lang={lang} navigate={navigate} />}
       {data.holders.length > 0 && <PokeUsers title={t('Wird in der Wildnis getragen von', 'Held in the wild by')} ids={data.holders} lang={lang} navigate={navigate} />}
 
@@ -91,6 +94,42 @@ function ItemExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: st
         </div>
       </div>
     </>
+  )
+}
+
+function Acquisition({ id, lang, t, cost }: { id: number; lang: 'de' | 'en'; t: (de: string, en: string) => string; cost: number }) {
+  const entries = getItemLocations(id)
+  const e = itemEntry(id)
+  const src = e ? sourceUrl(lang === 'de' ? e.de || e.en : e.en || e.de, lang) : null
+  const buyable = cost > 0 && !entries.some((x) => x.how === 'shop')
+  return (
+    <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
+      <h2 className="text-white font-bold text-sm mb-3 flex items-center gap-1.5"><MapPin className="w-4 h-4 text-pk-red" /> {t('Wo & wie bekomme ich es?', 'Where & how to get it')}</h2>
+      {entries.length > 0 ? (
+        <div className="space-y-2.5">
+          {entries.map((x, i) => (
+            <div key={i} className="flex items-start gap-2.5">
+              <span className="text-[10px] font-black uppercase tracking-wide rounded px-2 py-1 shrink-0" style={{ background: `${HOW_COLOR[x.how]}22`, color: HOW_COLOR[x.how] }}>{HOW_LABEL[lang][x.how]}</span>
+              <div className="min-w-0 text-sm">
+                <span className="text-slate-200">{[x.loc, x.npc].filter(Boolean).join(' · ') || '—'}</span>
+                {x.note && <span className="text-slate-500"> — {x.note}</span>}
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {x.ed.map((c) => <span key={c} className="text-[10px] font-bold rounded px-1.5 py-0.5 bg-white/5 border border-white/10 text-slate-400">{editionLabel(c, lang)}</span>)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-slate-400 text-sm">{buyable ? t('In Shops kaufbar.', 'Buyable in shops.') : t('Für dieses Item sind noch keine Fundorte erfasst.', 'No acquisition data recorded yet for this item.')}</p>
+      )}
+      {entries.length > 0 && buyable && <p className="text-slate-400 text-sm mt-2.5">{t('Außerdem in Shops kaufbar.', 'Also buyable in shops.')}</p>}
+      {src && (
+        <a href={src} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white mt-3">
+          <ExternalLink className="w-3.5 h-3.5" /> {t('Alle Fundorte', 'All locations')}: {lang === 'de' ? 'PokéWiki' : 'Bulbapedia'}
+        </a>
+      )}
+    </section>
   )
 }
 
