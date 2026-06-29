@@ -737,9 +737,9 @@ export default function RunPage() {
 
         {/* ─ Three-column layout ────────────────────────────────────────── */}
         <div className="flex-1 max-w-[1680px] mx-auto w-full px-4 lg:px-6 py-6">
-          <div className="grid grid-cols-1 xl:grid-cols-[290px_minmax(0,1fr)_340px] gap-5 items-start">
+          <div className="grid grid-cols-1 xl:grid-cols-[330px_minmax(0,1fr)_320px] gap-5 items-start">
 
-            {/* ░░ LEFT SIDEBAR — Run-Protokoll ░░ */}
+            {/* ░░ LEFT SIDEBAR — Run-Protokoll + permanenter Team-Coach ░░ */}
             <aside className="order-2 xl:order-1 min-w-0 xl:sticky xl:top-20 xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-4">
               {myPlayerId && (
                 <ActivityFeed
@@ -750,6 +750,20 @@ export default function RunPage() {
                   defaultOpen
                 />
               )}
+
+              {/* Permanenter Team-Coach — immer offen, läuft live mit */}
+              <TeamAnalysisPanel
+                runId={currentRun.id}
+                game={currentRun.game}
+                players={players}
+                myPlayerId={myPlayerId ?? ''}
+                encounters={encounters as Encounter[]}
+                teamSlots={teamSlots}
+                soulLinkPairs={is3 ? [] : pairs}
+                onSelectEncounter={(enc) => setSelectedEncounter(enc)}
+                useLiveTeam
+                defaultOpen
+              />
             </aside>
 
             {/* ░░ CENTER — Spielbereich ░░ */}
@@ -1093,21 +1107,6 @@ export default function RunPage() {
                   defaultOpen
                 />
               )}
-
-              {/* Strategy center — team analysis */}
-              <TeamAnalysisPanel
-                runId={currentRun.id}
-                game={currentRun.game}
-                players={players}
-                myPlayerId={myPlayerId ?? ''}
-                encounters={encounters as Encounter[]}
-                teamSlots={teamSlots}
-                soulLinkPairs={is3 ? [] : pairs}
-                onSelectEncounter={(enc) => setSelectedEncounter(enc)}
-                useLiveTeam
-                collapsible
-                defaultOpen
-              />
 
               {/* Type effectiveness */}
               <TypeEffectChart collapsible defaultOpen />

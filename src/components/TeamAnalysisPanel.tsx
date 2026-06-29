@@ -165,7 +165,7 @@ export default function TeamAnalysisPanel({
       >
         <div className="flex items-center gap-2">
           <Brain className="w-3.5 h-3.5 text-slate-500" />
-          <span className="text-slate-200 text-xs font-black uppercase tracking-widest">Team-Analyse</span>
+          <span className="text-slate-200 text-xs font-black uppercase tracking-widest">Team-Coach</span>
         </div>
         <div className="flex items-center gap-2">
           {!empty && <span className="text-[10px] font-bold tabular-nums" style={{ color: '#FFCB05' }}>{analysis.overall.toFixed(1)}/10</span>}
