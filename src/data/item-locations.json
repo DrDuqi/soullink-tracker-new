@@ -1,4 +1,169 @@
 {
+  "1": [
+    {
+      "how": "reward",
+      "loc": "Story-Belohnung (z. B. Silph Co.) / Lotterie",
+      "ed": [
+        "all"
+      ],
+      "note": "meist nur ein Exemplar pro Spiel"
+    }
+  ],
+  "2": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt",
+      "ed": [
+        "all"
+      ],
+      "note": "höhere Fangrate als der Superball"
+    }
+  ],
+  "3": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt",
+      "ed": [
+        "all"
+      ]
+    }
+  ],
+  "4": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt",
+      "ed": [
+        "all"
+      ],
+      "note": "Standard-Ball"
+    }
+  ],
+  "5": [
+    {
+      "how": "gift",
+      "loc": "nur in der Safari-Zone nutzbar",
+      "ed": [
+        "rby",
+        "gsc",
+        "rse",
+        "frlg",
+        "hgss",
+        "oras"
+      ]
+    }
+  ],
+  "6": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt (ab Hoenn)",
+      "ed": [
+        "rse",
+        "oras",
+        "all"
+      ],
+      "note": "besser gegen Wasser-/Käfer-Pokémon"
+    }
+  ],
+  "7": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt / Tauchgebiete",
+      "ed": [
+        "rse",
+        "oras",
+        "all"
+      ],
+      "note": "besser beim Angeln/Tauchen"
+    }
+  ],
+  "8": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt",
+      "ed": [
+        "all"
+      ],
+      "note": "besser gegen niedrigstufige Pokémon"
+    }
+  ],
+  "9": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt",
+      "ed": [
+        "all"
+      ],
+      "note": "besser gegen bereits gefangene Arten"
+    }
+  ],
+  "10": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt",
+      "ed": [
+        "all"
+      ],
+      "note": "wird mit jeder Kampfrunde wirksamer"
+    }
+  ],
+  "11": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt / Kaufhaus",
+      "ed": [
+        "all"
+      ],
+      "note": "erhöht die Freundschaft des Fangs"
+    }
+  ],
+  "12": [
+    {
+      "how": "gift",
+      "loc": "gratis ab 10 gekauften Bällen",
+      "ed": [
+        "all"
+      ]
+    }
+  ],
+  "13": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt",
+      "ed": [
+        "all"
+      ],
+      "note": "besser in Höhlen und nachts"
+    }
+  ],
+  "14": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt",
+      "ed": [
+        "all"
+      ],
+      "note": "heilt das gefangene Pokémon vollständig"
+    }
+  ],
+  "15": [
+    {
+      "how": "shop",
+      "loc": "Pokémon-Markt",
+      "ed": [
+        "all"
+      ],
+      "note": "sehr hohe Fangrate in der ersten Runde"
+    }
+  ],
+  "16": [
+    {
+      "how": "event",
+      "loc": "nur bei offiziellen Event-Verteilungen",
+      "ed": [
+        "all"
+      ]
+    }
+  ],
   "80": [
     {
       "how": "ground",
@@ -650,6 +815,105 @@
       "note": "öffnet das Fitnessstudio von Zinnober"
     }
   ],
+  "449": [
+    {
+      "how": "craft",
+      "loc": "bei Kurt in Azalea City",
+      "ed": [
+        "gsc",
+        "hgss"
+      ],
+      "note": "aus Blauem Apfelkokos; besser beim Angeln"
+    }
+  ],
+  "450": [
+    {
+      "how": "craft",
+      "loc": "bei Kurt in Azalea City",
+      "ed": [
+        "gsc",
+        "hgss"
+      ],
+      "note": "aus Rotem Apfelkokos; besser gegen niedrigstufige Pokémon"
+    }
+  ],
+  "451": [
+    {
+      "how": "craft",
+      "loc": "bei Kurt in Azalea City",
+      "ed": [
+        "gsc",
+        "hgss"
+      ],
+      "note": "aus Gelbem Apfelkokos; gut gegen Mondstein-Entwickler"
+    }
+  ],
+  "452": [
+    {
+      "how": "craft",
+      "loc": "bei Kurt in Azalea City",
+      "ed": [
+        "gsc",
+        "hgss"
+      ],
+      "note": "aus Schwarzem Apfelkokos; besser gegen schwere Pokémon"
+    }
+  ],
+  "453": [
+    {
+      "how": "craft",
+      "loc": "bei Kurt in Azalea City",
+      "ed": [
+        "gsc",
+        "hgss"
+      ],
+      "note": "aus Weißem Apfelkokos; gut gegen schnelle/fliehende Pokémon"
+    }
+  ],
+  "454": [
+    {
+      "how": "craft",
+      "loc": "bei Kurt in Azalea City",
+      "ed": [
+        "gsc",
+        "hgss"
+      ],
+      "note": "aus Grünem Apfelkokos; macht den Fang freundlich"
+    }
+  ],
+  "455": [
+    {
+      "how": "craft",
+      "loc": "bei Kurt in Azalea City",
+      "ed": [
+        "gsc",
+        "hgss"
+      ],
+      "note": "aus Pinkem Apfelkokos; sehr gut bei gegengeschlechtlichem Fang"
+    }
+  ],
+  "456": [
+    {
+      "how": "gift",
+      "loc": "Pal Park (Migration älterer Spiele)",
+      "ed": [
+        "dppt",
+        "hgss",
+        "bdsp"
+      ]
+    }
+  ],
+  "457": [
+    {
+      "how": "gift",
+      "loc": "Käfer-Turnier (Johto)",
+      "ed": [
+        "gsc",
+        "hgss"
+      ],
+      "note": "nur während des Turniers nutzbar"
+    }
+  ],
   "465": [
     {
       "how": "gift",
@@ -810,6 +1074,17 @@
         "b2w2"
       ],
       "note": "Wiederbelebung im Museum Rosaria City → Flapteryx"
+    }
+  ],
+  "617": [
+    {
+      "how": "gift",
+      "loc": "Traum-Areal (BW) / Naturzone (SwSh)",
+      "ed": [
+        "bw",
+        "b2w2",
+        "swsh"
+      ]
     }
   ],
   "686": [
@@ -1434,6 +1709,19 @@
       ]
     }
   ],
+  "887": [
+    {
+      "how": "gift",
+      "loc": "Aether-Stiftung / spezieller Händler",
+      "ed": [
+        "sm",
+        "usum",
+        "swsh",
+        "sv"
+      ],
+      "note": "fängt v. a. Ultrabestien zuverlässig"
+    }
+  ],
   "1163": [
     {
       "how": "ground",
@@ -1545,6 +1833,116 @@
         "sv"
       ],
       "note": "v. a. Karmesin"
+    }
+  ],
+  "2219": [
+    {
+      "how": "craft",
+      "loc": "an der Werkbank herstellen (Hisui)",
+      "ed": [
+        "la"
+      ],
+      "note": "aus gesammelten Materialien (Apfelkokos, Wummstein u. a.)"
+    }
+  ],
+  "2220": [
+    {
+      "how": "craft",
+      "loc": "an der Werkbank herstellen (Hisui)",
+      "ed": [
+        "la"
+      ],
+      "note": "aus gesammelten Materialien (Apfelkokos, Wummstein u. a.)"
+    }
+  ],
+  "2221": [
+    {
+      "how": "craft",
+      "loc": "an der Werkbank herstellen (Hisui)",
+      "ed": [
+        "la"
+      ],
+      "note": "aus gesammelten Materialien (Apfelkokos, Wummstein u. a.)"
+    }
+  ],
+  "2222": [
+    {
+      "how": "craft",
+      "loc": "an der Werkbank herstellen (Hisui)",
+      "ed": [
+        "la"
+      ],
+      "note": "aus gesammelten Materialien (Apfelkokos, Wummstein u. a.)"
+    }
+  ],
+  "2223": [
+    {
+      "how": "craft",
+      "loc": "an der Werkbank herstellen (Hisui)",
+      "ed": [
+        "la"
+      ],
+      "note": "aus gesammelten Materialien (Apfelkokos, Wummstein u. a.)"
+    }
+  ],
+  "2224": [
+    {
+      "how": "craft",
+      "loc": "an der Werkbank herstellen (Hisui)",
+      "ed": [
+        "la"
+      ],
+      "note": "aus gesammelten Materialien (Apfelkokos, Wummstein u. a.)"
+    }
+  ],
+  "2225": [
+    {
+      "how": "craft",
+      "loc": "an der Werkbank herstellen (Hisui)",
+      "ed": [
+        "la"
+      ],
+      "note": "aus gesammelten Materialien (Apfelkokos, Wummstein u. a.)"
+    }
+  ],
+  "2226": [
+    {
+      "how": "craft",
+      "loc": "an der Werkbank herstellen (Hisui)",
+      "ed": [
+        "la"
+      ],
+      "note": "aus gesammelten Materialien (Apfelkokos, Wummstein u. a.)"
+    }
+  ],
+  "2227": [
+    {
+      "how": "craft",
+      "loc": "an der Werkbank herstellen (Hisui)",
+      "ed": [
+        "la"
+      ],
+      "note": "aus gesammelten Materialien (Apfelkokos, Wummstein u. a.)"
+    }
+  ],
+  "2228": [
+    {
+      "how": "craft",
+      "loc": "an der Werkbank herstellen (Hisui)",
+      "ed": [
+        "la"
+      ],
+      "note": "aus gesammelten Materialien (Apfelkokos, Wummstein u. a.)"
+    }
+  ],
+  "2229": [
+    {
+      "how": "craft",
+      "loc": "an der Werkbank herstellen (Hisui)",
+      "ed": [
+        "la"
+      ],
+      "note": "aus gesammelten Materialien (Apfelkokos, Wummstein u. a.)"
     }
   ],
   "10001": [
