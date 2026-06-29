@@ -9,7 +9,7 @@
 // This is the abstraction that lets "Setup + Spielen" move into a native Companion
 // window later (the agreed Hybrid architecture) without rebuilding the wizard.
 
-import type { CompanionConfig, RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult, BizhawkStatus } from '../lib/companion'
+import type { CompanionConfig, RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult, BizhawkStatus, FvxInstallState } from '../lib/companion'
 import type { EmulatorSettings, LaunchResult } from '../lib/emulatorSettings'
 import type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult, LocalRun } from '../lib/profiles'
 import type { Preset, ImportPresetInput } from '../lib/presets'
@@ -72,6 +72,10 @@ export interface PlatformBridge {
   installBizhawk(): Promise<boolean>
   /** Poll the BizHawk auto-install progress. */
   bizhawkStatus(): Promise<BizhawkStatus | null>
+  /** Start the automatic FVX (randomizer) download+extract. */
+  installRandomizer(): Promise<boolean>
+  /** Poll the FVX auto-install progress. */
+  randomizerInstallStatus(): Promise<FvxInstallState | null>
   /** Run FVX to produce a randomized ROM (long-running). */
   randomize(input: RandomizeInput): Promise<RandomizeResult>
   /** Prepare a new SoulLink: randomize the profile's ROM into a per-run file. */

@@ -151,6 +151,28 @@ export async function bizhawkStatusHttp(): Promise<BizhawkStatus | null> {
   } catch { return null }
 }
 
+export interface FvxInstallState { state: 'idle' | 'downloading' | 'extracting' | 'done' | 'error'; percent: number; dir: string | null; error: string | null }
+
+/** Start the automatic FVX (randomizer) download+extract — mirrors the BizHawk one. */
+export async function installRandomizerHttp(): Promise<boolean> {
+  if (!USES_COMPANION) return false
+  try {
+    const r = await fetch(`${EMU_BASE}/api/randomizer/install`, { method: 'POST' })
+    const j = await r.json().catch(() => null)
+    return !!j?.ok
+  } catch { return false }
+}
+
+/** Poll the FVX auto-install progress. */
+export async function randomizerInstallStatusHttp(): Promise<FvxInstallState | null> {
+  if (!USES_COMPANION) return null
+  try {
+    const r = await fetch(`${EMU_BASE}/api/randomizer/install-status`, { cache: 'no-store' })
+    const j = await r.json().catch(() => null)
+    return j?.ok ? (j as FvxInstallState) : null
+  } catch { return null }
+}
+
 /** Open the FVX GUI as a preset editor (the user saves a .rnqs to import). */
 export async function openRandomizerHttp(): Promise<{ ok: boolean; error?: string }> {
   if (!USES_COMPANION) return { ok: false, error: 'no_companion' }
