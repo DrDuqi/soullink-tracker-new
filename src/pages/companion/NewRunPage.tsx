@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { createRun } from '../../lib/createRun'
 import { saveRunRecipe } from '../../lib/runRecipe'
 import { derivePlayerSeed } from '../../lib/randomizerSync'
-import { EDITION_OPTIONS, editionLabel, resolveEdition, type EditionKey } from '../../lib/edition'
+import { EDITION_OPTIONS, editionLabel, editionRomExts, resolveEdition, type EditionKey } from '../../lib/edition'
 import { companionConfig } from '../../lib/companion'
 import { useRunStore } from '../../store/runStore'
 import { useMyRuns } from '../../hooks/useMyRuns'
@@ -31,6 +31,11 @@ const ERR: Record<string, string> = {
   settings_missing: 'Das gewählte Preset/Regelwerk fehlt.',
   no_output_path: 'Kein Ziel für die randomisierte ROM — interner Fehler.',
   output_missing: 'Die randomisierte ROM wurde nicht erzeugt.',
+  output_write_failed: 'Die randomisierte ROM konnte nicht gespeichert werden (Schreibrechte/Pfad prüfen).',
+  preset_incompatible: 'Das Preset passt nicht zur ROM/Edition (oder ist beschädigt). Lege das Preset für diese Edition neu an.',
+  rom_load_failed: 'FVX konnte die ROM nicht laden — passt die ROM zur gewählten Edition?',
+  rom_edition_mismatch: 'Die hinterlegte ROM passt nicht zur gewählten Edition.',
+  out_of_memory: 'Zu wenig Arbeitsspeicher für die Randomisierung.',
   spawn_failed: 'FVX/Java konnte nicht gestartet werden — Java-Laufzeit prüfen.',
   unreachable: 'Companion nicht erreichbar.',
 }
@@ -64,6 +69,8 @@ export default function NewRunPage() {
   const [partnerName, setPartnerName] = useState('')
   const [step, setStep] = useState<Step>('idle')
   const [err, setErr] = useState<string | null>(null)
+  const [errLog, setErrLog] = useState<string | null>(null)
+  const [showErrLog, setShowErrLog] = useState(false)
 
   // ① Edition is the central choice. Default: the edition passed from "Mein Setup"
   //   (?edition=) → the last-used edition → first option. NEVER hardcoded to Platin and
@@ -98,7 +105,7 @@ export default function NewRunPage() {
 
   async function start() {
     if (!editionProfile || !user) return
-    setErr(null)
+    setErr(null); setErrLog(null); setShowErrLog(false)
     // 1) Create the real Supabase run (so it persists + appears in the dashboard).
     setStep('creating')
     let run, player
@@ -119,8 +126,9 @@ export default function NewRunPage() {
     setStep('randomizing')
     const hostSeed = sameWorld ? seed : derivePlayerSeed(seed, 0)
     const fvxVersion = (await platform.randomizerStatus())?.version ?? null
-    const r = await platform.prepareRun({ runId: run.id, profileId: editionProfile.id, presetId, seed: hostSeed })
-    if (!r.ok) { setErr(ERR[r.error || ''] || r.error || 'Fehler'); setStep('error'); return }
+    const r = await platform.prepareRun({ runId: run.id, profileId: editionProfile.id, presetId, seed: hostSeed, expectExts: editionRomExts(editionKey) })
+    // Prefer the server's concrete cause (FVX/ROM/preset); fall back to the code map.
+    if (!r.ok) { setErr(r.reason || ERR[r.error || ''] || r.error || 'Fehler'); setErrLog(r.log || null); setStep('error'); return }
 
     // Store the shared recipe so partners reproduce the SAME rules/edition/FVX version
     // but derive their OWN per-slot seed from the run master seed. Non-fatal if it fails.
@@ -233,7 +241,17 @@ export default function NewRunPage() {
               <StepLine done={false} active={step === 'launching'} label="BizHawk starten & öffnen" />
             </div>
           )}
-          {err && <p className="mt-4 text-red-300 text-sm flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {err}</p>}
+          {err && (
+            <div className="mt-4">
+              <p className="text-red-300 text-sm flex items-start gap-2"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{err}</span></p>
+              {errLog && (
+                <div className="mt-1.5">
+                  <button onClick={() => setShowErrLog((v) => !v)} className="text-[11px] font-bold text-slate-500 hover:text-slate-300">{showErrLog ? 'Details ausblenden' : 'Details anzeigen'}</button>
+                  {showErrLog && <pre className="mt-1.5 text-[10px] text-slate-500 bg-black/30 rounded-lg p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-40">{errLog}</pre>}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

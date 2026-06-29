@@ -83,7 +83,7 @@ export async function setActiveProfileHttp(id: string): Promise<boolean> {
 }
 
 // ── run preparation (Phase 3): randomize a profile's ROM for a new SoulLink ────
-export interface PrepareRunInput { profileId: string; runId?: string; presetId?: string; presetData?: string; seed?: number | string | null; settingsString?: string }
+export interface PrepareRunInput { profileId: string; runId?: string; presetId?: string; presetData?: string; seed?: number | string | null; settingsString?: string; expectExts?: string[] }
 export interface PrepareRunResult {
   ok: boolean
   runId?: string | null
@@ -95,7 +95,8 @@ export interface PrepareRunResult {
   bizhawk?: string
   players?: string[]
   error?: string
-  log?: string
+  reason?: string               // concrete, human-readable cause (FVX/ROM/preset)
+  log?: string                  // raw FVX output (behind "Details anzeigen")
 }
 
 /** The local launch data for a run prepared on this PC (ROM/seed/preset/save). */

@@ -11,7 +11,7 @@
 // what makes a multiplayer SoulLink reproducible (every player randomizes their own
 // original ROM with the shared settings+seed and gets the exact same world).
 
-import { existsSync, readdirSync, createWriteStream, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, readdirSync, createWriteStream, mkdirSync, rmSync, statSync } from 'node:fs'
 import { join, basename } from 'node:path'
 import { spawn, exec } from 'node:child_process'
 import { get as httpsGet } from 'node:https'
@@ -178,9 +178,29 @@ export function randomize({ inputRom, outputRom, settingsFile = null, settingsSt
     child.stderr.on('data', (d) => { out += d })
     child.on('error', (e) => resolve({ ok: false, error: 'spawn_failed', detail: String(e?.message || e) }))
     child.on('close', (code) => {
-      const ok = /Randomized successfully/i.test(out) && existsSync(outputRom)
-      if (ok) resolve({ ok: true, outputRom, version: versionFromDir(fvx.dir), log: out.slice(-4000) })
-      else resolve({ ok: false, error: 'randomize_failed', code, log: out.slice(-4000) })
+      const success = /Randomized successfully/i.test(out)
+      let wrote = false, size = 0
+      try { if (existsSync(outputRom)) { wrote = true; size = statSync(outputRom).size } } catch { /* ignore */ }
+      // FVX said OK and actually wrote a real ROM → done.
+      if (success && wrote && size > 1024) { resolve({ ok: true, outputRom, version: versionFromDir(fvx.dir), log: out.slice(-4000) }); return }
+      // FVX claimed success but no/empty output → make that the concrete reason.
+      if (success && (!wrote || size <= 1024)) { resolve({ ok: false, error: 'output_missing', reason: 'FVX meldete Erfolg, aber es wurde keine fertige ROM geschrieben.', code, log: out.slice(-4000) }); return }
+      const r = classifyFvxFailure(out)
+      resolve({ ok: false, error: r.error, reason: r.reason, code, log: out.slice(-4000) })
     })
   })
+}
+
+// Turn raw FVX stdout/stderr into ONE concrete, German cause. Order matters (most
+// specific first). The raw log is still returned separately for "Details anzeigen".
+function classifyFvxFailure(out = '') {
+  const s = String(out)
+  if (/OutOfMemory|heap space/i.test(s)) return { error: 'out_of_memory', reason: 'FVX hatte zu wenig Arbeitsspeicher für die Randomisierung.' }
+  if (/Unable to load|could not (open|load|read)|not a (valid|supported)|unsupported ROM|Loading ROM failed|Invalid ROM|RomEntry .*not found|unknown ROM/i.test(s))
+    return { error: 'rom_load_failed', reason: 'FVX konnte die ROM nicht laden — passt die ROM zur gewählten Edition (richtige .gba/.nds)?' }
+  if (/different (game|rom)|does not match|wrong game|settings .*(invalid|incompatible|corrupt)|invalid settings|could not (parse|read) settings|bad settings|preset/i.test(s))
+    return { error: 'preset_incompatible', reason: 'Das Regel-Preset passt nicht zur ROM/Edition (oder ist beschädigt). Lege das Preset für diese Edition neu an.' }
+  if (/could not (write|save)|unable to (write|save)|save failed|Permission denied|Access(Is)?Denied|read-only|ENOENT.*output/i.test(s))
+    return { error: 'output_write_failed', reason: 'Die randomisierte ROM konnte nicht gespeichert werden (Schreibrechte/Pfad prüfen).' }
+  return { error: 'randomize_failed', reason: 'FVX hat die Randomisierung abgebrochen. Prüfe ROM und Preset der Edition.' }
 }

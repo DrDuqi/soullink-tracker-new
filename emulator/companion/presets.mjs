@@ -128,16 +128,44 @@ export function deletePreset(id) {
   reg.splice(i, 1); saveReg(reg); return true
 }
 
-// After the user edits rules in FVX and clicks "Save Settings", they save a .rnqs
-// somewhere. Instead of making them import it, SoulLink finds the NEWEST .rnqs saved
-// AFTER the editor was opened (across the likely save locations) and imports it
-// automatically — so the user never picks a file or a folder. Returns the new preset
-// or null (nothing saved yet). Never scans CUSTOM_DIR (would re-grab its own imports).
-export function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene Regeln', edition = null } = {}) {
-  let best = null
-  let bestT = sinceMs
-  // Scan a directory's files; recurse ONE level into sub-folders (FVX/Windows often
-  // save into a sub-folder of the chosen location). Shallow → fast, never deep-indexes.
+// ── Single atomic capture (used by BOTH the watcher and the polling fallback) ────
+// Guarantees a .rnqs is captured EXACTLY ONCE: (1) an in-flight lock per path blocks
+// parallel watcher/poll events, (2) we wait until the file is fully written (size stable)
+// so FVX's mid-write partial bytes never become a (corrupt, duplicate) preset, (3) a
+// per-path content hash blocks re-importing identical content. importPreset itself stays
+// idempotent by hash+edition as the final guard.
+const _captureInFlight = new Set()
+const _capturedHash = new Map()
+function waitFileStable(path, tries = 25, interval = 200) {
+  return new Promise((resolve) => {
+    let last = -1, stable = 0, n = 0
+    const tick = () => {
+      let sz = -1; try { sz = statSync(path).size } catch { resolve(false); return }
+      if (sz > 0 && sz === last) { if (++stable >= 2) { resolve(true); return } } else { stable = 0; last = sz }
+      if (++n >= tries) { resolve(sz > 0); return }
+      setTimeout(tick, interval)
+    }
+    tick()
+  })
+}
+export async function captureRnqs(path, { name = 'Eigene Regeln', edition = null, sinceMs = 0 } = {}) {
+  if (!path || _captureInFlight.has(path)) return null
+  try { if (statSync(path).mtimeMs <= sinceMs) return null } catch { return null }
+  _captureInFlight.add(path)
+  try {
+    if (!(await waitFileStable(path))) return null            // FVX still writing → skip
+    const hash = rnqsHash(path)
+    if (hash && _capturedHash.get(path) === hash) return null  // exact content already captured
+    const preset = importPreset({ name, edition, sourceFile: path })
+    if (preset && hash) _capturedHash.set(path, hash)
+    return preset
+  } finally { _captureInFlight.delete(path) }
+}
+
+// Polling fallback (when recursive watch is unavailable): find the NEWEST .rnqs saved
+// after `sinceMs` across the likely locations, then capture it through the single gate.
+export async function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene Regeln', edition = null } = {}) {
+  let best = null, bestT = sinceMs
   const scan = (dir, depth) => {
     let entries = []
     try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return }
@@ -152,7 +180,7 @@ export function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene Regeln'
   }
   for (const root of roots) if (root) scan(root, 1)
   if (!best) return null
-  return importPreset({ name: name || basename(best).replace(/\.rnqs$/i, ''), edition, sourceFile: best })
+  return captureRnqs(best, { name: name || basename(best).replace(/\.rnqs$/i, ''), edition, sinceMs })
 }
 
 // ── Real-time, location-INDEPENDENT capture ──────────────────────────────────
@@ -186,10 +214,11 @@ export function startRnqsWatch({ sinceMs = 0, name = 'Eigene Regeln', edition = 
         if (state.found || !file || !/\.rnqs$/i.test(String(file))) return
         const p = join(root, String(file))
         if (seen.has(p)) return; seen.add(p)
-        try {
-          const t = statSync(p).mtimeMs
-          if (t > state.since) { const preset = importPreset({ name: state.name, edition: state.edition, sourceFile: p }); if (preset) { state.found = preset; stopRnqsWatch() } }
-        } catch { /* file mid-write / vanished — ignore */ }
+        // Single gate: waits for the file to finish writing, dedups by content. We may
+        // see the same file again later (re-save) → captureRnqs decides idempotently.
+        captureRnqs(p, { name: state.name, edition: state.edition, sinceMs: state.since })
+          .then((preset) => { if (preset && !state.found) { state.found = preset; stopRnqsWatch() } else { seen.delete(p) } })
+          .catch(() => seen.delete(p))
       })
       state.watchers.push(w)
     } catch { /* recursive watch unsupported on this root — fallback scan covers it */ }

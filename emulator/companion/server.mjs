@@ -719,6 +719,7 @@ function handleRequest(req, res) {
   // grab: auto-import the newest .rnqs the user just saved in FVX (after `since`),
   // so editing rules needs no manual import. POST ?since=<ms>
   if (path === '/api/presets/grab' && req.method === 'POST') {
+    (async () => {
     try {
       // Cover EVERY likely save location — incl. OneDrive-redirected known folders
       // (on this kind of PC "Desktop"/"Dokumente" live under …\OneDrive\…, which the
@@ -743,10 +744,11 @@ function handleRequest(req, res) {
       let p = pollRnqsWatch()
       if (p) stopRnqsWatch()
       // Fallback: the shallow scan over the explicit folder list (covers the rare case
-      // where recursive watch is unavailable).
-      if (!p) p = grabLatestRnqs({ sinceMs: since, roots: [...roots], name, edition })
+      // where recursive watch is unavailable). Same single capture gate → no duplicates.
+      if (!p) p = await grabLatestRnqs({ sinceMs: since, roots: [...roots], name, edition })
       sendJson(res, { ok: true, found: !!p, preset: p })
     } catch { sendJson(res, { ok: false }, 500) }
+    })()
     return
   }
   // import a picked .rnqs (FVX editor output / shared file) as a custom preset
@@ -777,6 +779,15 @@ function handleRequest(req, res) {
       if (!profile) { sendJson(res, { ok: false, error: 'profile_not_found' }, 404); return }
       const paths = profile.paths || {}
       if (!paths.originalRom || !existsSync(paths.originalRom)) { sendJson(res, { ok: false, error: 'original_rom_missing' }, 400); return }
+      // ROM↔edition guard: the client (which owns the editions registry) passes the
+      // extensions this edition accepts. Catches "Feuerrot run still points at a Platin
+      // .nds" BEFORE handing a mismatched ROM to FVX → a clear, specific cause.
+      const expectExts = Array.isArray(b.expectExts) ? b.expectExts.map((e) => String(e).toLowerCase()) : null
+      if (expectExts && expectExts.length) {
+        const m = String(paths.originalRom).toLowerCase().match(/\.(nds|gba|gbc|gb)$/)
+        const ext = m ? m[0] : null
+        if (ext && !expectExts.includes(ext)) { sendJson(res, { ok: false, error: 'rom_edition_mismatch', reason: `Die hinterlegte ROM (${ext}) passt nicht zur Edition (erwartet ${expectExts.join(' / ')}). Richte die richtige ROM für diese Edition ein.` }, 400); return }
+      }
       // BizHawk is a GLOBAL component (installed once), not per-edition. Resolve it from
       // the companion config/detection — never from the per-edition profile.
       const bizhawk = effectiveConfig().config.bizhawk
@@ -815,7 +826,7 @@ function handleRequest(req, res) {
 
       console.log('[run] prepare:', profile.name, '· run', runId || '(local)', '· seed', seed, '→', outputRom)
       const r = await randomize({ inputRom: paths.originalRom, outputRom, settingsFile, settingsString, seed })
-      if (!r.ok) { sendJson(res, { ok: false, error: r.error || 'randomize_failed', log: r.log }, 500); return }
+      if (!r.ok) { console.log('[run] randomize failed:', r.error, '·', r.reason || ''); sendJson(res, { ok: false, error: r.error || 'randomize_failed', reason: r.reason || null, log: r.log }, 500); return }
       // The shareable recipe so the partner can reproduce identically (or know the
       // rules): the preset bytes + the base ROM id (gameCode-revision).
       let presetData = null

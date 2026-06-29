@@ -4,6 +4,7 @@ import { Check, Loader2, AlertTriangle, Play, Circle } from 'lucide-react'
 import { getPlatform } from '../platform'
 import { companionHealth } from '../lib/companion'
 import { seedForPlayer } from '../lib/randomizerSync'
+import { resolveEdition, editionRomExts } from '../lib/edition'
 import { useRunStore } from '../store/runStore'
 import type { RunRecipe } from '../lib/runRecipe'
 
@@ -100,10 +101,13 @@ export default function JoinSetupWizard({ joined, recipe, profile, onClose }: { 
     },
     rom: async () => {
       const seed = (STEP as { _seed?: number })._seed
-      const r = await platform.prepareRun({ runId: joined.run.id, profileId: profile.id, presetData: recipe.preset_data ?? undefined, seed: recipe.world_seed != null ? seed : undefined })
+      const ek = resolveEdition(profile.edition) || resolveEdition(recipe.edition)
+      const expectExts = ek ? editionRomExts(ek) : undefined
+      const r = await platform.prepareRun({ runId: joined.run.id, profileId: profile.id, presetData: recipe.preset_data ?? undefined, seed: recipe.world_seed != null ? seed : undefined, expectExts })
       if (!r.ok) {
         const map: Record<string, string> = { original_rom_missing: 'Deine Original-ROM fehlt im Profil.', rom_not_found: 'Die Original-ROM wurde nicht gefunden.', randomize_failed: 'Die Randomisierung ist fehlgeschlagen (ROM/Preset prüfen).', fvx_not_found: 'FVX wurde nicht gefunden.' }
-        return { ok: false, detail: map[r.error || ''] || r.error || 'Randomisierung fehlgeschlagen.', solution: { label: 'Profil/ROM prüfen', run: () => navigate('/profiles') } }
+        // Prefer the server's concrete cause (FVX/ROM/preset/edition mismatch).
+        return { ok: false, detail: r.reason || map[r.error || ''] || r.error || 'Randomisierung fehlgeschlagen.', solution: { label: 'Profil/ROM prüfen', run: () => navigate('/profiles') } }
       }
       prep.current = { bizhawk: r.bizhawk, outputRom: r.outputRom }
       return { ok: true, detail: 'Eigene SoulLink-ROM erzeugt' }
