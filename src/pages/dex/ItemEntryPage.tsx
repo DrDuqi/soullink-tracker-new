@@ -2,8 +2,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, Loader2, Coins, Sparkles } from 'lucide-react'
 import { useSettings } from '../../store/settingsStore'
-import { itemEntry, itemName, itemSprite, catLabel } from '../../lib/dex/items'
+import { itemEntry, itemName, catLabel } from '../../lib/dex/items'
 import { getItemDetail } from '../../lib/dex/itemDetail'
+import ItemSprite from '../../components/ItemSprite'
 
 // SoulDex → Item-Detail. Name/category/sprite are instant/offline; effect, flavour,
 // buy/sell price and fling power load lazily + cache for offline reuse.
@@ -29,7 +30,7 @@ export default function ItemEntryPage() {
 
         <div className="rounded-3xl border border-white/[0.07] p-6 flex items-center gap-5" style={{ background: 'linear-gradient(160deg, rgba(22,22,31,0.92), rgba(12,12,18,0.92))' }}>
           <span className="w-20 h-20 rounded-2xl bg-black/25 flex items-center justify-center shrink-0">
-            <img src={itemSprite(it.n)} alt="" draggable={false} className="w-14 h-14 object-contain" style={{ imageRendering: 'pixelated' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden' }} />
+            <ItemSprite name={it.n} size={56} />
           </span>
           <div className="min-w-0">
             <h1 className="text-white font-black text-2xl tracking-tight">{itemName(it, lang)}</h1>

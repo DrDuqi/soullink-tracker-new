@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, X, Backpack } from 'lucide-react'
 import { useSettings } from '../../store/settingsStore'
-import { searchItems, itemName, itemSprite, catLabel, POCKETS, pocketLabel, type ItemEntry } from '../../lib/dex/items'
+import { searchItems, itemName, catLabel, POCKETS, pocketLabel, type ItemEntry } from '../../lib/dex/items'
+import ItemSprite from '../../components/ItemSprite'
 
 // SoulDex → Items. Bundled index → instant, offline browse/search/filter (category).
 // Detail (effect, buy/sell, fling) loads lazily on the entry page.
@@ -58,7 +59,7 @@ function ItemCard({ it, lang, onClick }: { it: ItemEntry; lang: 'de' | 'en'; onC
     <button onClick={onClick} className="flex items-center gap-3 rounded-2xl border border-white/[0.07] px-3 py-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-pk-red/40"
       style={{ background: 'linear-gradient(160deg, rgba(22,22,31,0.9), rgba(13,13,19,0.9))', contentVisibility: 'auto', containIntrinsicSize: '64px' } as React.CSSProperties}>
       <span className="w-10 h-10 rounded-lg bg-black/20 flex items-center justify-center shrink-0">
-        <img src={itemSprite(it.n)} alt="" loading="lazy" draggable={false} className="w-8 h-8 object-contain" style={{ imageRendering: 'pixelated' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden' }} />
+        <ItemSprite name={it.n} size={32} />
       </span>
       <span className="min-w-0">
         <span className="block text-slate-100 font-bold text-sm truncate">{itemName(it, lang)}</span>

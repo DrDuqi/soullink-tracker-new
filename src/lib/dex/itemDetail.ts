@@ -13,14 +13,14 @@ const QUERY = `query I($id: Int!) {
     cost fling_power
     pokemon_v2_itemcategory { name }
     pokemon_v2_itemeffecttexts${L} { short_effect effect language_id }
-    pokemon_v2_itemflavortexts${L.replace('}}', '}}, distinct_on: language_id, order_by: [{language_id: asc}, {version_group_id: desc}]')} { text language_id }
+    pokemon_v2_itemflavortexts${L.replace('}}', '}}, distinct_on: language_id, order_by: [{language_id: asc}, {version_group_id: desc}]')} { flavor_text language_id }
   }
 }`
 const pick = (a: any[] = [], id: number, field: string) => (a.find((x) => x.language_id === id)?.[field] || '')
 const clean = (t?: string) => (t || '').replace(/[\f\n\r­]/g, ' ').replace(/\s+/g, ' ').trim()
 
 export async function getItemDetail(id: number): Promise<ItemDetail | null> {
-  const ck = `item:v2:${id}`
+  const ck = `item:v3:${id}`
   const cached = await cacheGet<ItemDetail>(ck)
   if (cached) return cached
   try {
@@ -32,7 +32,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | null> {
     const fl = it.pokemon_v2_itemflavortexts || []
     const detail: ItemDetail = {
       effect: { de: clean(pick(eff, 6, 'short_effect') || pick(eff, 6, 'effect')), en: clean(pick(eff, 9, 'short_effect') || pick(eff, 9, 'effect')) },
-      flavor: { de: clean(pick(fl, 6, 'text')), en: clean(pick(fl, 9, 'text')) },
+      flavor: { de: clean(pick(fl, 6, 'flavor_text')), en: clean(pick(fl, 9, 'flavor_text')) },
       cost: it.cost ?? 0,
       fling: it.fling_power ?? null,
       category: it.pokemon_v2_itemcategory?.name || 'other',
