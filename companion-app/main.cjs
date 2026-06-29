@@ -226,19 +226,46 @@ ipcMain.handle('app:check-updates', async () => {
   } catch (e) { slogErr('app:check-updates', e); return { state: 'error', current, error: (e && e.message) || String(e) } }
   finally { _suppressDialog = false }
 })
-// In-app "Jetzt aktualisieren". The previous "checkForUpdates() then downloadUpdate()"
-// could still throw "Please check update first" (the two calls don't reliably share the
-// resolved update state, esp. with a pending download). Robust fix: let the check itself
-// trigger the download via autoDownload — no separate downloadUpdate call, no race. The
-// wired download-progress / update-downloaded handlers drive the UI + quit+install.
-ipcMain.on('app:start-update', () => {
+// In-app "Jetzt aktualisieren". Robust, explicit flow that does NOT rely on the
+// update-downloaded EVENT firing (it doesn't re-fire when the installer is already in
+// the pending folder → the old silent hang). We check, AWAIT the download (reusing a
+// pending one), then call quitAndInstall ourselves — with visible phases + real errors.
+ipcMain.on('app:start-update', async () => {
   const au = getUpdater(); if (!au) return
   wireUpdater(au); _updateAccepted = true; _suppressDialog = true
+  sendUI('update:phase', { phase: 'downloading' })
   notify('SoulLink Companion', 'Update wird heruntergeladen …')
-  au.autoDownload = true
-  au.checkForUpdates()
-    .catch((e) => { slogErr('app:start-update', e); sendUI('update:error', { message: (e && e.message) || String(e) }); notify('SoulLink Companion', 'Update fehlgeschlagen: ' + ((e && e.message) || String(e))) })
-    .finally(() => { au.autoDownload = false; _suppressDialog = false })
+  try {
+    au.autoDownload = false
+    const result = await au.checkForUpdates()
+    const info = result && result.updateInfo
+    if (!info || !semverGt(info.version, app.getVersion())) {
+      slog(`app:start-update: kein neueres Update (gefunden: ${info ? info.version : '—'}, installiert: ${app.getVersion()})`)
+      sendUI('update:none', { current: app.getVersion() })
+      return
+    }
+    slog(`app:start-update: lade v${info.version} …`)
+    // Await the download; reuse an already-downloaded pending installer. If downloadUpdate
+    // rejects but a pending file exists, quitAndInstall below still installs it.
+    try { await (result.downloadPromise || au.downloadUpdate()) }
+    catch (e) { slogErr('downloadUpdate (versuche dennoch zu installieren)', e) }
+    slog('app:start-update: Download fertig → installieren')
+    sendUI('update:phase', { phase: 'installing' })
+    await new Promise((r) => setTimeout(r, 600))           // let the UI paint the phase
+    sendUI('update:phase', { phase: 'restarting' })
+    quitting = true
+    try { au.quitAndInstall(false, true) }                 // show installer + relaunch
+    catch (e) { slogErr('quitAndInstall', e); sendUI('update:error', { message: 'Installation konnte nicht gestartet werden: ' + ((e && e.message) || e) }); return }
+    // Safety net: close-to-tray could swallow the quit and leave the NSIS installer
+    // (which waits for our process to exit) hanging → force-exit shortly after.
+    setTimeout(() => { try { slog('Force-Exit nach quitAndInstall'); app.exit(0) } catch { /* ignore */ } }, 4000)
+  } catch (e) {
+    slogErr('app:start-update', e)
+    sendUI('update:error', { message: (e && e.message) || String(e) })
+    notify('SoulLink Companion', 'Update fehlgeschlagen: ' + ((e && e.message) || String(e)))
+  } finally {
+    au.autoDownload = false; _suppressDialog = false
+  }
 })
 
 async function startServer() {
@@ -344,11 +371,13 @@ function wireUpdater(au) {
     sendUI('update:progress', { percent: p.percent || 0, transferred: p.transferred || 0, total: p.total || 0, bytesPerSecond: p.bytesPerSecond || 0 })
   })
   au.on('update-downloaded', (info) => {
-    slog('Update heruntergeladen.')
+    slog(`update-downloaded (v${(info && info.version) || '?'})`)
     try { refreshTray() } catch { /* ignore */ }
     sendUI('update:downloaded', { version: (info && info.version) || null })
-    if (_updateAccepted) { quitting = true; setImmediate(() => { try { au.quitAndInstall() } catch (e) { slogErr('quitAndInstall', e) } }) }
-    else notify('SoulLink Companion', 'Update bereit — wird beim nächsten Start installiert.')
+    // With a window, the explicit app:start-update flow drives the install. Only the
+    // HEADLESS native-dialog path (login-hidden, no window) installs from this event.
+    if (!parentWin() && _updateAccepted) { quitting = true; setImmediate(() => { try { au.quitAndInstall(false, true) } catch (e) { slogErr('quitAndInstall(headless)', e) } }) }
+    else if (!_updateAccepted) notify('SoulLink Companion', 'Update bereit — wird beim nächsten Start installiert.')
   })
   au.on('error', (e) => { slogErr('autoUpdater', e); sendUI('update:error', { message: (e && e.message) || String(e) }) })
 }

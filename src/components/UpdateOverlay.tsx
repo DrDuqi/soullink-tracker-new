@@ -10,7 +10,7 @@ import ChangelogModal from './ChangelogModal'
 // version + changelog, downloads with a progress bar on "Jetzt aktualisieren", then
 // the app installs and restarts itself. The browser download is only the last-resort
 // fallback shown when the self-update errors.
-interface UpdateEvent { type: 'available' | 'progress' | 'downloaded' | 'error'; version?: string | null; notes?: string | null; percent?: number; message?: string }
+interface UpdateEvent { type: 'available' | 'progress' | 'downloaded' | 'error' | 'phase' | 'none'; version?: string | null; notes?: string | null; percent?: number; message?: string; phase?: string }
 interface NativeApp {
   checkForUpdates?: () => Promise<{ state: string; current: string; latest?: string | null; notes?: string | null }>
   startUpdate?: () => void
@@ -20,7 +20,7 @@ function nativeApp(): NativeApp | null {
   return (typeof window !== 'undefined' ? (window as unknown as { soullinkNative?: NativeApp }).soullinkNative : null) ?? null
 }
 
-type Phase = 'hidden' | 'available' | 'downloading' | 'done' | 'error'
+type Phase = 'hidden' | 'available' | 'downloading' | 'installing' | 'restarting' | 'done' | 'uptodate' | 'error'
 
 export default function UpdateOverlay() {
   const lang = useSettings((s) => s.language)
@@ -44,9 +44,11 @@ export default function UpdateOverlay() {
     }
     const off = n.onUpdate((e) => {
       if (e.type === 'available') showAvailable(e.version ?? null, e.notes ?? null)
-      else if (e.type === 'progress') { setPhase('downloading'); setPercent(Math.round(e.percent || 0)) }
-      else if (e.type === 'downloaded') { setPhase('done'); setPercent(100) }
-      else if (e.type === 'error') { setError(e.message || null); setPhase((p) => (p === 'downloading' ? 'error' : p)) }
+      else if (e.type === 'progress') { setPhase((p) => (p === 'installing' || p === 'restarting' ? p : 'downloading')); setPercent(Math.round(e.percent || 0)) }
+      else if (e.type === 'phase') { if (e.phase === 'installing' || e.phase === 'restarting' || e.phase === 'downloading') setPhase(e.phase) }
+      else if (e.type === 'downloaded') setPercent(100)
+      else if (e.type === 'none') { setPhase('uptodate'); setTimeout(() => setPhase((p) => (p === 'uptodate' ? 'hidden' : p)), 2800) }
+      else if (e.type === 'error') { setError(e.message || null); setPhase('error') }
     })
     // Initial pull so a brand-new window also learns about an update it missed.
     n.checkForUpdates?.().then((r) => { if (r?.state === 'available') showAvailable(r.latest ?? null, r.notes ?? null) }).catch(() => {})
@@ -92,8 +94,20 @@ export default function UpdateOverlay() {
               </>
             )}
 
+            {phase === 'installing' && (
+              <div className="flex items-center gap-2.5 text-white font-bold text-sm"><Loader2 className="w-4 h-4 animate-spin text-pk-red" /> {tr('Installation wird vorbereitet …', 'Preparing installation …')}</div>
+            )}
+
+            {phase === 'restarting' && (
+              <div className="flex items-center gap-2.5 text-white font-bold text-sm"><Loader2 className="w-4 h-4 animate-spin text-pk-red" /> {tr('Companion wird neu gestartet …', 'Restarting Companion …')}</div>
+            )}
+
             {phase === 'done' && (
-              <div className="flex items-center gap-2.5 text-green-400 font-bold text-sm"><CheckCircle2 className="w-4 h-4" /> {tr('Installiert – Companion startet neu …', 'Installed – restarting Companion …')}</div>
+              <div className="flex items-center gap-2.5 text-green-400 font-bold text-sm"><CheckCircle2 className="w-4 h-4" /> {tr('Update erfolgreich installiert.', 'Update installed successfully.')}</div>
+            )}
+
+            {phase === 'uptodate' && (
+              <div className="flex items-center gap-2.5 text-green-400 font-bold text-sm"><CheckCircle2 className="w-4 h-4" /> {tr('Du bist bereits auf der neuesten Version.', 'You are already on the latest version.')}</div>
             )}
 
             {phase === 'error' && (
