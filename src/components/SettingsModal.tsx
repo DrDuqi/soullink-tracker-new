@@ -18,7 +18,7 @@ import CompanionVersion from './CompanionVersion'
 
 type Section = 'appearance' | 'language' | 'gameplay' | 'notifications' | 'performance' | 'companion' | 'about'
 
-interface UpdateResult { state: 'current' | 'available' | 'error' | 'dev'; current: string; latest?: string | null; error?: string }
+interface UpdateResult { state: 'current' | 'available' | 'error' | 'dev'; current: string; latest?: string | null; error?: string; code?: string; detail?: string }
 interface NativeApp { checkForUpdates?: () => Promise<UpdateResult>; startUpdate?: () => void }
 function nativeApp(): NativeApp | null {
   return (typeof window !== 'undefined' ? (window as unknown as { soullinkNative?: NativeApp }).soullinkNative : null) ?? null
@@ -64,13 +64,20 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const [showChangelog, setShowChangelog] = useState(false)
   const [updChecking, setUpdChecking] = useState(false)
   const [upd, setUpd] = useState<UpdateResult | null>(null)
+  const [showErrDetails, setShowErrDetails] = useState(false)
 
   async function checkUpdates() {
     const n = nativeApp(); if (!n?.checkForUpdates) return
-    setUpdChecking(true); setUpd(null)
+    setUpdChecking(true); setUpd(null); setShowErrDetails(false)
     try { setUpd(await n.checkForUpdates()) }
-    catch { setUpd({ state: 'error', current: '', error: t('settings.checkFailed') }) }
+    catch (e) { setUpd({ state: 'error', current: '', code: 'check_failed', detail: e instanceof Error ? e.message : String(e) }) }
     setUpdChecking(false)
+  }
+  // Map a clean, friendly message to an error code — never the raw electron/GitHub text.
+  function errMsg(code?: string): string {
+    if (code === 'offline') return t('settings.checkOffline')
+    if (code === 'temporarily_unavailable') return t('settings.checkTemp')
+    return t('settings.checkFailed')
   }
 
   const { data: comp, refetch, isFetching } = useQuery({ queryKey: ['companion-info'], queryFn: () => companionInfo(), staleTime: 30_000 })
@@ -189,9 +196,12 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                       <RefreshCw className={`w-4 h-4 ${updChecking ? 'animate-spin' : ''}`} /> {updChecking ? t('settings.checking') : t('settings.checkUpdates')}
                     </button>
                   ) : upd.state === 'current' ? (
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="flex items-center gap-2 text-green-400 font-bold text-sm"><Check className="w-4 h-4" /> {t('settings.upToDate')} (v{upd.current})</span>
-                      <button onClick={checkUpdates} className="text-xs font-bold text-slate-500 hover:text-white">{t('settings.recheck')}</button>
+                    <div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-2 text-green-400 font-bold text-sm"><Check className="w-4 h-4" /> {t('settings.upToDate')} (v{upd.current})</span>
+                        <button onClick={checkUpdates} className="text-xs font-bold text-slate-500 hover:text-white">{t('settings.recheck')}</button>
+                      </div>
+                      <div className="text-slate-500 text-xs mt-1">{t('settings.lastCheckOk')} · {t('settings.noUpdates')}</div>
                     </div>
                   ) : upd.state === 'available' ? (
                     <div>
@@ -205,9 +215,17 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                   ) : upd.state === 'dev' ? (
                     <div className="text-slate-400 text-sm">{t('settings.updatesPackagedOnly')}</div>
                   ) : (
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-amber-400 text-sm">{upd.error || t('settings.checkFailed')}</span>
-                      <button onClick={checkUpdates} className="text-xs font-bold text-slate-400 hover:text-white">{t('settings.recheck')}</button>
+                    <div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-amber-400 text-sm">{errMsg(upd.code)}</span>
+                        <button onClick={checkUpdates} className="text-xs font-bold text-white px-2.5 py-1 rounded-lg" style={{ background: 'var(--color-pk-red)' }}>{t('settings.tryAgain')}</button>
+                      </div>
+                      {upd.detail && (
+                        <div className="mt-1.5">
+                          <button onClick={() => setShowErrDetails((v) => !v)} className="text-[11px] font-bold text-slate-500 hover:text-slate-300">{showErrDetails ? t('settings.hideDetails') : t('settings.showDetails')}</button>
+                          {showErrDetails && <pre className="mt-1.5 text-[10px] text-slate-500 bg-black/30 rounded-lg p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-24">{upd.detail}</pre>}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

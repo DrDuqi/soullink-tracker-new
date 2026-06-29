@@ -213,7 +213,7 @@ ipcMain.handle('app:version', () => app.getVersion())
 ipcMain.handle('app:check-updates', async () => {
   const current = app.getVersion()
   if (!app.isPackaged) return { state: 'dev', current }
-  const au = getUpdater(); if (!au) return { state: 'error', current, error: 'Updater nicht verfügbar' }
+  const au = getUpdater(); if (!au) return { state: 'error', current, code: 'no_updater', detail: 'Updater nicht verfügbar' }
   wireUpdater(au)
   _suppressDialog = true
   try {
@@ -223,7 +223,16 @@ ipcMain.handle('app:check-updates', async () => {
     let notes = (r && r.updateInfo && r.updateInfo.releaseNotes) || null
     if (Array.isArray(notes)) notes = notes.map((n) => (n && n.note) || '').join('\n')
     return { state: available ? 'available' : 'current', current, latest, notes, date: (r && r.updateInfo && r.updateInfo.releaseDate) || null }
-  } catch (e) { slogErr('app:check-updates', e); return { state: 'error', current, error: (e && e.message) || String(e) } }
+  } catch (e) {
+    slogErr('app:check-updates', e)
+    // Clean code for the UI (offline / just-published CDN gap / other). The raw text is
+    // returned as `detail` only — shown behind an optional "Details anzeigen".
+    const raw = (e && e.message) || String(e)
+    let code = 'check_failed'
+    if (/net::|ENOTFOUND|getaddrinfo|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH/i.test(raw)) code = 'offline'
+    else if (/404|cannot find|not found|latest\.yml/i.test(raw)) code = 'temporarily_unavailable'
+    return { state: 'error', current, code, detail: raw }
+  }
   finally { _suppressDialog = false }
 })
 // In-app "Jetzt aktualisieren". Robust, explicit flow that does NOT rely on the
