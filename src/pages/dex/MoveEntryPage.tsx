@@ -64,17 +64,22 @@ function MoveExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: st
   if (isLoading) return <div className="mt-4 flex items-center gap-2 text-slate-400 text-sm px-1"><Loader2 className="w-4 h-4 animate-spin" /> {t('Lädt Details …', 'Loading details …')}</div>
   if (isError || !data) return <div className="mt-4 text-slate-500 text-sm px-1">{t('Weitere Details konnten nicht geladen werden (offline?).', 'Could not load further details (offline?).')}</div>
 
-  const effect = lang === 'de' ? data.effect.de || data.effect.en : data.effect.en || data.effect.de
-  const flavor = lang === 'de' ? data.flavor.de || data.flavor.en : data.flavor.en || data.flavor.de
+  // Move effect texts are English-only in the source; for DE prefer the German flavour.
+  const desc = lang === 'de' ? (data.effect.de || data.flavor.de || data.effect.en || data.flavor.en) : (data.effect.en || data.flavor.en || data.effect.de || data.flavor.de)
+  const flavor = lang === 'de' ? data.flavor.de : data.flavor.en
   return (
     <>
-      {(effect || flavor) && (
-        <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
-          <h2 className="text-white font-bold text-sm mb-2">{t('Effekt', 'Effect')}</h2>
-          <p className="text-slate-300 text-sm leading-relaxed">{effect || flavor}</p>
-          {effect && flavor && flavor !== effect && <p className="text-slate-500 text-xs mt-2 leading-relaxed">{flavor}</p>}
-        </section>
-      )}
+      <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
+        <h2 className="text-white font-bold text-sm mb-2">{t('Effekt', 'Effect')}</h2>
+        {desc ? (
+          <>
+            <p className="text-slate-300 text-sm leading-relaxed">{desc}</p>
+            {flavor && flavor !== desc && <p className="text-slate-500 text-xs mt-2 leading-relaxed">{flavor}</p>}
+          </>
+        ) : (
+          <p className="text-slate-400 text-sm">{t('Für diese Attacke sind keine weiteren Informationen verfügbar.', 'No further information is available for this move.')}</p>
+        )}
+      </section>
       <Learners learners={data.learners} lang={lang} t={t} navigate={navigate} />
     </>
   )

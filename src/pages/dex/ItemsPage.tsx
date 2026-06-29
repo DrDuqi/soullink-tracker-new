@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, X, Backpack } from 'lucide-react'
 import { useSettings } from '../../store/settingsStore'
-import { searchItems, itemName, itemSprite, catLabel, ITEM_CATEGORIES, type ItemEntry } from '../../lib/dex/items'
+import { searchItems, itemName, itemSprite, catLabel, POCKETS, pocketLabel, type ItemEntry } from '../../lib/dex/items'
 
 // SoulDex → Items. Bundled index → instant, offline browse/search/filter (category).
 // Detail (effect, buy/sell, fling) loads lazily on the entry page.
@@ -10,13 +10,13 @@ export default function ItemsPage() {
   const navigate = useNavigate()
   const lang = useSettings((s) => s.language)
   const [q, setQ] = useState('')
-  const [cat, setCat] = useState('')
+  const [pocket, setPocket] = useState('')
 
   const results = useMemo(() => {
-    const r = searchItems(q, { cat: cat || undefined })
+    const r = searchItems(q, { pocket: pocket || undefined })
     return [...r].sort((a, b) => itemName(a, lang).localeCompare(itemName(b, lang)))
-  }, [q, cat, lang])
-  const active = q || cat
+  }, [q, pocket, lang])
+  const active = q || pocket
 
   return (
     <div className="px-6 lg:px-8 py-8">
@@ -32,11 +32,11 @@ export default function ItemsPage() {
             <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={lang === 'de' ? 'Item suchen …' : 'Search item …'}
               className="w-full rounded-2xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none pl-10 pr-10 py-3 text-sm text-white" />
-            {active ? <button onClick={() => { setQ(''); setCat('') }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white" aria-label="Reset"><X className="w-4 h-4" /></button> : null}
+            {active ? <button onClick={() => { setQ(''); setPocket('') }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white" aria-label="Reset"><X className="w-4 h-4" /></button> : null}
           </div>
-          <select value={cat} onChange={(e) => setCat(e.target.value)} className="rounded-2xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3 py-3 text-sm text-white sm:w-56">
-            <option value="">{lang === 'de' ? 'Alle Kategorien' : 'All categories'}</option>
-            {ITEM_CATEGORIES.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
+          <select value={pocket} onChange={(e) => setPocket(e.target.value)} className="rounded-2xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3 py-3 text-sm text-white sm:w-56">
+            <option value="">{lang === 'de' ? 'Alle Gruppen' : 'All groups'}</option>
+            {POCKETS.map((p) => <option key={p} value={p}>{pocketLabel(p, lang)}</option>)}
           </select>
         </div>
         <div className="text-right text-xs text-slate-500 mt-2">{results.length} {lang === 'de' ? 'Treffer' : 'results'}</div>
@@ -62,7 +62,7 @@ function ItemCard({ it, lang, onClick }: { it: ItemEntry; lang: 'de' | 'en'; onC
       </span>
       <span className="min-w-0">
         <span className="block text-slate-100 font-bold text-sm truncate">{itemName(it, lang)}</span>
-        <span className="block text-slate-500 text-xs truncate">{catLabel(it.c)}</span>
+        <span className="block text-slate-500 text-xs truncate">{catLabel(it, lang)}</span>
       </span>
     </button>
   )

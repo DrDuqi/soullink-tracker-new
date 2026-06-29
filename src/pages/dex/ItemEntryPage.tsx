@@ -34,7 +34,7 @@ export default function ItemEntryPage() {
           <div className="min-w-0">
             <h1 className="text-white font-black text-2xl tracking-tight">{itemName(it, lang)}</h1>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <span className="text-xs font-bold rounded-full px-3 py-1 bg-white/5 border border-white/10 text-slate-300">{catLabel(it.c)}</span>
+              <span className="text-xs font-bold rounded-full px-3 py-1 bg-white/5 border border-white/10 text-slate-300">{catLabel(it, lang)}</span>
               {isEvo && <span className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-3 py-1" style={{ background: '#4ade8022', color: '#4ade80' }}><Sparkles className="w-3.5 h-3.5" /> {t('Entwicklungs-Item', 'Evolution item')}</span>}
             </div>
           </div>
@@ -51,18 +51,23 @@ function ItemExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: st
   if (isLoading) return <div className="mt-4 flex items-center gap-2 text-slate-400 text-sm px-1"><Loader2 className="w-4 h-4 animate-spin" /> {t('Lädt Details …', 'Loading details …')}</div>
   if (isError || !data) return <div className="mt-4 text-slate-500 text-sm px-1">{t('Weitere Details konnten nicht geladen werden (offline?).', 'Could not load further details (offline?).')}</div>
 
-  const effect = lang === 'de' ? data.effect.de || data.effect.en : data.effect.en || data.effect.de
-  const flavor = lang === 'de' ? data.flavor.de || data.flavor.en : data.flavor.en || data.flavor.de
+  // Prefer same-language text; for DE prefer the German flavour over an English effect.
+  const desc = lang === 'de' ? (data.effect.de || data.flavor.de || data.effect.en || data.flavor.en) : (data.effect.en || data.flavor.en || data.effect.de || data.flavor.de)
+  const flavor = lang === 'de' ? data.flavor.de : data.flavor.en
   const sell = Math.floor(data.cost / 2)
   return (
     <>
-      {(effect || flavor) && (
-        <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
-          <h2 className="text-white font-bold text-sm mb-2">{t('Wirkung', 'Effect')}</h2>
-          <p className="text-slate-300 text-sm leading-relaxed">{effect || flavor}</p>
-          {effect && flavor && flavor !== effect && <p className="text-slate-500 text-xs mt-2 leading-relaxed">{flavor}</p>}
-        </section>
-      )}
+      <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
+        <h2 className="text-white font-bold text-sm mb-2">{t('Wirkung', 'Effect')}</h2>
+        {desc ? (
+          <>
+            <p className="text-slate-300 text-sm leading-relaxed">{desc}</p>
+            {flavor && flavor !== desc && <p className="text-slate-500 text-xs mt-2 leading-relaxed">{flavor}</p>}
+          </>
+        ) : (
+          <p className="text-slate-400 text-sm">{t('Für dieses Item sind keine weiteren Informationen verfügbar.', 'No further information is available for this item.')}</p>
+        )}
+      </section>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
         <div className="rounded-xl border border-white/[0.06] px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)' }}>
           <div className="text-[11px] text-slate-500 flex items-center gap-1"><Coins className="w-3 h-3" /> {t('Kaufpreis', 'Buy')}</div>
