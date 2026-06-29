@@ -30,7 +30,7 @@ import { spawn, exec } from 'node:child_process'
 import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile, getProfile, recordRun } from './profiles.mjs'
 import { initRandomizer, randomizerStatus, randomize, openRandomizer, installFvx, fvxInstallState } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
-import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs } from './presets.mjs'
+import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs, presetInbox } from './presets.mjs'
 import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun, runIdForRom } from './runs.mjs'
 import { ensureRunBizhawkConfig } from './runConfig.mjs'
 import { installBizhawk, bizhawkInstallState } from './bizhawk.mjs'
@@ -88,6 +88,7 @@ initPresets({
   builtinCandidates: [process.env.SOULLINK_PRESETS_DIR, join(HERE, '..', 'presets'), join(ROOT, 'presets')],
   customDir: join(dirname(CONFIG_FILE), 'Presets'),
 })
+try { presetInbox() } catch { /* create the Documents/SoulLink/Presets inbox up front */ }
 // Local run registry: maps Supabase run ids → local ROM/seed/preset (+ savegame via
 // the unique ROM name). Stored per-machine next to the config.
 initRuns({ file: join(dirname(CONFIG_FILE), 'runs.json'), runsDir: join(dirname(CONFIG_FILE), 'Runs') })
@@ -722,6 +723,7 @@ function handleRequest(req, res) {
       const roots = new Set()
       const add = (...ps) => ps.forEach((p) => p && roots.add(p))
       let home = null; try { home = homedir() } catch { /* none */ }
+      add(presetInbox())   // the canonical Documents/SoulLink/Presets inbox (top priority)
       const fvx = randomizerStatus(); add(fvx?.dir, fvx?.dir && dirname(fvx.dir))
       const bases = [home, process.env.USERPROFILE, process.env.OneDrive, process.env.OneDriveConsumer, process.env.OneDriveCommercial, home && join(home, 'OneDrive')]
       const subs = ['Desktop', 'Schreibtisch', 'Downloads', 'Documents', 'Dokumente']

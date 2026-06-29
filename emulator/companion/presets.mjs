@@ -14,10 +14,28 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync, renameSync, copyFileSync, mkdirSync, unlinkSync, statSync } from 'node:fs'
 import { join, basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { homedir } from 'node:os'
 
 let BUILTIN_DIR = null
 let CUSTOM_DIR = null
 let REGISTRY = null
+
+// Canonical, visible "save your rules here" inbox: Documents/SoulLink/Presets. The FVX
+// "Save Settings" JFileChooser opens in Documents by default, so this folder appears
+// right there — the user clicks into a clearly-named SoulLink folder instead of guessing.
+// It is NOT the managed CUSTOM_DIR (grab still copies imports into CUSTOM_DIR), so it is
+// safe to scan. Created on demand; returns its absolute path (or null on locked-down FS).
+let _inbox = null
+export function presetInbox() {
+  if (_inbox !== null) return _inbox || null
+  const bases = [process.env.OneDrive, process.env.USERPROFILE, (() => { try { return homedir() } catch { return null } })()]
+    .filter(Boolean).map((b) => join(b, 'Documents'))
+  const base = bases.find((d) => existsSync(d)) || bases[0] || null
+  const dir = base ? join(base, 'SoulLink', 'Presets') : null
+  if (dir) { try { mkdirSync(dir, { recursive: true }) } catch { /* ignore */ } }
+  _inbox = dir || ''
+  return dir
+}
 
 export function initPresets({ builtinCandidates = [], customDir = null } = {}) {
   BUILTIN_DIR = builtinCandidates.find((d) => { try { return d && existsSync(join(d, 'manifest.json')) } catch { return false } }) || null
