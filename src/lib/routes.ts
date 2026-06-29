@@ -111,13 +111,17 @@ const ROUTE_MAP: Record<string, string[]> = {
   'PokéMMO': POKEMMO_ROUTES,
 }
 
-// Resolve the run's edition centrally, then return ONLY that edition's official routes
-// (+ the always-available custom option). No silent cross-edition fallback: an
-// unresolved game yields just the custom entry, never another game's routes.
+// Fixed, edition-independent first encounter every run has — managed like any route
+// (checklist slot, SoulLink, death …) so the starter never has to be a "custom route".
+export const STARTER_ROUTE = 'Starter'
+
+// Resolve the run's edition centrally, then return the Starter slot + ONLY that edition's
+// official routes (+ the always-available custom option). No silent cross-edition
+// fallback: an unresolved game yields just Starter + custom, never another game's routes.
 export function getRoutesForGame(game: string): string[] {
   const key = resolveEdition(game)
   const routes = key ? ROUTE_MAP[key] ?? [] : []
-  return [...new Set(routes), 'Eigene Route...']
+  return [STARTER_ROUTE, ...new Set(routes), 'Eigene Route...']
 }
 
 // Set of every official route name across all editions (built once). Used to tell
