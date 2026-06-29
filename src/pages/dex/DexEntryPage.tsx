@@ -6,6 +6,7 @@ import { useSettings } from '../../store/settingsStore'
 import { dexEntry, dexName, artUrl, shinyArtUrl, spriteUrl, typeLabel, typeColor, STAT_LABEL, statTotal } from '../../lib/dex/dex'
 import { getDexDetail, type DexDetail, type DexEvo, type DexMeta, type DexAbility } from '../../lib/dex/detail'
 import { LEARN_METHODS, METHOD_LABEL, type LearnMethod } from '../../lib/dex/learn'
+import { defenseMatchup, groupMatchup } from '../../lib/dex/typechart'
 
 // SoulDex entry — instant, offline detail from the bundled index (artwork, shiny, types,
 // base stats) plus lazy sections (Pokédex text, evolution line, abilities incl. hidden,
@@ -73,9 +74,36 @@ export default function DexEntryPage() {
           </div>
         </div>
 
+        <TypeMatchup types={e.t} lang={lang} />
         <DetailSections id={e.id} lang={lang} />
       </div>
     </div>
+  )
+}
+
+function TypeMatchup({ types, lang }: { types: string[]; lang: 'de' | 'en' }) {
+  const g = groupMatchup(defenseMatchup(types))
+  const rows: { key: string; label: string; color: string }[] = [
+    { key: '4', label: '×4', color: '#dc2626' },
+    { key: '2', label: '×2', color: '#fb923c' },
+    { key: '0.5', label: '×½', color: '#4ade80' },
+    { key: '0.25', label: '×¼', color: '#22c55e' },
+    { key: '0', label: '×0', color: '#64748b' },
+  ].filter((r) => g[r.key].length)
+  return (
+    <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
+      <h2 className="text-white font-bold text-sm mb-3">{lang === 'de' ? 'Typ-Effektivität (Verteidigung)' : 'Type effectiveness (defense)'}</h2>
+      <div className="space-y-2">
+        {rows.map((r) => (
+          <div key={r.key} className="flex items-start gap-2.5">
+            <span className="text-xs font-black w-8 shrink-0 text-right" style={{ color: r.color }}>{r.label}</span>
+            <div className="flex flex-wrap gap-1.5">
+              {g[r.key].map((t) => <span key={t} className="text-[11px] font-bold rounded-full px-2.5 py-0.5" style={{ background: typeColor(t), color: '#0b0b10' }}>{typeLabel(t, lang)}</span>)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -112,11 +140,14 @@ function MetaGrid({ meta, t }: { meta: DexMeta; t: (de: string, en: string) => s
   const gender = meta.genderRate < 0
     ? t('Geschlechtslos', 'Genderless')
     : `♂ ${Math.round((1 - meta.genderRate / 8) * 100)}% · ♀ ${Math.round((meta.genderRate / 8) * 100)}%`
+  const evShort = t('HP/Ang/Vert/SpA/SpV/Init', 'HP/Atk/Def/SpA/SpD/Spe').split('/')
+  const evYield = (meta.evs || []).map((v, i) => (v > 0 ? `${v} ${evShort[i]}` : '')).filter(Boolean).join(', ')
   const cells: { label: string; value: string }[] = [
     { label: t('Größe', 'Height'), value: `${meta.height.toFixed(1)} m` },
     { label: t('Gewicht', 'Weight'), value: `${meta.weight.toFixed(1)} kg` },
     { label: t('Fangrate', 'Capture rate'), value: String(meta.captureRate) },
     { label: t('Geschlecht', 'Gender'), value: gender },
+    { label: t('EV-Ertrag', 'EV yield'), value: evYield || '—' },
     { label: t('Basis-Freundschaft', 'Base friendship'), value: String(meta.baseHappiness) },
     { label: t('Ei-Zyklen', 'Egg cycles'), value: String(meta.hatchCounter) },
     { label: t('Wachstum', 'Growth'), value: meta.growth ? titleize(meta.growth) : '—' },

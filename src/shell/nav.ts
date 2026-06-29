@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { LayoutDashboard, Users, Settings, BookOpen, Swords, Backpack } from 'lucide-react'
+import { LayoutDashboard, Users, Settings, BookOpen, Swords, Backpack, Grid3x3 } from 'lucide-react'
 
 // Player-oriented navigation, NOT a toolbox: the daily app is about your SoulLinks,
 // not about configuring emulators/randomizers/profiles. Those technical tools moved
@@ -18,6 +18,7 @@ export const NAV: NavItem[] = [
   { id: 'souldex',   label: 'SoulDex',       icon: BookOpen,        to: '/dex' },
   { id: 'moves',     label: 'Attacken',      icon: Swords,          to: '/moves' },
   { id: 'items',     label: 'Items',         icon: Backpack,        to: '/items' },
+  { id: 'types',     label: 'Typen',         icon: Grid3x3,         to: '/types' },
   { id: 'friends',   label: 'Freunde',       icon: Users,           soon: true },
   { id: 'settings',  label: 'Einstellungen', icon: Settings,        to: '/settings' },
 ]

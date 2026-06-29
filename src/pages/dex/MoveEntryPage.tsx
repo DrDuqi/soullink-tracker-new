@@ -7,6 +7,11 @@ import { typeLabel, typeColor, spriteUrl, dexEntry, dexName } from '../../lib/de
 import { moveEntry, moveName, CAT_LABEL, catColor } from '../../lib/dex/moves'
 import { getMoveDetail } from '../../lib/dex/moveDetail'
 import { LEARN_METHODS, METHOD_LABEL, type LearnMethod } from '../../lib/dex/learn'
+import type { MoveDetail } from '../../lib/dex/moveDetail'
+
+const TARGET_DE: Record<string, string> = { 'selected-pokemon': 'Ein Ziel', 'selected-pokemon-me-first': 'Ein Ziel', 'all-opponents': 'Alle Gegner', 'all-other-pokemon': 'Alle anderen', user: 'Anwender', 'random-opponent': 'Zufälliger Gegner', 'entire-field': 'Gesamtes Feld', 'user-and-allies': 'Anwender & Team', 'all-pokemon': 'Alle Pokémon', 'users-field': 'Eigene Seite', 'opponents-field': 'Gegner-Seite', ally: 'Verbündeter', 'user-or-ally': 'Anwender/Verbündeter', 'all-allies': 'Alle Verbündeten', 'fainting-pokemon': 'Besiegtes Pokémon' }
+const AILMENT_DE: Record<string, string> = { paralysis: 'Paralyse', burn: 'Verbrennung', freeze: 'Einfrieren', poison: 'Vergiftung', sleep: 'Schlaf', confusion: 'Verwirrung', infatuation: 'Verliebtheit', trap: 'Gefangen', 'leech-seed': 'Egelsamen', 'perish-song': 'Abschiedslied', torment: 'Folterknecht', disable: 'Aussetzer', yawn: 'Gähner', 'heal-block': 'Heilblockade', 'no-type-immunity': 'Hellseher', nightmare: 'Nachtmahr', curse: 'Fluch' }
+const titleizeSlug = (s: string) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
 // SoulDex → Attacke-Detail. Base data (type, power, accuracy, pp, category, priority) is
 // instant/offline; effect, flavour and the learner list load lazily + cache for offline.
@@ -80,8 +85,37 @@ function MoveExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: st
           <p className="text-slate-400 text-sm">{t('Für diese Attacke sind keine weiteren Informationen verfügbar.', 'No further information is available for this move.')}</p>
         )}
       </section>
+      <MoveFacts data={data} lang={lang} t={t} />
       <Learners learners={data.learners} lang={lang} t={t} navigate={navigate} />
     </>
+  )
+}
+
+function MoveFacts({ data, lang, t }: { data: MoveDetail; lang: 'de' | 'en'; t: (de: string, en: string) => string }) {
+  const facts: { label: string; value: string }[] = []
+  if (data.target) facts.push({ label: t('Ziel', 'Target'), value: lang === 'de' ? TARGET_DE[data.target] || titleizeSlug(data.target) : titleizeSlug(data.target) })
+  const m = data.meta
+  if (m) {
+    if (m.minHits && m.maxHits && m.maxHits > 1) facts.push({ label: t('Treffer', 'Hits'), value: m.minHits === m.maxHits ? `${m.minHits}×` : `${m.minHits}–${m.maxHits}×` })
+    if (m.drain > 0) facts.push({ label: t('Saugt', 'Drain'), value: `${m.drain}% ${t('des Schadens', 'of damage')}` })
+    if (m.drain < 0) facts.push({ label: t('Rückstoß', 'Recoil'), value: `${Math.abs(m.drain)}%` })
+    if (m.healing > 0) facts.push({ label: t('Heilung', 'Healing'), value: `${m.healing}% KP` })
+    if (m.ailment) facts.push({ label: t('Status', 'Ailment'), value: `${lang === 'de' ? AILMENT_DE[m.ailment] || titleizeSlug(m.ailment) : titleizeSlug(m.ailment)}${m.ailmentChance ? ` (${m.ailmentChance}%)` : ''}` })
+    if (m.flinch > 0) facts.push({ label: t('Zurückschrecken', 'Flinch'), value: `${m.flinch}%` })
+  }
+  if (!facts.length) return null
+  return (
+    <section className="mt-4 rounded-2xl border border-white/[0.07] p-5" style={{ background: 'rgba(22,22,31,0.7)' }}>
+      <h2 className="text-white font-bold text-sm mb-3">{t('Weitere Details', 'Further details')}</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {facts.map((f) => (
+          <div key={f.label} className="rounded-xl border border-white/[0.06] px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)' }}>
+            <div className="text-[11px] text-slate-500">{f.label}</div>
+            <div className="text-slate-100 font-bold text-sm mt-0.5">{f.value}</div>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 

@@ -10,7 +10,7 @@ export interface DexAbility { de: string; en: string; hidden: boolean; effectDe:
 export interface DexMove { id: number; level: number; de: string; en: string; type: string; method: LearnMethod }
 export interface DexEvo { id: number; de: string; en: string; from: number | null; level: number | null; trigger: string | null; item: string | null; happiness: number | null; time: string | null }
 export interface DexEncounter { version: { de: string; en: string }; location: { de: string; en: string }; min: number; max: number; chance: number }
-export interface DexMeta { height: number; weight: number; baseExp: number; captureRate: number; baseHappiness: number; genderRate: number; hatchCounter: number; growth: string; legendary: boolean; mythical: boolean; baby: boolean }
+export interface DexMeta { height: number; weight: number; baseExp: number; captureRate: number; baseHappiness: number; genderRate: number; hatchCounter: number; growth: string; legendary: boolean; mythical: boolean; baby: boolean; evs: number[] }
 export interface DexDetail {
   abilities: DexAbility[]
   eggGroups: { de: string; en: string }[]
@@ -26,6 +26,7 @@ const L = '(where: {language_id: {_in: [6, 9]}})'
 const QUERY = `query D($id: Int!) {
   pokemon_v2_pokemon_by_pk(id: $id) {
     height weight base_experience
+    pokemon_v2_pokemonstats(order_by: {stat_id: asc}) { effort }
     pokemon_v2_pokemonabilities { is_hidden pokemon_v2_ability { pokemon_v2_abilitynames${L} { name language_id } pokemon_v2_abilityeffecttexts${L} { short_effect language_id } } }
     pokemon_v2_pokemonmoves(distinct_on: [move_id, move_learn_method_id], order_by: [{move_id: asc}, {move_learn_method_id: asc}, {level: asc}]) {
       level move_id pokemon_v2_movelearnmethod { name } pokemon_v2_move { pokemon_v2_type { name } pokemon_v2_movenames${L} { name language_id } }
@@ -57,7 +58,7 @@ const nm = (a: Named[] = []) => ({ de: a.find((n) => n.language_id === 6)?.name 
 const clean = (t?: string) => (t || '').replace(/[\f\n\r­]/g, ' ').replace(/\s+/g, ' ').trim()
 
 export async function getDexDetail(id: number): Promise<DexDetail | null> {
-  const ck = `detail:v4:${id}`
+  const ck = `detail:v5:${id}`
   const cached = await cacheGet<DexDetail>(ck)
   if (cached) return cached
   try {
@@ -94,7 +95,7 @@ export async function getDexDetail(id: number): Promise<DexDetail | null> {
         const item = ev?.pokemon_v2_item ? nm(ev.pokemon_v2_item.pokemon_v2_itemnames) : null
         return { id: s.id, ...nm(s.pokemon_v2_pokemonspeciesnames), from: s.evolves_from_species_id, level: ev?.min_level ?? null, trigger: ev?.pokemon_v2_evolutiontrigger?.name ?? null, item: item ? (item.de || item.en) : null, happiness: ev?.min_happiness ?? null, time: ev?.time_of_day || null }
       }),
-      meta: spec ? { height: (p.height || 0) / 10, weight: (p.weight || 0) / 10, baseExp: p.base_experience || 0, captureRate: spec.capture_rate ?? 0, baseHappiness: spec.base_happiness ?? 0, genderRate: spec.gender_rate ?? -1, hatchCounter: spec.hatch_counter ?? 0, growth: spec.pokemon_v2_growthrate?.name || '', legendary: !!spec.is_legendary, mythical: !!spec.is_mythical, baby: !!spec.is_baby } : null,
+      meta: spec ? { height: (p.height || 0) / 10, weight: (p.weight || 0) / 10, baseExp: p.base_experience || 0, captureRate: spec.capture_rate ?? 0, baseHappiness: spec.base_happiness ?? 0, genderRate: spec.gender_rate ?? -1, hatchCounter: spec.hatch_counter ?? 0, growth: spec.pokemon_v2_growthrate?.name || '', legendary: !!spec.is_legendary, mythical: !!spec.is_mythical, baby: !!spec.is_baby, evs: (p.pokemon_v2_pokemonstats || []).map((s: any) => s.effort || 0) } : null,
       encounters: [...encMap.values()].sort((a, b) => a.version.en.localeCompare(b.version.en) || b.chance - a.chance),
     }
     await cacheSet(ck, detail)

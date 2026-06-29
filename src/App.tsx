@@ -28,6 +28,7 @@ const MovesPage = lazy(() => import('./pages/dex/MovesPage'))
 const MoveEntryPage = lazy(() => import('./pages/dex/MoveEntryPage'))
 const ItemsPage = lazy(() => import('./pages/dex/ItemsPage'))
 const ItemEntryPage = lazy(() => import('./pages/dex/ItemEntryPage'))
+const TypesPage = lazy(() => import('./pages/dex/TypesPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
@@ -65,6 +66,7 @@ export default function App() {
                     <Route path="/moves/:id" element={<MoveEntryPage />} />
                     <Route path="/items" element={<ItemsPage />} />
                     <Route path="/items/:id" element={<ItemEntryPage />} />
+                    <Route path="/types" element={<TypesPage />} />
                     <Route path="/presets" element={<PresetsPage />} />
                     <Route path="/setup" element={<SetupPage />} />
                     <Route path="/profiles" element={<ProfilesPage />} />
@@ -85,6 +87,7 @@ export default function App() {
                   <Route path="/moves/:id" element={<MoveEntryPage />} />
                   <Route path="/items" element={<ItemsPage />} />
                   <Route path="/items/:id" element={<ItemEntryPage />} />
+                  <Route path="/types" element={<TypesPage />} />
                   <Route path="/run/:runId" element={<RunPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
