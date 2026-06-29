@@ -164,6 +164,8 @@ export async function captureRnqs(path, { name = 'Eigene Regeln', edition = null
 
 // Polling fallback (when recursive watch is unavailable): find the NEWEST .rnqs saved
 // after `sinceMs` across the likely locations, then capture it through the single gate.
+// Returns { preset, detecting } so the UI can show a real "detected → importing" status:
+// `detecting` = a fresh candidate exists but isn't a finished preset yet (FVX still writing).
 export async function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene Regeln', edition = null } = {}) {
   let best = null, bestT = sinceMs
   const scan = (dir, depth) => {
@@ -179,8 +181,10 @@ export async function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene R
     }
   }
   for (const root of roots) if (root) scan(root, 1)
-  if (!best) return null
-  return captureRnqs(best, { name: name || basename(best).replace(/\.rnqs$/i, ''), edition, sinceMs })
+  if (!best) return { preset: null, detecting: false }
+  const preset = await captureRnqs(best, { name: name || basename(best).replace(/\.rnqs$/i, ''), edition, sinceMs })
+  const fresh = !preset && (Date.now() - bestT < 12000)   // saw a new file, not finished yet
+  return { preset, detecting: fresh }
 }
 
 // ── Real-time, location-INDEPENDENT capture ──────────────────────────────────
@@ -190,7 +194,7 @@ export async function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene R
 // the first hit or after a timeout) and import COPIES the file into the managed Presets
 // folder, so the user truly never thinks about location or filename. Best-effort: if
 // recursive watch isn't available, the polling scan above still works as a fallback.
-let WATCH = null   // { since, name, edition, found, watchers:[], timer }
+let WATCH = null   // { since, name, edition, found, detecting, watchers:[], timer }
 export function stopRnqsWatch() {
   if (!WATCH) return
   for (const w of WATCH.watchers) { try { w.close() } catch { /* ignore */ } }
@@ -198,6 +202,9 @@ export function stopRnqsWatch() {
   WATCH = null
 }
 export function pollRnqsWatch() { return WATCH?.found || null }
+// True while a fresh .rnqs has been seen but its import isn't finished yet → the UI shows
+// "detected → importing" instead of staying on "waiting".
+export function rnqsWatchBusy() { return !!(WATCH && WATCH.detecting && !WATCH.found) }
 
 /** Start (or keep) a recursive watch for the newest .rnqs after `sinceMs`. Idempotent
  *  per `sinceMs` so repeated polls don't restart it. `roots` should be high-level dirs
@@ -205,7 +212,7 @@ export function pollRnqsWatch() { return WATCH?.found || null }
 export function startRnqsWatch({ sinceMs = 0, name = 'Eigene Regeln', edition = null, roots = [] } = {}) {
   if (WATCH && WATCH.since === sinceMs) return WATCH.found
   stopRnqsWatch()
-  const state = { since: sinceMs, name, edition, found: null, watchers: [], timer: null }
+  const state = { since: sinceMs, name, edition, found: null, detecting: false, watchers: [], timer: null }
   const seen = new Set()
   for (const root of roots) {
     if (!root || !existsSync(root)) continue
@@ -214,11 +221,14 @@ export function startRnqsWatch({ sinceMs = 0, name = 'Eigene Regeln', edition = 
         if (state.found || !file || !/\.rnqs$/i.test(String(file))) return
         const p = join(root, String(file))
         if (seen.has(p)) return; seen.add(p)
+        // Only act on a file newer than when the editor opened.
+        try { if (statSync(p).mtimeMs <= state.since) { seen.delete(p); return } } catch { seen.delete(p); return }
+        state.detecting = true   // a fresh file appeared → UI flips to "wird importiert"
         // Single gate: waits for the file to finish writing, dedups by content. We may
         // see the same file again later (re-save) → captureRnqs decides idempotently.
         captureRnqs(p, { name: state.name, edition: state.edition, sinceMs: state.since })
-          .then((preset) => { if (preset && !state.found) { state.found = preset; stopRnqsWatch() } else { seen.delete(p) } })
-          .catch(() => seen.delete(p))
+          .then((preset) => { if (preset && !state.found) { state.found = preset; stopRnqsWatch() } else { seen.delete(p); state.detecting = false } })
+          .catch(() => { seen.delete(p); state.detecting = false })
       })
       state.watchers.push(w)
     } catch { /* recursive watch unsupported on this root — fallback scan covers it */ }

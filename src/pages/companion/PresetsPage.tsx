@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dices, Plus, Upload, Trash2, Pencil, Check, X, Loader2, ExternalLink, ArrowLeft, Star } from 'lucide-react'
+import { Dices, Plus, Upload, Trash2, Pencil, Check, X, Loader2, ExternalLink, ArrowLeft, Star, AlertTriangle, Play, RotateCw } from 'lucide-react'
 import { getPlatform } from '../../platform'
 import { useProfiles } from '../../hooks/useProfiles'
 import { EDITION_OPTIONS, editionLabel, resolveEdition, type EditionKey } from '../../lib/edition'
@@ -29,9 +29,18 @@ export default function PresetsPage() {
     return resolveEdition(last) || EDITION_OPTIONS[0].key
   })
 
-  const [watching, setWatching] = useState(false)
+  // The "create rules" flow is a small explicit state machine so the user ALWAYS sees
+  // where they are: opening FVX → waiting for the save → importing → done (or timeout/error).
+  type CreatePhase = 'idle' | 'opening' | 'waiting' | 'importing' | 'done' | 'timeout' | 'error'
+  const [phase, setPhase] = useState<CreatePhase>('idle')
+  const [phaseMsg, setPhaseMsg] = useState<string | null>(null)
+  const watching = phase === 'opening' || phase === 'waiting' || phase === 'importing'
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const stopWatch = useCallback(() => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } setWatching(false) }, [])
+  const stopPoll = useCallback(() => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }, [])
+  const cancelCreate = useCallback(() => { stopPoll(); setPhase('idle'); setPhaseMsg(null) }, [stopPoll])
+  // The interval closure needs the LATEST profiles to auto-select the new preset.
+  const profilesRef = useRef(profiles)
+  useEffect(() => { profilesRef.current = profiles }, [profiles])
 
   const reload = useCallback(async () => {
     const list = await platform.listPresets()
@@ -39,25 +48,56 @@ export default function PresetsPage() {
     setLoading(false)
   }, [platform])
   useEffect(() => { reload() }, [reload])
-  useEffect(() => () => stopWatch(), [stopWatch])
+  useEffect(() => () => stopPoll(), [stopPoll])
+
+  // After detection: make the name UI-authoritative (rename to exactly what was typed,
+  // regardless of the .rnqs filename) AND auto-select it as this edition's active preset.
+  async function finalizeNewPreset(preset: Preset, wantName: string, ek: EditionKey) {
+    setPhase('importing')
+    let finalName = preset.name
+    if (wantName && preset.name !== wantName) {
+      try { if (await platform.renamePreset(preset.id, wantName)) finalName = wantName } catch { /* keep import name */ }
+    }
+    const ep = profilesRef.current.find((p) => resolveEdition(p.edition) === ek) ?? null
+    let selected = false
+    if (ep) { try { await update(ep.id, { presetId: preset.id }); selected = true } catch { /* not fatal */ } }
+    await reload()
+    setPhase('done')
+    setPhaseMsg(selected
+      ? `„${finalName}" wurde gespeichert und als aktives Preset für ${editionLabel(ek)} ausgewählt — du kannst direkt einen Run starten.`
+      : `„${finalName}" wurde für ${editionLabel(ek)} gespeichert. Richte die Edition in „Mein Setup" ein, dann lässt sie sich als Standard auswählen.`)
+  }
 
   // Open the FVX editor, then WATCH for the .rnqs the user saves and import it
   // automatically — no file dialog, no "where do I save this?".
   async function openEditor() {
-    setNotice(null)
+    setNotice(null); setPhaseMsg(null); setPhase('opening')
+    const ek = editionKey
+    const wantName = presetName.trim() || `${editionLabel(ek)}-Regeln`
     const r = await platform.openRandomizer()
-    if (!r.ok) { setNotice(r.error === 'fvx_not_found' ? 'Der Regel-Editor wurde noch nicht eingerichtet.' : 'Der Editor konnte nicht geöffnet werden.'); return }
-    setNotice('Der Regel-Editor öffnet sich. Stelle deine Regeln ein und klicke „Save Settings" — speichere einfach an dem Ort, den FVX vorschlägt, und klicke „Speichern". Ordner und Dateiname sind völlig egal: SoulLink erkennt die Datei automatisch in Sekunden und übernimmt sie als Preset.')
+    if (!r.ok) {
+      setPhase('error')
+      setPhaseMsg(r.error === 'fvx_not_found'
+        ? 'Der Regel-Editor (FVX) ist noch nicht eingerichtet — richte ihn in „Mein Setup" automatisch ein.'
+        : 'Der Regel-Editor konnte nicht geöffnet werden. Versuche es erneut.')
+      return
+    }
     const since = Date.now() - 3000
-    const name = presetName.trim() || 'Eigene Regeln'
+    setPhase('waiting')
     let elapsed = 0
-    stopWatch(); setWatching(true)
+    stopPoll()
     pollRef.current = setInterval(async () => {
-      elapsed += 3000
-      const p = await platform.grabRules(since, { name, edition: editionKey })
-      if (p) { stopWatch(); setNotice(`Deine Regeln „${p.name}" für ${editionLabel(editionKey)} wurden automatisch übernommen.`); await reload() }
-      else if (elapsed >= 240000) { stopWatch() }   // give up after 4 min
-    }, 3000)
+      elapsed += 2000
+      let res: { preset: Preset | null; detecting: boolean }
+      try { res = await platform.grabRules(since, { name: wantName, edition: ek }) }
+      catch { res = { preset: null, detecting: false } }
+      if (res.preset) { stopPoll(); await finalizeNewPreset(res.preset, wantName, ek); return }
+      setPhase(res.detecting ? 'importing' : 'waiting')
+      if (elapsed >= 240000) {
+        stopPoll(); setPhase('timeout')
+        setPhaseMsg('Ich habe keine gespeicherte Regeldatei gefunden. Stelle sicher, dass du in FVX „Save Settings" geklickt und die Datei gespeichert hast.')
+      }
+    }, 2000)
   }
   async function importPreset() {
     setBusy(true); setNotice(null)
@@ -105,19 +145,53 @@ export default function PresetsPage() {
       </div>
       <p className="text-slate-500 text-[11px] mt-1.5">Diese Regeln werden <b className="text-slate-300">{editionLabel(editionKey)}</b> zugeordnet und erscheinen nur dort.</p>
       <div className="flex items-center gap-2.5 mt-3">
-        <button onClick={openEditor} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
-          <Plus className="w-4 h-4" /> Eigene Regeln erstellen
+        <button onClick={openEditor} disabled={watching} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50" style={{ background: '#CC0000' }}>
+          {watching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Eigene Regeln erstellen
         </button>
-        <button onClick={importPreset} disabled={busy} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5 disabled:opacity-40">
+        <button onClick={importPreset} disabled={busy || watching} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5 disabled:opacity-40">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Regeln importieren
         </button>
       </div>
       {notice && <p className="mt-3 text-sm text-slate-300 bg-[#16161f] border border-[#2e2e42] rounded-xl px-3.5 py-2.5 flex items-start gap-2"><ExternalLink className="w-4 h-4 text-pk-red shrink-0 mt-0.5" /> {notice}</p>}
-      {watching && (
-        <div className="mt-2 text-sm text-slate-300 bg-[#16161f] border border-pk-red/30 rounded-xl px-3.5 py-2.5 flex items-center gap-2.5">
-          <Loader2 className="w-4 h-4 animate-spin text-pk-red shrink-0" />
-          <span className="flex-1">Warte auf deine gespeicherten Regeln … sobald du in FVX „Save Settings" klickst, übernehme ich sie automatisch.</span>
-          <button onClick={stopWatch} className="text-[11px] font-bold text-slate-400 hover:text-white">Abbrechen</button>
+
+      {/* Guided status: the user always knows whether SoulLink is opening FVX, waiting
+          for the save, importing, or done — never a silent spinner or a dead end. */}
+      {phase !== 'idle' && (
+        <div className="mt-3 rounded-2xl border bg-[#16161f] px-4 py-3.5" style={{ borderColor: phase === 'done' ? 'rgba(74,222,128,0.4)' : phase === 'error' || phase === 'timeout' ? 'rgba(251,191,36,0.4)' : 'rgba(204,0,0,0.35)' }}>
+          {(phase === 'opening' || phase === 'waiting' || phase === 'importing') && (
+            <>
+              <div className="flex items-center gap-2.5 text-white font-bold text-sm">
+                <Loader2 className="w-4 h-4 animate-spin text-pk-red shrink-0" />
+                {phase === 'opening' ? 'FVX (Regel-Editor) wird geöffnet …'
+                  : phase === 'importing' ? 'Regeln erkannt – werden importiert …'
+                  : 'Warte auf „Save Settings" in FVX …'}
+                <button onClick={cancelCreate} className="ml-auto text-[11px] font-bold text-slate-400 hover:text-white">Abbrechen</button>
+              </div>
+              <ol className="mt-2.5 space-y-1 text-[12px]">
+                <StepRow done label="Editor öffnen" />
+                <StepRow done={phase === 'importing'} active={phase === 'waiting'} label={'In FVX Regeln einstellen, dann „Save Settings" → speichern (Ort & Name egal)'} />
+                <StepRow active={phase === 'importing'} label="SoulLink erkennt & importiert die Datei automatisch" />
+              </ol>
+            </>
+          )}
+          {phase === 'done' && (
+            <div>
+              <div className="flex items-start gap-2.5 text-green-300 font-bold text-sm"><Check className="w-4 h-4 shrink-0 mt-0.5 text-green-400" /> <span>{phaseMsg}</span></div>
+              <div className="flex items-center gap-2 mt-3">
+                {editionProfile && <button onClick={() => navigate(`/new?edition=${encodeURIComponent(editionKey)}`)} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-black text-sm text-white" style={{ background: '#CC0000' }}><Play className="w-4 h-4" /> Run starten</button>}
+                <button onClick={() => { setPhase('idle'); setPhaseMsg(null) }} className="text-[12px] font-bold text-slate-400 hover:text-white">Schließen</button>
+              </div>
+            </div>
+          )}
+          {(phase === 'timeout' || phase === 'error') && (
+            <div>
+              <div className="flex items-start gap-2.5 text-amber-300 text-sm"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{phaseMsg}</span></div>
+              <div className="flex items-center gap-2 mt-3">
+                <button onClick={openEditor} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}><RotateCw className="w-4 h-4" /> Erneut versuchen</button>
+                <button onClick={cancelCreate} className="text-[12px] font-bold text-slate-400 hover:text-white">Abbrechen</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -173,5 +247,14 @@ export default function PresetsPage() {
         })}
       </div>
     </div>
+  )
+}
+
+function StepRow({ done = false, active = false, label }: { done?: boolean; active?: boolean; label: string }) {
+  return (
+    <li className="flex items-start gap-2">
+      {done ? <Check className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" /> : active ? <Loader2 className="w-3.5 h-3.5 animate-spin text-pk-red mt-0.5 shrink-0" /> : <span className="w-3.5 h-3.5 rounded-full border border-[#3a3a4e] mt-0.5 shrink-0" />}
+      <span className={done ? 'text-green-300' : active ? 'text-white font-semibold' : 'text-slate-500'}>{label}</span>
+    </li>
   )
 }

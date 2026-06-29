@@ -12,12 +12,12 @@
 import type { CompanionConfig, RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult, BizhawkStatus, FvxInstallState, RomValidateOpts } from '../lib/companion'
 import type { EmulatorSettings, LaunchResult } from '../lib/emulatorSettings'
 import type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult, LocalRun } from '../lib/profiles'
-import type { Preset, ImportPresetInput } from '../lib/presets'
+import type { Preset, ImportPresetInput, GrabResult } from '../lib/presets'
 
 export type { CompanionConfig, EmulatorSettings, LaunchResult }
 export type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult, LocalRun }
 export type { RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult, BizhawkStatus }
-export type { Preset, ImportPresetInput }
+export type { Preset, ImportPresetInput, GrabResult }
 
 export type PlatformKind = 'web' | 'companion'
 export type PickKind = 'biz' | 'rom' | 'preset'
@@ -94,8 +94,10 @@ export interface PlatformBridge {
   importPreset(input: ImportPresetInput): Promise<Preset | null>
   renamePreset(id: string, name: string): Promise<boolean>
   deletePreset(id: string): Promise<boolean>
-  /** Auto-import the newest rules the user just saved in FVX (after sinceMs). */
-  grabRules(sinceMs: number, opts?: { name?: string; edition?: string | null }): Promise<Preset | null>
+  /** Auto-import the newest rules the user just saved in FVX (after sinceMs).
+   *  Returns the imported preset (once finished) plus a `detecting` flag (a save was
+   *  spotted and is still importing) so the UI can show a real status. */
+  grabRules(sinceMs: number, opts?: { name?: string; edition?: string | null }): Promise<GrabResult>
   /** Open the FVX GUI as a preset editor (Stufe 1). */
   openRandomizer(): Promise<{ ok: boolean; error?: string }>
 }
