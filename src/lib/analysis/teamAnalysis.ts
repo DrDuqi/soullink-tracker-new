@@ -6,6 +6,7 @@ import type { Encounter, SoulLinkPair } from '../../types/database'
 import type { PokemonStats } from '../pokemon-api'
 import { TYPE_NAMES_DE } from '../pokemon-api'
 import { ALL_TYPES, attackEffect, defenseMultiplier } from './typeMath'
+import { dexEntry } from '../dex/dex'
 import type { GymLeader } from './gyms'
 
 const de = (t: string) => TYPE_NAMES_DE[t] ?? t
@@ -315,6 +316,99 @@ export function analyzeSoulLinks(
     .map(({ pair }) => ({ pair, reason: 'Wenige Resistenzen – dieser Link sollte nicht fallen.' }))
 
   return { complement, duplicateWeaknesses, duplicateTypes, missingTypes, importantLinks, riskyLinks }
+}
+
+// ── Detailed dashboard analysis (the "coach" view) ─────────────────────────────
+// Same engine/inputs as analyzeTeam — just a richer, structured breakdown for the
+// full-screen dashboard. No duplicate logic: reuses defenseAgg/offenseCovered/roleOf.
+export interface TeamBalance {
+  physical: number; special: number
+  offensive: number; defensive: number            // averaged 0-~150 for bars
+  roles: { role: string; count: number }[]
+  typeDist: { type: string; count: number }[]
+  avg: { hp: number; atk: number; def: number; spa: number; spd: number; spe: number; bst: number }
+  withStats: number
+}
+export interface TypeAnalysis {
+  weaknesses: { type: string; count: number }[]
+  resistances: { type: string; count: number }[]
+  immunities: { type: string; count: number }[]
+  dangerous: string[]
+  missingResist: string[]
+}
+export interface OffenseAnalysis { hitsWell: string[]; problematic: string[]; missingAttackTypes: string[] }
+export interface TeamDashboard { count: number; balance: TeamBalance; defense: TypeAnalysis; offense: OffenseAnalysis }
+export interface BoxRec { enc: Encounter; score: number; reasons: string[] }
+
+export function analyzeTeamDetailed(members: AnalyzedMember[]): TeamDashboard {
+  const count = members.length
+  const def = defenseAgg(members)
+  const covered = offenseCovered(members)
+  const withStats = members.filter((m) => m.stats)
+  const avgOf = (sel: (s: PokemonStats) => number) => (withStats.length ? Math.round(withStats.reduce((a, m) => a + sel(m.stats!), 0) / withStats.length) : 0)
+  const avg = { hp: avgOf((s) => s.hp), atk: avgOf((s) => s.attack), def: avgOf((s) => s.defense), spa: avgOf((s) => s.specialAttack), spd: avgOf((s) => s.specialDefense), spe: avgOf((s) => s.speed), bst: withStats.length ? Math.round(withStats.reduce((a, m) => a + m.bst, 0) / withStats.length) : 0 }
+  let physical = 0, special = 0
+  for (const m of withStats) { if (m.stats!.attack >= m.stats!.specialAttack) physical++; else special++ }
+  const offensive = avgOf((s) => Math.max(s.attack, s.specialAttack))
+  const defensive = withStats.length ? Math.round(withStats.reduce((a, m) => a + (m.stats!.hp + m.stats!.defense + m.stats!.specialDefense) / 3, 0) / withStats.length) : 0
+  const roleCount = new Map<string, number>()
+  for (const m of withStats) { const r = roleOf(m.stats); roleCount.set(r, (roleCount.get(r) || 0) + 1) }
+  const roles = [...roleCount.entries()].map(([role, c]) => ({ role, count: c })).sort((a, b) => b.count - a.count)
+  const typeCount = new Map<string, number>()
+  for (const m of members) for (const t of m.types) typeCount.set(t, (typeCount.get(t) || 0) + 1)
+  const typeDist = [...typeCount.entries()].map(([type, c]) => ({ type, count: c })).sort((a, b) => b.count - a.count)
+
+  const weaknesses = ALL_TYPES.map((t) => ({ type: t, count: def.perType[t].weak })).filter((x) => x.count > 0).sort((a, b) => b.count - a.count)
+  const resistances = ALL_TYPES.map((t) => ({ type: t, count: def.perType[t].resist + def.perType[t].immune })).filter((x) => x.count > 0).sort((a, b) => b.count - a.count)
+  const immunities = ALL_TYPES.map((t) => ({ type: t, count: def.perType[t].immune })).filter((x) => x.count > 0).sort((a, b) => b.count - a.count)
+  const dangerous = ALL_TYPES.filter((t) => def.perType[t].weak >= 2 && !def.anyResist.has(t))
+  const missingResist = ALL_TYPES.filter((t) => !def.anyResist.has(t))
+
+  const presentAttack = new Set<string>(); members.forEach((m) => m.attackTypes.forEach((t) => presentAttack.add(t)))
+  return {
+    count,
+    balance: { physical, special, offensive, defensive, roles, typeDist, avg, withStats: withStats.length },
+    defense: { weaknesses, resistances, immunities, dangerous, missingResist },
+    offense: { hitsWell: [...covered], problematic: ALL_TYPES.filter((t) => !covered.has(t)), missingAttackTypes: ALL_TYPES.filter((t) => !presentAttack.has(t)) },
+  }
+}
+
+// Box recommendations: which available (non-teamed) Pokémon improve the team and WHY.
+// Uses the bundled dex for instant offline stats/types — no fetch.
+export function recommendFromBox(team: AnalyzedMember[], boxEncs: Encounter[]): BoxRec[] {
+  const def = defenseAgg(team)
+  const covered = offenseCovered(team)
+  const unresolved = ALL_TYPES.filter((t) => def.perType[t].weak >= 1 && !def.anyResist.has(t))
+  const missingResist = ALL_TYPES.filter((t) => !def.anyResist.has(t))
+  const withStats = team.filter((m) => m.stats)
+  const avgOf = (sel: (s: PokemonStats) => number) => (withStats.length ? withStats.reduce((a, m) => a + sel(m.stats!), 0) / withStats.length : 0)
+  const avgSpa = avgOf((s) => s.specialAttack), avgAtk = avgOf((s) => s.attack), avgSpd = avgOf((s) => s.speed)
+  const avgBulk = avgOf((s) => (s.hp + s.defense + s.specialDefense) / 3)
+  const presentRoles = new Set(withStats.map((m) => roleOf(m.stats)))
+  const teamIds = new Set(team.map((m) => m.enc.id))
+
+  const recs: BoxRec[] = []
+  for (const enc of boxEncs) {
+    if (teamIds.has(enc.id)) continue
+    const e = enc.pokemon_id != null ? dexEntry(enc.pokemon_id) : undefined
+    const types = (enc.types && enc.types.length ? enc.types : e?.t) ?? []
+    if (!types.length) continue
+    const s = e ? { hp: e.s[0], attack: e.s[1], defense: e.s[2], specialAttack: e.s[3], specialDefense: e.s[4], speed: e.s[5] } : null
+    let score = 0; const reasons: string[] = []
+    for (const t of unresolved) if (defenseMultiplier(t, types) < 1) { score += 14; reasons.push(`deckt ${de(t)}-Schwäche`) }
+    for (const t of missingResist) if (defenseMultiplier(t, types) === 0) { score += 12; reasons.push(`bringt ${de(t)}-Immunität`) }
+    const newCover = ALL_TYPES.filter((d2) => !covered.has(d2) && types.some((at) => attackEffect(at, d2) === 2))
+    if (newCover.length) { score += Math.min(12, newCover.length * 4); reasons.push(`verbessert Coverage (${newCover.slice(0, 3).map(de).join(', ')})`) }
+    if (s) {
+      if (s.specialAttack >= avgSpa + 25 && s.specialAttack >= 100) { score += 8; reasons.push('erhöht Spezialangriff') }
+      if (s.attack >= avgAtk + 25 && s.attack >= 100) { score += 8; reasons.push('erhöht Angriff') }
+      if (s.speed >= avgSpd + 25 && s.speed >= 95) { score += 6; reasons.push('erhöht Initiative') }
+      if ((s.hp + s.defense + s.specialDefense) / 3 >= avgBulk + 25) { score += 6; reasons.push('mehr Bulk') }
+      const role = roleOf(s); if (!presentRoles.has(role)) { score += 6; reasons.push(`ergänzt Rolle: ${role}`) }
+    }
+    if (reasons.length) recs.push({ enc, score, reasons: [...new Set(reasons)].slice(0, 4) })
+  }
+  return recs.sort((a, b) => b.score - a.score).slice(0, 5)
 }
 
 export function analyzeGym(members: AnalyzedMember[], gym: GymLeader): GymInsight {

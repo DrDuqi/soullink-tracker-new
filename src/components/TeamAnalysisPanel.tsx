@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronUp, Brain } from 'lucide-react'
+import { ChevronDown, ChevronUp, Brain, Maximize2 } from 'lucide-react'
 import {
   fetchPokemonDetails, fetchMoveDetails, getSpriteUrl, getTypeColor, TYPE_NAMES_DE,
 } from '../lib/pokemon-api'
 import type { PokemonStats } from '../lib/pokemon-api'
-import { buildMembers, analyzeTeam, analyzeSoulLinks, analyzeGym } from '../lib/analysis/teamAnalysis'
+import { buildMembers, analyzeTeam, analyzeSoulLinks, analyzeGym, analyzeTeamDetailed, recommendFromBox } from '../lib/analysis/teamAnalysis'
+import { analyzeUtility } from '../lib/analysis/utility'
+import TeamAnalysisDashboard from './TeamAnalysisDashboard'
 import { getGymsForGame } from '../lib/analysis/gyms'
 import { useEmuTeamStore } from '../store/emuTeamStore'
 import type { Encounter, Player, SoulLinkPair, TeamSlot } from '../types/database'
@@ -139,10 +141,21 @@ export default function TeamAnalysisPanel({
   const sl = useMemo(() => analyzeSoulLinks(myMembers, partnerMembers, soulLinkPairs), [myMembers, partnerMembers, soulLinkPairs])
   const gymInsight = useMemo(() => analyzeGym(combinedMembers, gym), [combinedMembers, gym])
 
+  // Detailed "coach" data for the full dashboard — same engine, richer breakdown.
+  const detailed = useMemo(() => analyzeTeamDetailed(combinedMembers), [combinedMembers])
+  const utility = useMemo(() => analyzeUtility(combinedEncs), [combinedEncs])
+  const boxCandidates = useMemo(() => {
+    const teamIds = new Set(myTeamEncs.map((e) => e.id))
+    return encounters.filter((e) => e.player_id === myPlayerId && e.status !== 'dead' && !teamIds.has(e.id))
+  }, [encounters, myPlayerId, myTeamEncs])
+  const boxRecs = useMemo(() => recommendFromBox(myMembers, boxCandidates), [myMembers, boxCandidates])
+  const [dashOpen, setDashOpen] = useState(false)
+
   const risk = RISK_CFG[gymInsight.risk]
   const empty = analysis.count === 0
 
   return (
+    <>
     <div className="rounded-2xl border border-[#2e2e42] overflow-hidden">
       {/* Header */}
       <div
@@ -183,6 +196,11 @@ export default function TeamAnalysisPanel({
                   <div className="text-slate-500 text-[9px]">Gesamtbewertung</div>
                 </div>
               </div>
+
+              {/* Volle Analyse öffnen */}
+              <button onClick={() => setDashOpen(true)} className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs text-white" style={{ background: 'var(--color-pk-red)' }}>
+                <Maximize2 className="w-3.5 h-3.5" /> Analyse öffnen
+              </button>
 
               {/* Stärken */}
               <div>
@@ -374,5 +392,17 @@ export default function TeamAnalysisPanel({
         </div>
       )}
     </div>
+    {dashOpen && (
+      <TeamAnalysisDashboard
+        analysis={analysis}
+        dashboard={detailed}
+        utility={utility}
+        sl={sl}
+        hasPartner={!!partnerId && partnerMembers.length > 0}
+        boxRecs={boxRecs}
+        onClose={() => setDashOpen(false)}
+      />
+    )}
+    </>
   )
 }
