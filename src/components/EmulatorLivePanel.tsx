@@ -518,9 +518,9 @@ export default function EmulatorLivePanel({
               >
                 {launching
                   ? <><Loader2 className="w-4 h-4 animate-spin" /> {launchMsg ?? 'Verbinde …'}</>
-                  : <><Play className="w-4 h-4" /> Lua-Sync verbinden</>}
+                  : <><Play className="w-4 h-4" /> {runId ? 'Weiterspielen' : 'Lua-Sync verbinden'}</>}
               </button>
-              <p className="text-slate-500 text-[11px] mt-2 text-center">Lädt das Sync-Script automatisch – startet BizHawk, falls nötig.</p>
+              <p className="text-slate-500 text-[11px] mt-2 text-center">{runId ? 'Setzt diesen Run über BizHawk fort – Lua-Sync startet automatisch.' : 'Lädt das Sync-Script automatisch – startet BizHawk, falls nötig.'}</p>
             </>
           )}
         </div>
