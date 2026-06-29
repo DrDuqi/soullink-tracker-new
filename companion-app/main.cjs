@@ -226,16 +226,19 @@ ipcMain.handle('app:check-updates', async () => {
   } catch (e) { slogErr('app:check-updates', e); return { state: 'error', current, error: (e && e.message) || String(e) } }
   finally { _suppressDialog = false }
 })
-// In-app "Jetzt aktualisieren": re-check (electron-updater requires fresh update info
-// right before downloadUpdate → otherwise "Please check update first"), then download →
-// quit+install (the wired update-downloaded handler relaunches).
+// In-app "Jetzt aktualisieren". The previous "checkForUpdates() then downloadUpdate()"
+// could still throw "Please check update first" (the two calls don't reliably share the
+// resolved update state, esp. with a pending download). Robust fix: let the check itself
+// trigger the download via autoDownload — no separate downloadUpdate call, no race. The
+// wired download-progress / update-downloaded handlers drive the UI + quit+install.
 ipcMain.on('app:start-update', () => {
   const au = getUpdater(); if (!au) return
   wireUpdater(au); _updateAccepted = true; _suppressDialog = true
   notify('SoulLink Companion', 'Update wird heruntergeladen …')
+  au.autoDownload = true
   au.checkForUpdates()
-    .then((r) => { _suppressDialog = false; if (!r || !r.updateInfo) throw new Error('Keine Update-Info'); return au.downloadUpdate() })
-    .catch((e) => { _suppressDialog = false; slogErr('app:start-update', e); sendUI('update:error', { message: (e && e.message) || String(e) }); notify('SoulLink Companion', 'Update-Download fehlgeschlagen.') })
+    .catch((e) => { slogErr('app:start-update', e); sendUI('update:error', { message: (e && e.message) || String(e) }); notify('SoulLink Companion', 'Update fehlgeschlagen: ' + ((e && e.message) || String(e))) })
+    .finally(() => { au.autoDownload = false; _suppressDialog = false })
 })
 
 async function startServer() {
@@ -304,6 +307,9 @@ function getUpdater() {
   try { _updater = require('electron-updater').autoUpdater } catch { return null }
   _updater.autoDownload = false            // ask first (don't surprise-download)
   _updater.autoInstallOnAppQuit = true     // if they pick "Später" after a download, install on quit
+  // Real electron-updater logs land in startup.log so update failures are diagnosable
+  // (previously there were none — only our own catch messages).
+  _updater.logger = { info: (m) => slog('[updater] ' + m), warn: (m) => slog('[updater][warn] ' + m), error: (m) => slog('[updater][error] ' + m), debug: () => {} }
   return _updater
 }
 
