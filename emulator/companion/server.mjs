@@ -716,13 +716,21 @@ function handleRequest(req, res) {
   // so editing rules needs no manual import. POST ?since=<ms>
   if (path === '/api/presets/grab' && req.method === 'POST') {
     try {
+      // Cover EVERY likely save location — incl. OneDrive-redirected known folders
+      // (on this kind of PC "Desktop"/"Dokumente" live under …\OneDrive\…, which the
+      // old root list missed → the saved .rnqs was never found).
+      const roots = new Set()
+      const add = (...ps) => ps.forEach((p) => p && roots.add(p))
       let home = null; try { home = homedir() } catch { /* none */ }
-      const fvx = randomizerStatus()
-      const roots = [fvx?.dir]
-      if (home) roots.push(join(home, 'Desktop'), join(home, 'Downloads'), join(home, 'Documents'))
-      roots.push(join(ROOT, 'ROMs', 'Randomizer Settings'), join(dirname(ROOT), 'ROMs', 'Randomizer Settings'))
+      const fvx = randomizerStatus(); add(fvx?.dir, fvx?.dir && dirname(fvx.dir))
+      const bases = [home, process.env.USERPROFILE, process.env.OneDrive, process.env.OneDriveConsumer, process.env.OneDriveCommercial, home && join(home, 'OneDrive')]
+      const subs = ['Desktop', 'Schreibtisch', 'Downloads', 'Documents', 'Dokumente']
+      for (const b of bases) { if (!b) continue; add(b); for (const s of subs) add(join(b, s)) }
+      add(join(ROOT, 'ROMs', 'Randomizer Settings'), join(dirname(ROOT), 'ROMs', 'Randomizer Settings'))
       const since = Number(url.searchParams.get('since') || 0)
-      const p = grabLatestRnqs({ sinceMs: since, roots, name: 'Eigene Regeln' })
+      const name = url.searchParams.get('name') || 'Eigene Regeln'
+      const edition = url.searchParams.get('edition') || null
+      const p = grabLatestRnqs({ sinceMs: since, roots: [...roots], name, edition })
       sendJson(res, { ok: true, found: !!p, preset: p })
     } catch { sendJson(res, { ok: false }, 500) }
     return

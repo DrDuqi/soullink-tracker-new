@@ -16,6 +16,7 @@ export default function PresetsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [presetName, setPresetName] = useState('Eigene Regeln')
 
   const [watching, setWatching] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -35,13 +36,14 @@ export default function PresetsPage() {
     setNotice(null)
     const r = await platform.openRandomizer()
     if (!r.ok) { setNotice(r.error === 'fvx_not_found' ? 'Der Regel-Editor wurde noch nicht eingerichtet.' : 'Der Editor konnte nicht geöffnet werden.'); return }
-    setNotice('Der Regel-Editor öffnet sich. Stelle deine Regeln ein und klicke „Save Settings" — SoulLink übernimmt die Datei dann automatisch.')
+    setNotice('Der Regel-Editor öffnet sich. Stelle deine Regeln ein und klicke „Save Settings" — Ordner und Dateiname sind egal, SoulLink übernimmt die Datei automatisch.')
     const since = Date.now() - 3000
+    const name = presetName.trim() || 'Eigene Regeln'
     let elapsed = 0
     stopWatch(); setWatching(true)
     pollRef.current = setInterval(async () => {
       elapsed += 3000
-      const p = await platform.grabRules(since)
+      const p = await platform.grabRules(since, { name })
       if (p) { stopWatch(); setNotice(`Deine Regeln „${p.name}" wurden automatisch übernommen.`); await reload() }
       else if (elapsed >= 240000) { stopWatch() }   // give up after 4 min
     }, 3000)
@@ -69,7 +71,13 @@ export default function PresetsPage() {
       <h1 className="text-white font-black text-3xl tracking-tight">Spielregeln</h1>
       <p className="text-slate-400 mt-1.5">Deine Regeln bestimmen, <i>wie</i> randomisiert wird (z. B. Pokémon, Trainer, Items zufällig). Der Seed bestimmt das konkrete Ergebnis.</p>
 
-      <div className="flex items-center gap-2.5 mt-5">
+      <div className="mt-5">
+        <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Name der Regeln</label>
+        <input value={presetName} onChange={(e) => setPresetName(e.target.value)} disabled={watching}
+          placeholder="z. B. Pokémon Platin – LeonValon"
+          className="mt-1 w-full max-w-md rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3 py-2 text-sm text-white" />
+      </div>
+      <div className="flex items-center gap-2.5 mt-3">
         <button onClick={openEditor} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
           <Plus className="w-4 h-4" /> Eigene Regeln erstellen
         </button>

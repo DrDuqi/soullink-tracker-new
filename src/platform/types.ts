@@ -91,7 +91,7 @@ export interface PlatformBridge {
   renamePreset(id: string, name: string): Promise<boolean>
   deletePreset(id: string): Promise<boolean>
   /** Auto-import the newest rules the user just saved in FVX (after sinceMs). */
-  grabRules(sinceMs: number): Promise<Preset | null>
+  grabRules(sinceMs: number, opts?: { name?: string; edition?: string | null }): Promise<Preset | null>
   /** Open the FVX GUI as a preset editor (Stufe 1). */
   openRandomizer(): Promise<{ ok: boolean; error?: string }>
 }

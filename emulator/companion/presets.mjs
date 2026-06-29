@@ -99,19 +99,24 @@ export function deletePreset(id) {
 // AFTER the editor was opened (across the likely save locations) and imports it
 // automatically — so the user never picks a file or a folder. Returns the new preset
 // or null (nothing saved yet). Never scans CUSTOM_DIR (would re-grab its own imports).
-export function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene Regeln' } = {}) {
+export function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene Regeln', edition = null } = {}) {
   let best = null
   let bestT = sinceMs
-  for (const root of roots) {
-    if (!root) continue
+  // Scan a directory's files; recurse ONE level into sub-folders (FVX/Windows often
+  // save into a sub-folder of the chosen location). Shallow → fast, never deep-indexes.
+  const scan = (dir, depth) => {
     let entries = []
-    try { entries = readdirSync(root, { withFileTypes: true }) } catch { continue }
+    try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return }
     for (const e of entries) {
-      if (!e.isFile() || !/\.rnqs$/i.test(e.name)) continue
-      const p = join(root, e.name)
-      try { const t = statSync(p).mtimeMs; if (t > bestT) { bestT = t; best = p } } catch { /* ignore */ }
+      const p = join(dir, e.name)
+      if (e.isFile() && /\.rnqs$/i.test(e.name)) {
+        try { const t = statSync(p).mtimeMs; if (t > bestT) { bestT = t; best = p } } catch { /* ignore */ }
+      } else if (e.isDirectory() && depth > 0 && !/^(node_modules|\$Recycle|AppData)/i.test(e.name)) {
+        scan(p, depth - 1)
+      }
     }
   }
+  for (const root of roots) if (root) scan(root, 1)
   if (!best) return null
-  return importPreset({ name: name || basename(best).replace(/\.rnqs$/i, ''), sourceFile: best })
+  return importPreset({ name: name || basename(best).replace(/\.rnqs$/i, ''), edition, sourceFile: best })
 }
