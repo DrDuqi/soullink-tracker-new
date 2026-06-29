@@ -83,6 +83,7 @@ function ItemExtras({ id, lang, t }: { id: number; lang: 'de' | 'en'; t: (de: st
       <Acquisition id={id} lang={lang} t={t} cost={data.cost} category={data.category} />
 
       {data.evolves.length > 0 && <PokeUsers title={t('Diese Pokémon entwickeln sich damit', 'Pokémon that evolve with this item')} ids={data.evolves} lang={lang} navigate={navigate} />}
+      {data.heldEvolves.length > 0 && <PokeUsers title={t('Entwicklung beim Tragen (oft per Tausch)', 'Evolves while held (often by trade)')} ids={data.heldEvolves} lang={lang} navigate={navigate} />}
       {data.holders.length > 0 && <PokeUsers title={t('Wird in der Wildnis getragen von', 'Held in the wild by')} ids={data.holders} lang={lang} navigate={navigate} />}
 
       {/* Preise & Schleuder — sekundär, daher unten und kompakt. */}
