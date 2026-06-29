@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Gamepad2, Cpu, Dices, Check, Loader2, ChevronRight, FolderOpen, Sparkles } from 'lucide-react'
 import { useProfiles } from '../../hooks/useProfiles'
 import { useCompanion } from '../../hooks/useCompanion'
 import { getPlatform } from '../../platform'
+import { EDITION_OPTIONS, editionLabel, editionRomExts, editionPlatformLabel, resolveEdition, type EditionKey } from '../../lib/edition'
 import type { RomInfo } from '../../lib/companion'
 import type { Preset } from '../../lib/presets'
 
@@ -15,31 +16,45 @@ export default function MeinSetupPage() {
   const navigate = useNavigate()
   const platform = getPlatform()
   const companion = useCompanion(true)
-  const { active, available, loading, create, update } = useProfiles()
+  const { profiles, active, available, loading, create, update } = useProfiles()
+  const [params] = useSearchParams()
   const [presets, setPresets] = useState<Preset[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [romInfo, setRomInfo] = useState<RomInfo | null>(null)
 
-  // Ensure exactly ONE setup exists — the player never "creates a profile".
-  useEffect(() => { if (available && !loading && !active) create({ name: 'Mein Setup', players: [] }) }, [available, loading, active, create])
-  useEffect(() => { platform.listPresets(active?.edition || undefined).then((l) => setPresets(l ?? [])) }, [platform, active?.edition])
+  // Edition is the central choice — each edition has its OWN profile (ROM/emulator/rules),
+  // so a GBA edition never inherits a DS ROM or a DS hint. NewRunPage links here with
+  // ?edition=… so "einrichten" lands on the right edition.
+  const [editionKey, setEditionKey] = useState<EditionKey>(() => resolveEdition(params.get('edition')) || resolveEdition(active?.edition) || EDITION_OPTIONS[0].key)
+  const ed = profiles.find((p) => resolveEdition(p.edition) === editionKey) ?? null
+  const creating = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (available && !loading && !ed && !creating.current.has(editionKey)) {
+      creating.current.add(editionKey)
+      create({ name: `Setup ${editionLabel(editionKey)}`, players: [], edition: editionKey })
+    }
+  }, [available, loading, ed, editionKey, create])
+  useEffect(() => { setRomInfo(null) }, [editionKey])
+  useEffect(() => { platform.listPresets(editionKey).then((l) => setPresets(l ?? [])) }, [platform, editionKey])
 
   async function pickRom() {
+    if (!ed) return
     setBusy('rom'); setRomInfo(null)
     const r = await platform.pickFile('rom')
-    if (r.path && active) {
-      const info = await platform.validateRom(r.path)
+    if (r.path) {
+      const info = await platform.validateRom(r.path, { exts: editionRomExts(editionKey), editionLabel: editionLabel(editionKey), platformLabel: editionPlatformLabel(editionKey) })
       setRomInfo(info)
-      if (info?.valid) await update(active.id, { paths: { originalRom: r.path }, ...(info.edition ? { edition: info.edition } : {}) })
+      if (info?.valid) await update(ed.id, { paths: { originalRom: r.path }, edition: editionKey })
     }
     setBusy(null)
   }
   async function pickBiz() {
+    if (!ed) return
     setBusy('biz'); const r = await platform.pickFile('biz')
-    if (r.path && active) await update(active.id, { paths: { bizhawk: r.path } })
+    if (r.path) await update(ed.id, { paths: { bizhawk: r.path } })
     setBusy(null)
   }
-  async function setRules(presetId: string) { if (active) await update(active.id, { presetId }) }
+  async function setRules(presetId: string) { if (ed) await update(ed.id, { presetId }) }
 
   // Auto-install BizHawk (download + extract into the managed folder) so the player
   // never picks an emulator by hand. Poll the progress for a bar.
@@ -54,9 +69,9 @@ export default function MeinSetupPage() {
       const st = await platform.bizhawkStatus()
       if (!st) return
       setBizInstall({ state: st.state, percent: st.percent, error: st.error })
-      if (st.state === 'done' && st.exe && active) {
+      if (st.state === 'done' && st.exe && ed) {
         if (pollRef.current) clearInterval(pollRef.current)
-        await update(active.id, { paths: { bizhawk: st.exe } })
+        await update(ed.id, { paths: { bizhawk: st.exe } })
         setBizInstall(null)
       } else if (st.state === 'error') {
         if (pollRef.current) clearInterval(pollRef.current)
@@ -76,21 +91,31 @@ export default function MeinSetupPage() {
     )
   }
 
-  const rom = active?.paths.originalRom
-  const biz = active?.paths.bizhawk
-  const presetId = active?.presetId || presets.find((p) => p.builtin)?.id || ''
+  const rom = ed?.paths.originalRom
+  const biz = ed?.paths.bizhawk
+  const presetId = ed?.presetId || presets.find((p) => p.builtin)?.id || ''
   const fname = (p?: string | null): string | null => (p ? (p.split(/[\\/]/).pop() ?? null) : null)
 
   return (
     <div className="max-w-2xl mx-auto px-8 py-10">
       <h1 className="text-white font-black text-3xl tracking-tight">Mein Setup</h1>
-      <p className="text-slate-400 mt-1.5">Einmal einrichten — danach übernimmt SoulLink alles automatisch.</p>
+      <p className="text-slate-400 mt-1.5">Wähle die Edition — jede Edition hat ihr eigenes Setup (ROM, Emulator, Regeln).</p>
 
-      <div className="mt-7 space-y-3">
+      {/* Edition — bestimmt ROM-Typ, Validierung und Presets */}
+      <div className="mt-7 rounded-2xl border border-pk-red/30 bg-[#16161f] p-4">
+        <label className="text-slate-400 text-xs font-black uppercase tracking-widest block mb-2">Edition</label>
+        <select value={editionKey} onChange={(e) => setEditionKey(e.target.value as EditionKey)}
+          className="w-full rounded-xl bg-[#111116] border border-[#2e2e42] focus:border-pk-red/60 outline-none px-3 py-2.5 text-sm text-white">
+          {EDITION_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+        <p className="text-slate-500 text-[11px] mt-2">Benötigt eine <b className="text-slate-300">{editionRomExts(editionKey).join('/')}</b>-ROM ({editionPlatformLabel(editionKey)}). Jede Edition speichert ihre ROM/Einstellungen unabhängig.</p>
+      </div>
+
+      <div className="mt-3 space-y-3">
         {/* Original-ROM */}
         <Row icon={Gamepad2} title="Original-ROM" done={!!rom}
           value={fname(rom)} hint={romInfo?.message} hintOk={romInfo?.valid}
-          desc="Deine originale Pokémon-ROM (.nds). Die randomisierten ROMs erzeugt SoulLink selbst."
+          desc={`Deine originale ${editionLabel(editionKey)}-ROM (${editionRomExts(editionKey).join('/')}). Die randomisierten ROMs erzeugt SoulLink selbst.`}
           busy={busy === 'rom'} action={rom ? 'Ändern' : 'Auswählen'} onClick={pickRom} icon2={FolderOpen} />
 
         {/* Emulator */}

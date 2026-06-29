@@ -9,7 +9,7 @@
 // This is the abstraction that lets "Setup + Spielen" move into a native Companion
 // window later (the agreed Hybrid architecture) without rebuilding the wizard.
 
-import type { CompanionConfig, RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult, BizhawkStatus, FvxInstallState } from '../lib/companion'
+import type { CompanionConfig, RomInfo, RandomizerStatus, RandomizeInput, RandomizeResult, BizhawkStatus, FvxInstallState, RomValidateOpts } from '../lib/companion'
 import type { EmulatorSettings, LaunchResult } from '../lib/emulatorSettings'
 import type { Profile, ProfileList, ProfilePatch, NewProfileInput, PrepareRunInput, PrepareRunResult, LocalRun } from '../lib/profiles'
 import type { Preset, ImportPresetInput } from '../lib/presets'
@@ -65,7 +65,7 @@ export interface PlatformBridge {
 
   // ── auto-setup (Phase 3): ROM validation + randomizer ──────────────────────
   /** Inspect a picked ROM's NDS header (edition/region/revision) or reject it. */
-  validateRom(path: string): Promise<RomInfo | null>
+  validateRom(path: string, opts?: RomValidateOpts): Promise<RomInfo | null>
   /** Is FVX available (bundled / configured / detected)? */
   randomizerStatus(): Promise<RandomizerStatus | null>
   /** Start the automatic BizHawk download+extract (no manual install). */

@@ -640,8 +640,11 @@ function handleRequest(req, res) {
 
   // ── rom: validate a picked file (.nds header → edition/region/revision) ─────
   if (path === '/api/rom/validate') {
-    try { sendJson(res, { ok: true, ...validateRom(url.searchParams.get('path')) }) }
-    catch { sendJson(res, { ok: false }, 500) }
+    try {
+      const exts = (url.searchParams.get('exts') || '').split(',').map((s) => s.trim()).filter(Boolean)
+      const opts = { exts, editionLabel: url.searchParams.get('editionLabel') || null, platformLabel: url.searchParams.get('platformLabel') || null }
+      sendJson(res, { ok: true, ...validateRom(url.searchParams.get('path'), opts) })
+    } catch { sendJson(res, { ok: false }, 500) }
     return
   }
 

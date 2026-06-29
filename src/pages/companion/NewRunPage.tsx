@@ -142,7 +142,7 @@ export default function NewRunPage() {
         <div className="mt-4 rounded-2xl border border-amber-700/40 bg-amber-950/15 p-6">
           <div className="flex items-center gap-2 text-amber-300 font-black"><AlertTriangle className="w-5 h-5" /> Für {editionLabel(editionKey)} noch nicht eingerichtet</div>
           <p className="text-slate-300 text-sm mt-2">Für diese Edition ist noch keine <b className="text-white">Original-ROM</b> bzw. kein Emulator hinterlegt. Einmal einrichten — danach läuft alles automatisch.</p>
-          <button onClick={() => navigate('/mysetup')} className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
+          <button onClick={() => navigate(`/mysetup?edition=${encodeURIComponent(editionKey)}`)} className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>
             <Settings className="w-4 h-4" /> {editionLabel(editionKey)} einrichten
           </button>
         </div>

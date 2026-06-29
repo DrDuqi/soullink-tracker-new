@@ -108,10 +108,15 @@ export interface RomInfo {
 }
 
 /** Read a picked file's NDS header → edition/region/revision (or a friendly reject). */
-export async function validateRomHttp(path: string): Promise<RomInfo | null> {
+export interface RomValidateOpts { exts?: string[]; editionLabel?: string | null; platformLabel?: string | null }
+export async function validateRomHttp(path: string, opts?: RomValidateOpts): Promise<RomInfo | null> {
   if (!USES_COMPANION) return null
   try {
-    const r = await fetch(`${EMU_BASE}/api/rom/validate?path=${encodeURIComponent(path)}`, { cache: 'no-store' })
+    const q = new URLSearchParams({ path })
+    if (opts?.exts?.length) q.set('exts', opts.exts.join(','))
+    if (opts?.editionLabel) q.set('editionLabel', opts.editionLabel)
+    if (opts?.platformLabel) q.set('platformLabel', opts.platformLabel)
+    const r = await fetch(`${EMU_BASE}/api/rom/validate?${q.toString()}`, { cache: 'no-store' })
     const j = await r.json().catch(() => null)
     return j?.ok ? (j as RomInfo) : null
   } catch { return null }

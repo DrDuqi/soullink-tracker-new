@@ -17,32 +17,38 @@ export type EditionKey =
   | 'PokéMMO'
 
 export type Region = 'kanto' | 'johto' | 'hoenn' | 'sinnoh' | 'unova' | 'multi'
+export type RomPlatform = 'gb' | 'gbc' | 'gba' | 'nds'
 
-export interface Edition { key: EditionKey; region: Region; gen: number; emuCodes: string[] }
+export interface Edition { key: EditionKey; region: Region; gen: number; emuCodes: string[]; platform: RomPlatform; romExt: string[] }
 
 export const EDITIONS: Record<EditionKey, Edition> = {
-  Rot: { key: 'Rot', region: 'kanto', gen: 1, emuCodes: ['red'] },
-  Blau: { key: 'Blau', region: 'kanto', gen: 1, emuCodes: ['blue'] },
-  Gelb: { key: 'Gelb', region: 'kanto', gen: 1, emuCodes: ['yellow'] },
-  Gold: { key: 'Gold', region: 'johto', gen: 2, emuCodes: ['gold'] },
-  Silber: { key: 'Silber', region: 'johto', gen: 2, emuCodes: ['silver'] },
-  Kristall: { key: 'Kristall', region: 'johto', gen: 2, emuCodes: ['crystal'] },
-  Rubin: { key: 'Rubin', region: 'hoenn', gen: 3, emuCodes: ['ruby'] },
-  Saphir: { key: 'Saphir', region: 'hoenn', gen: 3, emuCodes: ['sapphire'] },
-  Smaragd: { key: 'Smaragd', region: 'hoenn', gen: 3, emuCodes: ['emerald'] },
-  Feuerrot: { key: 'Feuerrot', region: 'kanto', gen: 3, emuCodes: ['firered'] },
-  Blattgrün: { key: 'Blattgrün', region: 'kanto', gen: 3, emuCodes: ['leafgreen'] },
-  Diamant: { key: 'Diamant', region: 'sinnoh', gen: 4, emuCodes: ['diamond'] },
-  Perl: { key: 'Perl', region: 'sinnoh', gen: 4, emuCodes: ['pearl'] },
-  Platin: { key: 'Platin', region: 'sinnoh', gen: 4, emuCodes: ['platinum'] },
-  HeartGold: { key: 'HeartGold', region: 'johto', gen: 4, emuCodes: ['heartgold'] },
-  SoulSilver: { key: 'SoulSilver', region: 'johto', gen: 4, emuCodes: ['soulsilver'] },
-  Schwarz: { key: 'Schwarz', region: 'unova', gen: 5, emuCodes: ['black'] },
-  Weiß: { key: 'Weiß', region: 'unova', gen: 5, emuCodes: ['white'] },
-  'Schwarz 2': { key: 'Schwarz 2', region: 'unova', gen: 5, emuCodes: ['black2'] },
-  'Weiß 2': { key: 'Weiß 2', region: 'unova', gen: 5, emuCodes: ['white2'] },
-  PokéMMO: { key: 'PokéMMO', region: 'multi', gen: 0, emuCodes: [] },
+  Rot: { key: 'Rot', region: 'kanto', gen: 1, emuCodes: ['red'], platform: 'gb', romExt: ['.gb'] },
+  Blau: { key: 'Blau', region: 'kanto', gen: 1, emuCodes: ['blue'], platform: 'gb', romExt: ['.gb'] },
+  Gelb: { key: 'Gelb', region: 'kanto', gen: 1, emuCodes: ['yellow'], platform: 'gb', romExt: ['.gb'] },
+  Gold: { key: 'Gold', region: 'johto', gen: 2, emuCodes: ['gold'], platform: 'gbc', romExt: ['.gbc'] },
+  Silber: { key: 'Silber', region: 'johto', gen: 2, emuCodes: ['silver'], platform: 'gbc', romExt: ['.gbc'] },
+  Kristall: { key: 'Kristall', region: 'johto', gen: 2, emuCodes: ['crystal'], platform: 'gbc', romExt: ['.gbc'] },
+  Rubin: { key: 'Rubin', region: 'hoenn', gen: 3, emuCodes: ['ruby'], platform: 'gba', romExt: ['.gba'] },
+  Saphir: { key: 'Saphir', region: 'hoenn', gen: 3, emuCodes: ['sapphire'], platform: 'gba', romExt: ['.gba'] },
+  Smaragd: { key: 'Smaragd', region: 'hoenn', gen: 3, emuCodes: ['emerald'], platform: 'gba', romExt: ['.gba'] },
+  Feuerrot: { key: 'Feuerrot', region: 'kanto', gen: 3, emuCodes: ['firered'], platform: 'gba', romExt: ['.gba'] },
+  Blattgrün: { key: 'Blattgrün', region: 'kanto', gen: 3, emuCodes: ['leafgreen'], platform: 'gba', romExt: ['.gba'] },
+  Diamant: { key: 'Diamant', region: 'sinnoh', gen: 4, emuCodes: ['diamond'], platform: 'nds', romExt: ['.nds'] },
+  Perl: { key: 'Perl', region: 'sinnoh', gen: 4, emuCodes: ['pearl'], platform: 'nds', romExt: ['.nds'] },
+  Platin: { key: 'Platin', region: 'sinnoh', gen: 4, emuCodes: ['platinum'], platform: 'nds', romExt: ['.nds'] },
+  HeartGold: { key: 'HeartGold', region: 'johto', gen: 4, emuCodes: ['heartgold'], platform: 'nds', romExt: ['.nds'] },
+  SoulSilver: { key: 'SoulSilver', region: 'johto', gen: 4, emuCodes: ['soulsilver'], platform: 'nds', romExt: ['.nds'] },
+  Schwarz: { key: 'Schwarz', region: 'unova', gen: 5, emuCodes: ['black'], platform: 'nds', romExt: ['.nds'] },
+  Weiß: { key: 'Weiß', region: 'unova', gen: 5, emuCodes: ['white'], platform: 'nds', romExt: ['.nds'] },
+  'Schwarz 2': { key: 'Schwarz 2', region: 'unova', gen: 5, emuCodes: ['black2'], platform: 'nds', romExt: ['.nds'] },
+  'Weiß 2': { key: 'Weiß 2', region: 'unova', gen: 5, emuCodes: ['white2'], platform: 'nds', romExt: ['.nds'] },
+  PokéMMO: { key: 'PokéMMO', region: 'multi', gen: 0, emuCodes: [], platform: 'nds', romExt: ['.gba', '.nds'] },
 }
+
+export const PLATFORM_LABEL: Record<RomPlatform, string> = { gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', nds: 'Nintendo DS' }
+export const editionPlatform = (game: string | null | undefined): RomPlatform | null => { const k = resolveEdition(game); return k ? EDITIONS[k].platform : null }
+export const editionRomExts = (game: string | null | undefined): string[] => { const k = resolveEdition(game); return k ? EDITIONS[k].romExt : ['.gba', '.nds'] }
+export const editionPlatformLabel = (game: string | null | undefined): string => { const p = editionPlatform(game); return p ? PLATFORM_LABEL[p] : 'ROM' }
 
 // Display labels + the ordered option list every edition picker should use (single
 // source — no more per-component edition maps). New games: add to EDITIONS + here.
