@@ -652,8 +652,8 @@ export default function RunPage() {
 
         {/* ─ Sticky header ──────────────────────────────────────────────── */}
         <header className="sticky top-0 z-40 border-b border-white/5 backdrop-blur-2xl" style={{ background: 'rgba(17,17,22,0.92)' }}>
-          <div className="max-w-[1680px] mx-auto px-4 lg:px-6">
-            <div className="flex items-center justify-between py-3.5 gap-3">
+          <div className="max-w-[1880px] 2xl:max-w-[2240px] mx-auto px-5 lg:px-8 2xl:px-12">
+            <div className="flex items-center justify-between py-3 gap-3">
 
               <div className="flex items-center gap-3">
                 <button
@@ -736,11 +736,11 @@ export default function RunPage() {
         </header>
 
         {/* ─ Three-column layout ────────────────────────────────────────── */}
-        <div className="flex-1 max-w-[1680px] mx-auto w-full px-4 lg:px-6 py-6">
-          <div className="grid grid-cols-1 xl:grid-cols-[330px_minmax(0,1fr)_320px] gap-5 items-start">
+        <div className="flex-1 max-w-[1880px] 2xl:max-w-[2240px] mx-auto w-full px-5 lg:px-8 2xl:px-12 pt-5 pb-9">
+          <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)_360px] 2xl:grid-cols-[360px_minmax(0,1fr)_400px] gap-6 2xl:gap-7 items-start">
 
             {/* ░░ LEFT SIDEBAR — Run-Protokoll + permanenter Team-Coach ░░ */}
-            <aside className="order-2 xl:order-1 min-w-0 xl:sticky xl:top-20 xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-4">
+            <aside className="order-2 xl:order-1 min-w-0 xl:sticky xl:top-[4.75rem] xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-5">
               {myPlayerId && (
                 <ActivityFeed
                   runId={currentRun.id}
@@ -767,7 +767,7 @@ export default function RunPage() {
             </aside>
 
             {/* ░░ CENTER — Spielbereich ░░ */}
-            <main className="order-1 xl:order-2 min-w-0 space-y-6">
+            <main className="order-1 xl:order-2 min-w-0 space-y-7">
 
               {/* Pending requests (only in my view) */}
               {isMyFocus && pendingRequests.length > 0 && myPlayerId && (
@@ -775,7 +775,7 @@ export default function RunPage() {
               )}
 
               {/* Player focus cards */}
-              <div className="grid grid-cols-2 gap-3 lg:gap-4">
+              <div className="grid grid-cols-2 gap-4 lg:gap-5">
                 <PlayerStatCard
                   player={myPlayer}
                   isMe={true}
@@ -855,11 +855,11 @@ export default function RunPage() {
 
               {/* Action buttons (only my view) */}
               {isMyFocus && (
-                <div className="flex flex-wrap gap-3">
-                  <button onClick={() => { setAddEncounterRoute(undefined); setShowAddEncounter(true) }} className="btn-primary flex items-center gap-2 py-3 px-6">
+                <div className="flex flex-wrap gap-3.5">
+                  <button onClick={() => { setAddEncounterRoute(undefined); setShowAddEncounter(true) }} className="btn-primary flex items-center gap-2.5 py-4 px-7 text-base transition-transform duration-200 hover:scale-[1.02]">
                     <Plus className="w-5 h-5" /> Encounter hinzufügen
                   </button>
-                  <button onClick={() => setShowSoulLink(true)} className="btn-ghost flex items-center gap-2 py-3 px-6">
+                  <button onClick={() => setShowSoulLink(true)} className="btn-ghost flex items-center gap-2.5 py-4 px-7 text-base">
                     <Link2 className="w-5 h-5" /> Pokémon verlinken
                   </button>
                 </div>
@@ -1059,7 +1059,7 @@ export default function RunPage() {
             </main>
 
             {/* ░░ RIGHT SIDEBAR — Spieler · Checkliste · Typen · Statistik ░░ */}
-            <aside className="order-3 min-w-0 xl:sticky xl:top-20 xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-4">
+            <aside className="order-3 min-w-0 xl:sticky xl:top-[4.75rem] xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-5">
 
               {/* Run roster + online status */}
               <PlayersPanel
