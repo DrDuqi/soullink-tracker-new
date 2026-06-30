@@ -33,6 +33,7 @@ import { validateRom } from './roms.mjs'
 import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs, presetInbox, startRnqsWatch, pollRnqsWatch, stopRnqsWatch, rnqsWatchBusy, rnqsWatchError } from './presets.mjs'
 import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun, runIdForRom } from './runs.mjs'
 import { liveSyncFor } from './liveSync.mjs'
+import { initBackgrounds, listBackgrounds, saveBackgroundMeta } from './backgrounds.mjs'
 import { ensureRunBizhawkConfig } from './runConfig.mjs'
 import { installBizhawk, bizhawkInstallState } from './bizhawk.mjs'
 
@@ -516,6 +517,11 @@ const WEB_ROOT = (() => {
   for (const c of cands) { try { if (c && existsSync(join(c, 'index.html'))) return resolve(c) } catch { /* ignore */ } }
   return null
 })()
+// Background DB: scan the served image folder (read-only) + persist analysis to userData.
+initBackgrounds({
+  imageDir: WEB_ROOT ? join(WEB_ROOT, 'backgrounds', 'dashboard') : null,
+  store: join(dirname(CONFIG_FILE), 'backgrounds.json'),
+})
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.map': 'application/json; charset=utf-8',
@@ -1099,6 +1105,22 @@ function handleRequest(req, res) {
       return
     }
     sendJson(res, { ok: false }, 405)
+    return
+  }
+
+  // ── background DB: structured list (auto-detected) + persist per-image analysis ──
+  if (path === '/api/backgrounds' && req.method === 'GET') {
+    try { sendJson(res, { ok: true, list: listBackgrounds() }) } catch (e) { console.error('[backgrounds] list:', e?.message || e); sendJson(res, { ok: false, list: [] }, 500) }
+    return
+  }
+  if (path === '/api/backgrounds/meta' && req.method === 'POST') {
+    let body = ''
+    req.on('data', (c) => { body += c; if (body.length > 20_000) req.destroy() })
+    req.on('end', () => {
+      let b = {}; try { b = JSON.parse(body || '{}') } catch { /* invalid */ }
+      const ok = saveBackgroundMeta(b.file, b)
+      sendJson(res, { ok }, ok ? 200 : 400)
+    })
     return
   }
 

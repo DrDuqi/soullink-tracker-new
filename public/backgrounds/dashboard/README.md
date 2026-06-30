@@ -1,26 +1,36 @@
-# Dashboard-Hintergründe
+# Dashboard-Hintergründe (Datenbank 2.0)
 
-Die komplette Hintergrund-Galerie des Companions wird **ausschließlich** aus diesem Ordner
-+ `manifest.json` erzeugt. Es ist **nichts** im Code fest verdrahtet — neue Bilder
-erscheinen automatisch in der Galerie, im Zufallsmodus und sind auswählbar.
+Datengetriebenes Hintergrundsystem. Der Companion **scannt diesen Ordner automatisch**,
+analysiert jedes neue Bild **einmal** (Helligkeit/Kontrast → passende Overlay-/Vignette-/
+Panel-Werte) und persistiert die Werte. Bekannte Bilder werden nie erneut analysiert.
 
 ## Neues Bild hinzufügen (ohne Codeänderung)
-1. `.webp` (empfohlen, 16:9, ~2560×1440) in **diesen Ordner** legen.
-2. Dateinamen in **`manifest.json`** eintragen:
+1. `.webp` (empfohlen, 16:9, ~2560×1440) in **diesen Ordner** legen — fertig.
+   Es wird automatisch erkannt, beim ersten Anzeigen analysiert und erscheint in der
+   Galerie + im Zufallspool.
+2. Optional: in `manifest.json` einen **Anzeigenamen/Tags** hinterlegen (sonst wird der
+   Name aus dem Dateinamen abgeleitet):
    ```json
-   ["artwork01.webp", "artwork02.webp", "gengar.webp", "..."]
+   [
+     { "id": "gengar", "file": "gengar.webp", "name": "Gengar", "tags": ["ghost","dark"] }
+   ]
    ```
-3. Fertig. Das Bild ist sofort in **Einstellungen → Darstellung → Hintergrund** verfügbar.
+   `manifest.json` ist nur ein Seed — Dateien ohne Eintrag werden trotzdem erkannt.
 
-- Eine im Manifest gelistete, aber fehlende Datei wird automatisch übersprungen.
-- `default.webp` ist optional (letzter Fallback, falls eine Datei fehlt).
+## Wo liegen die analysierten Werte?
+Die berechneten `overlay`/`vignette`/`panelOpacity`/`brightness`/`contrast`/`tags` schreibt
+der Companion in `…/SoulLink Companion/backgrounds.json` (userData, beschreibbar) — die
+ausgelieferte `manifest.json` bleibt unberührt.
 
-## Verhalten (in den Einstellungen wählbar)
-- **Zufällig** — beim App-Start wird genau ein Bild zufällig gewählt und bleibt die
-  ganze Sitzung gleich (optional nur aus Favoriten). Re-Roll erst beim nächsten App-Start.
-- **Bild auswählen** — Galerie mit Vorschau/Hover/Glow; Klick übernimmt das Bild sofort.
-- **Favoriten** — pro Bild mit dem Stern markierbar; der Zufallsmodus kann auf Favoriten
-  beschränkt werden.
+## Verhalten (Einstellungen → Darstellung → Hintergrund)
+- **Zufällig** (alle / nur Favoriten) — beim App-Start eines wählen, Session über stabil,
+  Re-Roll beim nächsten Start. **Bild auswählen** — Galerie mit Vorschau, Name, Favoriten-
+  Stern, Hover-Zoom/Glow; Klick übernimmt sofort.
+- Lesbarkeit pro Bild automatisch: helles Bild → stärkeres Overlay/Vignette/dunklere Glass-
+  Panels; dunkles Bild → leichter. Darstellung: `cover`/`center`/`no-repeat`, vollbild,
+  responsiv, ohne Verzerrung.
 
-Darstellung: `cover` / `center` / `no-repeat`, vollbild, responsiv, ~50 % dunkles
-Overlay + dezente Vignette; das Glassmorphism der Panels bleibt unverändert.
+## Fallbacks
+- `manifest.json` fehlt/kaputt → wird ignoriert + geloggt, Ordner-Scan trägt; ganz ohne
+  Bilder → `default.webp`.
+- Eintrag ohne Datei → übersprungen + Warnung. Die App läuft immer weiter.

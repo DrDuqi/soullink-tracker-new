@@ -1,1 +1,5 @@
-["gengar.webp", "charizard.webp", "pikachu.webp"]
+[
+  { "id": "gengar", "file": "gengar.webp", "name": "Gengar", "tags": ["ghost", "dark"] },
+  { "id": "charizard", "file": "charizard.webp", "name": "Charizard", "tags": ["fire", "dragon"] },
+  { "id": "pikachu", "file": "pikachu.webp", "name": "Pikachu", "tags": ["electric", "bright"] }
+]

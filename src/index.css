@@ -479,7 +479,9 @@ html.no-fx .rc-p, html.no-fx .rc-ray, html.no-fx .rc-fog { display: none; }
 
 /* ── Glassmorphism + partner frame ─────────────────── */
 .glass {
-  background: rgba(28,28,38,0.66);
+  /* opacity follows the active background's analysed panelOpacity (set on :root by the
+     AtmosphereBackground); blur/glassmorphism unchanged. */
+  background: rgba(20,20,28, var(--panel-opacity, 0.66));
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255,255,255,0.06);
