@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Plus, Link2, Copy, Check, ArrowLeft, Heart, Skull,
-  LayoutGrid, List, Zap, Eye, Lock, Pencil, Gamepad2, X, BookOpen,
+  LayoutGrid, List, Zap, Eye, Lock, Pencil, Gamepad2, X, BookOpen, Archive,
 } from 'lucide-react'
 import { useRunStore } from '../store/runStore'
 import { useEncounters, useReorderEncounters, useUpdateEncounterStatus } from '../hooks/useEncounters'
@@ -200,7 +200,7 @@ export default function RunPage() {
   const [showSoulLink, setShowSoulLink] = useState(false)
   const [copied, setCopied] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [mainView, setMainView] = useState<'encounters' | 'pairs' | 'story'>('encounters')
+  const [mainView, setMainView] = useState<'encounters' | 'pairs' | 'box' | 'story'>('encounters')
   const [selectedEncounter, setSelectedEncounter] = useState<Encounter | null>(null)
   const [slotPickerEncounter, setSlotPickerEncounter] = useState<Encounter | null>(null)
   const [dragOverEncId, setDragOverEncId] = useState<string | null>(null)
@@ -741,7 +741,7 @@ export default function RunPage() {
               that made the middle feel small and the left too wide). min-w-0 children +
               wrapping content prevent overflow. Below 2xl, safe fixed side columns. */}
         <div className="flex-1 w-full px-6 2xl:px-8 pt-6 pb-10">
-          <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,18fr)_minmax(0,60fr)_minmax(0,22fr)] gap-7 2xl:gap-9 items-start">
+          <div className="grid grid-cols-1 xl:grid-cols-[270px_minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,18fr)_minmax(0,62fr)_minmax(0,20fr)] gap-7 2xl:gap-9 items-start">
 
             {/* ░░ LEFT SIDEBAR — Run-Protokoll + permanenter Team-Coach ░░ */}
             <aside className="order-2 xl:order-1 min-w-0 xl:sticky xl:top-[4.75rem] xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-5">
@@ -778,32 +778,76 @@ export default function RunPage() {
                 <RequestsPanel requests={pendingRequests} myPlayerId={myPlayerId} />
               )}
 
-              {/* ░ HERO — Live-Sync / „Weiterspielen": der #1 Fokus beim Öffnen des Runs ░ */}
-              {isMyFocus && liveSyncMode && LIVE_SURFACE && (
-                <section className="anim-fade-up">
-                  <SectionLabel label="Dein Abenteuer · Live-Sync" />
-                  <div className="rounded-2xl transition-transform duration-200" style={{ boxShadow: '0 28px 72px -32px rgba(204,0,0,0.6)' }}>
-                    <EmulatorLivePanel
-                      game={currentRun.game}
-                      runId={currentRun.id}
-                      importedSpeciesIds={myEncounterSpeciesIds}
-                      importedPids={myEncounterPids}
-                      onImport={(p, route) => { setEmuPrefill(p); setAddEncounterRoute(route); setShowAddEncounter(true) }}
-                    />
+              {/* ░░ HERO — der Mittelpunkt: „Weiterspielen" + Run-Puls. Glasfläche ÜBER dem
+                    Hintergrund-Galerie-Bild (kein eigenes Bild), hebt sich durch Glow/Licht ab. ░░ */}
+              {isMyFocus && (
+                <section className="hero-glass anim-fade-up p-6 2xl:p-8">
+                  {/* Eyebrow · Titel · Run-Puls */}
+                  <div className="flex items-start justify-between gap-5 mb-6">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-pk-red text-[11px] font-black uppercase tracking-[0.25em] mb-2">
+                        <Zap className="w-3.5 h-3.5" /> Dein Abenteuer
+                      </div>
+                      <h2 className="text-white font-black text-2xl 2xl:text-[1.75rem] leading-tight truncate">{currentRun.name}</h2>
+                      <div className="text-slate-400 text-sm font-medium mt-1">{currentRun.game} · {liveSyncMode ? 'Live-Sync' : 'Manueller Tracker'}</div>
+                    </div>
+                    <div className="hidden md:grid grid-cols-4 gap-2.5 shrink-0">
+                      {[
+                        { label: 'Team', value: `${myTeamCount}/6`, color: '#e2e8f0' },
+                        { label: 'Gefangen', value: myEncounters.length, color: '#e2e8f0' },
+                        { label: 'Am Leben', value: myEncounters.filter((e) => e.status === 'alive').length, color: '#4ade80' },
+                        { label: 'SoulLinks', value: is3 ? groups.length : pairs.length, color: '#ff6b6b' },
+                      ].map((s) => (
+                        <div key={s.label} className="hero-stat rounded-xl px-4 py-2.5 text-center min-w-[80px]" style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div className="font-black text-xl 2xl:text-2xl tabular-nums leading-none" style={{ color: s.color }}>{s.value}</div>
+                          <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mt-1.5">{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </section>
-              )}
 
-              {/* On the website a Live-Sync run is a MANUAL tracker — point to the Companion. */}
-              {isMyFocus && liveSyncMode && !LIVE_SURFACE && (
-                <div className="rounded-2xl border border-pk-red/30 bg-gradient-to-r from-pk-red/10 to-transparent p-4 flex items-center gap-3 flex-wrap">
-                  <span className="text-xl">🖊</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-white font-black text-sm">Browser-Tracker (manuell)</div>
-                    <div className="text-slate-400 text-xs mt-0.5">Pokémon, Routen, SoulLinks & Box trägst du hier von Hand ein. Für automatischen Live-Sync mit BizHawk brauchst du den Companion.</div>
-                  </div>
-                  <a href={LINKS.download} className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>Companion herunterladen</a>
-                </div>
+                  {/* Kommando-Konsole: Live-Sync (Weiterspielen) ODER manuelle Haupt-Aktion */}
+                  {liveSyncMode && LIVE_SURFACE ? (
+                    <>
+                      <EmulatorLivePanel
+                        game={currentRun.game}
+                        runId={currentRun.id}
+                        importedSpeciesIds={myEncounterSpeciesIds}
+                        importedPids={myEncounterPids}
+                        onImport={(p, route) => { setEmuPrefill(p); setAddEncounterRoute(route); setShowAddEncounter(true) }}
+                        compact
+                      />
+                      <div className="flex flex-wrap gap-3 mt-5">
+                        <button onClick={() => { setAddEncounterRoute(undefined); setShowAddEncounter(true) }} className="btn-primary flex items-center gap-2.5 py-3.5 px-6 text-base">
+                          <Plus className="w-5 h-5" /> Encounter hinzufügen
+                        </button>
+                        <button onClick={() => setShowSoulLink(true)} className="btn-ghost flex items-center gap-2.5 py-3.5 px-6 text-base">
+                          <Link2 className="w-5 h-5" /> Pokémon verlinken
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {liveSyncMode && !LIVE_SURFACE && (
+                        <div className="flex items-center gap-4 flex-wrap rounded-2xl p-4 mb-5" style={{ background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(204,0,0,0.28)' }}>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-white font-black text-base">Browser-Tracker (manuell)</div>
+                            <div className="text-slate-400 text-sm mt-0.5">Für automatischen Live-Sync mit BizHawk brauchst du den Companion.</div>
+                          </div>
+                          <a href={LINKS.download} className="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-xl font-black text-sm text-white" style={{ background: '#CC0000' }}>Companion holen</a>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-3.5">
+                        <button onClick={() => { setAddEncounterRoute(undefined); setShowAddEncounter(true) }} className="hero-cta inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-black text-lg text-white">
+                          <Plus className="w-6 h-6" /> Encounter hinzufügen
+                        </button>
+                        <button onClick={() => setShowSoulLink(true)} className="btn-ghost flex items-center gap-2.5 py-4 px-7 text-base">
+                          <Link2 className="w-5 h-5" /> Pokémon verlinken
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </section>
               )}
 
               {/* Hauptteam (shared, always editable for my slots) */}
@@ -861,18 +905,6 @@ export default function RunPage() {
                 </div>
               )}
 
-              {/* Action buttons (only my view) */}
-              {isMyFocus && (
-                <div className="flex flex-wrap gap-3.5">
-                  <button onClick={() => { setAddEncounterRoute(undefined); setShowAddEncounter(true) }} className="btn-primary flex items-center gap-2.5 py-4 px-7 text-base transition-transform duration-200 hover:scale-[1.02]">
-                    <Plus className="w-5 h-5" /> Encounter hinzufügen
-                  </button>
-                  <button onClick={() => setShowSoulLink(true)} className="btn-ghost flex items-center gap-2.5 py-4 px-7 text-base">
-                    <Link2 className="w-5 h-5" /> Pokémon verlinken
-                  </button>
-                </div>
-              )}
-
               {/* Team / Box / Besiegt / Partner — derived from the live emulator team (by PID), fallback to team_slots */}
               {isMyFocus && (
                 <TeamOverview
@@ -889,31 +921,30 @@ export default function RunPage() {
 
               {/* Focus-dependent block (framed yellow when viewing partner) */}
               <div className={`space-y-5 ${!isMyFocus ? 'partner-frame p-4 lg:p-5' : ''}`}>
-                {/* View toggle row */}
-                <div className="flex items-center gap-3">
-                  <div className="flex flex-1 rounded-xl p-1 gap-1" style={{ background: '#1c1c26', border: '1px solid #2e2e42' }}>
-                    <button
-                      onClick={() => setMainView('encounters')}
-                      className="flex-1 py-2 rounded-lg text-xs font-bold transition-all"
-                      style={mainView === 'encounters' ? { background: '#CC0000', color: 'white' } : { color: '#64748b' }}
-                    >
-                      {isMyFocus ? 'Meine Pokémon' : `${focusedPlayer?.name ?? 'Partner'}`}
-                      <span className="ml-1.5 opacity-70">({focusedEncounters.length})</span>
-                    </button>
-                    <button
-                      onClick={() => setMainView('pairs')}
-                      className="flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1"
-                      style={mainView === 'pairs' ? { background: '#CC0000', color: 'white' } : { color: '#64748b' }}
-                    >
-                      <Link2 className="w-3 h-3" /> Soul Links ({is3 ? groups.length : pairs.length})
-                    </button>
-                    <button
-                      onClick={() => setMainView('story')}
-                      className="flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1"
-                      style={mainView === 'story' ? { background: '#CC0000', color: 'white' } : { color: '#64748b' }}
-                    >
-                      <BookOpen className="w-3 h-3" /> Story
-                    </button>
+                {/* Workspace — Tabs: alternative Sichten auf den Run, eine nach der anderen */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex flex-1 min-w-0 rounded-2xl p-1.5 gap-1.5" style={{ background: 'rgba(20,20,30,0.7)', border: '1px solid #2e2e42' }}>
+                    {([
+                      { key: 'encounters', icon: <LayoutGrid className="w-4 h-4" />, label: isMyFocus ? 'Encounter' : (focusedPlayer?.name ?? 'Partner'), count: focusedEncounters.length },
+                      { key: 'pairs', icon: <Link2 className="w-4 h-4" />, label: 'SoulLinks', count: is3 ? groups.length : pairs.length },
+                      { key: 'box', icon: <Archive className="w-4 h-4" />, label: 'Box', count: focusedEncounters.filter((e) => e.status === 'boxed').length },
+                      { key: 'story', icon: <BookOpen className="w-4 h-4" />, label: 'Story', count: null },
+                    ] as const).map((t) => {
+                      const active = mainView === t.key
+                      return (
+                        <button
+                          key={t.key}
+                          onClick={() => setMainView(t.key)}
+                          className="flex-1 min-w-0 py-2.5 px-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-1.5"
+                          style={active
+                            ? { background: 'linear-gradient(135deg,#e00018,#9c0014)', color: 'white', boxShadow: '0 8px 24px -12px rgba(204,0,0,0.7)' }
+                            : { color: '#94a3b8' }}
+                        >
+                          {t.icon}<span className="truncate">{t.label}</span>
+                          {t.count != null && <span className="opacity-70 tabular-nums">({t.count})</span>}
+                        </button>
+                      )
+                    })}
                   </div>
 
                   {!isMyFocus && (
@@ -923,7 +954,7 @@ export default function RunPage() {
                     </span>
                   )}
 
-                  {mainView === 'encounters' && (
+                  {(mainView === 'encounters' || mainView === 'box') && (
                     <div className="flex rounded-xl p-1 shrink-0" style={{ background: '#1c1c26', border: '1px solid #2e2e42' }}>
                       <button
                         onClick={() => setViewMode('grid')}
@@ -960,6 +991,24 @@ export default function RunPage() {
                       {focusedEncounters.map((enc) => renderEnc(enc, true))}
                     </div>
                   )
+                )}
+
+                {/* BOX view — boxed Pokémon of the focused player */}
+                {mainView === 'box' && (
+                  (() => {
+                    const boxed = focusedEncounters.filter((e) => e.status === 'boxed')
+                    return boxed.length === 0 ? (
+                      <EmptyState
+                        icon={<Archive className="w-12 h-12" />}
+                        title="Box ist leer"
+                        desc="Hierher kommen Pokémon, die du eingelagert hast — am Leben, aber nicht im Team."
+                      />
+                    ) : viewMode === 'list' ? (
+                      <div className="space-y-3">{boxed.map((enc) => renderEnc(enc, true))}</div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{boxed.map((enc) => renderEnc(enc, false))}</div>
+                    )
+                  })()
                 )}
 
                 {/* STORY GUIDE view */}

@@ -199,13 +199,15 @@ function CompanionBanner({ status, onRecheck }: { status: 'checking' | 'absent';
 /** Live in-game party from the local emulator sync. Additive & non-destructive:
  *  it does NOT touch tracked encounters / soul links / the team system. */
 export default function EmulatorLivePanel({
-  game, runId, onImport, importedSpeciesIds, importedPids,
+  game, runId, onImport, importedSpeciesIds, importedPids, compact = false,
 }: {
   game?: string
   runId?: string
   onImport?: (p: EncounterPrefill, suggestedRoute?: string) => void
   importedSpeciesIds?: Set<number>
   importedPids?: Set<string>
+  /** Hero use: hide the in-panel live-team grid so the team is shown only once (in „Mein Team"). UI-only. */
+  compact?: boolean
 }) {
   const [enabled, setEnabled] = useState(() => {
     try { return localStorage.getItem(ENABLED_KEY) !== '0' } catch { return true }
@@ -537,7 +539,7 @@ export default function EmulatorLivePanel({
         </div>
       )}
 
-      {!collapsed && enabled && !wrongRun && team.length > 0 && (
+      {!collapsed && enabled && !wrongRun && team.length > 0 && !compact && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5" style={{ background: '#161620' }}>
           {team.map((m) => (
             <MonRich
@@ -556,7 +558,7 @@ export default function EmulatorLivePanel({
 
       {!collapsed && enabled && !mismatch && <LocationMapManager game={runGame} />}
 
-      {!collapsed && enabled && team.length === 0 && phase !== 'init' && (
+      {!collapsed && enabled && team.length === 0 && phase !== 'init' && !compact && (
         <div className="px-4 py-3 text-slate-600 text-[11px]" style={{ background: '#161620' }}>
           {phase === 'connected' || phase === 'waiting'
             ? 'Noch keine Pokémon im Team erkannt.'
