@@ -1,68 +1,64 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useProfiles } from '../hooks/useProfiles'
-import { resolveEdition } from '../lib/edition'
+import { useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 
-// Dashboard backdrop = a finished 16:9 ARTWORK image (no CSS shapes, no per-Pokémon PNGs).
-// The UI sits on top; this layer only renders the art (cover / center / responsive, never
-// distorted) plus a readability treatment (dark overlay + vignette + edge gradients) and a
-// few optional dust motes. Edition-aware: the active edition swaps the artwork, otherwise
-// default.webp. A missing edition image falls back to default.webp; a missing default just
-// leaves the dark base — never a broken layout. Drop images into
-// /public/backgrounds/dashboard/ (see the README there).
+// Dashboard backdrop = ONE of the uploaded artworks, picked at RANDOM (no edition binding,
+// no CSS shapes, no sprites). The pool is the images listed in manifest.json (probed so a
+// listed-but-missing file is dropped); empty pool → default.webp. A fresh random image is
+// chosen each time the dashboard is opened (and on app start) and stays fixed while you
+// view it. The UI sits fully on top; this layer only renders the artwork (cover / center /
+// no-repeat, responsive) + a ~50% dark overlay + a subtle vignette for readability.
 
 const BG_DIR = '/backgrounds/dashboard'
 const DEFAULT_BG = `${BG_DIR}/default.webp`
-// canonical EditionKey → artwork file. Add a line per edition as artworks arrive.
-const EDITION_BG: Record<string, string> = {
-  Feuerrot: 'fire-red.webp',
-  Smaragd: 'emerald.webp',
-  Platin: 'platinum.webp',
+
+// Resolve the available artworks: manifest names → URLs → probe each → keep the ones that
+// actually load. Empty → [default]. Runs once per session (results are HTTP-cached).
+async function loadImages(): Promise<string[]> {
+  let names: string[] = []
+  try {
+    const r = await fetch(`${BG_DIR}/manifest.json`, { cache: 'no-store' })
+    if (r.ok) { const j = await r.json(); if (Array.isArray(j)) names = j.filter((n) => typeof n === 'string') }
+  } catch { /* no manifest → fall back to default below */ }
+  const urls = names.map((n) => (n.startsWith('/') ? n : `${BG_DIR}/${n}`))
+  const probed = await Promise.all(urls.map((u) => new Promise<string | null>((res) => {
+    const img = new Image(); img.onload = () => res(u); img.onerror = () => res(null); img.src = u
+  })))
+  const ok = probed.filter((u): u is string => !!u)
+  return ok.length ? ok : [DEFAULT_BG]
 }
-function bgFor(game?: string | null): string {
-  const key = resolveEdition(game)
-  const file = key ? EDITION_BG[key] : undefined
-  return file ? `${BG_DIR}/${file}` : DEFAULT_BG
-}
 
-export default function AtmosphereBackground({ game }: { game?: string }) {
-  const { active } = useProfiles()
-  // Active edition: explicit prop → active profile → last chosen edition → default.
-  const edition = useMemo(() => {
-    if (game) return game
-    if (active?.edition) return active.edition
-    try { return localStorage.getItem('soullink:lastEdition') || undefined } catch { return undefined }
-  }, [game, active?.edition])
+export default function AtmosphereBackground() {
+  const atDash = useLocation().pathname === '/'
+  const [images, setImages] = useState<string[]>([])
+  const [pick, setPick] = useState<string | null>(null)
+  const prevAtDash = useRef(false)
+  const lastPick = useRef<string | null>(null)
 
-  const [src, setSrc] = useState<string>(() => bgFor(edition))
-  useEffect(() => { setSrc(bgFor(edition)) }, [edition])
-  // Missing edition file → default; missing default → dark base (no broken image icon).
-  const onError = () => setSrc((s) => (s !== DEFAULT_BG ? DEFAULT_BG : ''))
+  useEffect(() => { let on = true; loadImages().then((l) => { if (on) setImages(l) }); return () => { on = false } }, [])
 
-  const motes = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
-    left: `${(i * 37 + 8) % 100}%`, top: `${18 + ((i * 53) % 72)}%`,
-    d: `${16 + (i % 5) * 4}s`, delay: `${(i * 1.7) % 14}s`, s: 0.7 + (i % 3) * 0.3,
-  })), [])
+  // (Re)pick a random artwork whenever the dashboard is (re)opened — and once the image
+  // list first becomes available while already on the dashboard (e.g. app start).
+  useEffect(() => {
+    if (!images.length) return
+    if (atDash && (!prevAtDash.current || pick === null)) {
+      let next = images[Math.floor(Math.random() * images.length)]
+      if (images.length > 1 && next === lastPick.current) next = images[(images.indexOf(next) + 1) % images.length]
+      lastPick.current = next
+      setPick(next)
+    }
+    prevAtDash.current = atDash
+  }, [atDash, images, pick])
 
   return (
     <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
-      {/* the finished artwork — cover, centered, responsive, no distortion */}
-      {src && (
-        <img src={src} alt="" draggable={false} onError={onError}
-          className="absolute inset-0 w-full h-full" style={{ objectFit: 'cover', objectPosition: 'center' }} />
+      {pick && (
+        <img src={pick} alt="" draggable={false}
+          onError={(e) => { const t = e.currentTarget; if (t.src.indexOf(DEFAULT_BG) === -1) t.src = DEFAULT_BG }}
+          className="absolute inset-0 w-full h-full" style={{ objectFit: 'cover', objectPosition: 'center', backgroundColor: '#06070B' }} />
       )}
-
-      {/* readability — dark overlay + vignette + edge gradients (panels stay crisp on top) */}
-      <div className="absolute inset-0" style={{ background: 'rgba(6,7,11,0.42)' }} />
-      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 76% 66% at 50% 46%, transparent 32%, rgba(0,0,0,0.55) 80%, rgba(0,0,0,0.86) 100%)' }} />
-      <div className="absolute inset-x-0 top-0 h-28" style={{ background: 'linear-gradient(180deg, rgba(4,5,9,0.70), transparent)' }} />
-      <div className="absolute inset-x-0 bottom-0 h-36" style={{ background: 'linear-gradient(0deg, rgba(4,5,9,0.60), transparent)' }} />
-
-      {/* optional, subtle dust motes (hidden by the no-fx toggle) */}
-      <div className="atmo">
-        {motes.map((m, i) => (
-          <span key={i} className="atmo-p" style={{ left: m.left, top: m.top, animationDuration: m.d, animationDelay: m.delay, transform: `scale(${m.s})` }} />
-        ))}
-      </div>
+      {/* readability — ~50% dark overlay + subtle vignette (panel glass stays unchanged) */}
+      <div className="absolute inset-0" style={{ background: 'rgba(6,7,11,0.50)' }} />
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 80% 70% at 50% 48%, transparent 38%, rgba(0,0,0,0.55) 100%)' }} />
     </div>
   )
 }
