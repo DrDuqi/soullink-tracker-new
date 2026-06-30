@@ -735,11 +735,13 @@ export default function RunPage() {
           </div>
         </header>
 
-        {/* ─ Three-column layout — FULL width, PROPORTIONAL (≈18% / 60% / 22%). Columns
-              scale with the screen via fr units (min widths only as a safety floor), so the
-              center is the dominant focus and the whole work area is used. ~24–32px padding. */}
+        {/* ─ Three-column layout — FULL width, TRUE proportions (≈18% / 60% / 22%). All
+              tracks use `minmax(0, Nfr)` so the WHOLE width is split by ratio (a min-width
+              floor would steal the base from the fr share and shrink the center — the bug
+              that made the middle feel small and the left too wide). min-w-0 children +
+              wrapping content prevent overflow. Below 2xl, safe fixed side columns. */}
         <div className="flex-1 w-full px-6 2xl:px-8 pt-6 pb-10">
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(290px,18fr)_minmax(0,60fr)_minmax(330px,22fr)] gap-7 2xl:gap-9 items-start">
+          <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,18fr)_minmax(0,60fr)_minmax(0,22fr)] gap-7 2xl:gap-9 items-start">
 
             {/* ░░ LEFT SIDEBAR — Run-Protokoll + permanenter Team-Coach ░░ */}
             <aside className="order-2 xl:order-1 min-w-0 xl:sticky xl:top-[4.75rem] xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-5">
