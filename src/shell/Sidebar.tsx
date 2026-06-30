@@ -37,19 +37,19 @@ export default function Sidebar() {
   const social = 'w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/5 transition-colors'
 
   return (
-    <nav className="w-60 shrink-0 h-full flex flex-col border-r border-white/[0.06] bg-[#0b0c12]/70 backdrop-blur-xl">
+    <nav className="w-[17rem] shrink-0 h-full flex flex-col border-r border-white/[0.06] bg-[#0b0c12]/70 backdrop-blur-xl">
       {/* Brand */}
-      <div className="flex items-center gap-2.5 px-5 h-16 shrink-0">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-pk-red/30"
+      <div className="flex items-center gap-3 px-5 h-[4.75rem] shrink-0">
+        <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg shadow-pk-red/30"
           style={{ background: 'linear-gradient(135deg,#ff2d2d,#b80018)' }}>S</div>
         <div className="leading-none">
-          <div className="text-white font-black tracking-tight text-[15px]">SoulLink</div>
-          <div className="text-[9px] font-black tracking-[0.25em] text-pk-red/80 mt-0.5">COMPANION</div>
+          <div className="text-white font-black tracking-tight text-lg">SoulLink</div>
+          <div className="text-[10px] font-black tracking-[0.25em] text-pk-red/80 mt-1">COMPANION</div>
         </div>
       </div>
 
       {/* Nav */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 space-y-1.5">
         {NAV.map((item) => {
           const active = isActive(item.to)
           const Icon = item.icon
@@ -60,14 +60,14 @@ export default function Sidebar() {
               disabled={item.soon}
               aria-current={active ? 'page' : undefined}
               className={[
-                'group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-200',
+                'group relative w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-bold transition-all duration-200 ease-out',
                 active ? 'text-white' : 'text-slate-400',
-                item.soon ? 'opacity-45 cursor-default' : 'hover:bg-white/[0.06] hover:text-white hover:translate-x-0.5',
+                item.soon ? 'opacity-45 cursor-default' : 'hover:bg-white/[0.06] hover:text-white hover:translate-x-1',
               ].join(' ')}
-              style={active ? { background: 'linear-gradient(100deg, rgba(204,0,0,0.22), rgba(204,0,0,0.06))', boxShadow: 'inset 0 0 0 1px rgba(255,60,60,0.25), 0 6px 20px -8px rgba(204,0,0,0.6)' } : undefined}
+              style={active ? { background: 'linear-gradient(100deg, rgba(204,0,0,0.24), rgba(204,0,0,0.06))', boxShadow: 'inset 0 0 0 1px rgba(255,60,60,0.3), 0 8px 24px -8px rgba(204,0,0,0.65)' } : undefined}
             >
-              {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-pk-red shadow-[0_0_12px_2px_rgba(204,0,0,0.7)]" />}
-              <Icon className={`w-[18px] h-[18px] shrink-0 transition-transform ${active ? 'text-pk-red' : 'group-hover:scale-110'}`} />
+              {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-7 rounded-r-full bg-pk-red shadow-[0_0_14px_3px_rgba(204,0,0,0.75)]" />}
+              <Icon className={`w-[22px] h-[22px] shrink-0 transition-transform duration-200 ${active ? 'text-pk-red' : 'group-hover:scale-110'}`} />
               <span className="flex-1 text-left">{item.label}</span>
               {item.soon && <span className="text-[9px] font-black uppercase tracking-wide text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">Bald</span>}
             </button>

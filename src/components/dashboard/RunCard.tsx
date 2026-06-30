@@ -51,32 +51,32 @@ export default function RunCard({ vm, latest, busy, lr, editionLabel, relTime, o
       </div>
 
       {/* content */}
-      <div className="relative p-5" style={{ zIndex: 2 }}>
+      <div className="relative p-6" style={{ zIndex: 2 }}>
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <span className="text-white font-black text-xl drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">{vm.run.name}</span>
-            <div className="flex items-center gap-1.5 flex-wrap mt-2">
-              <span className="text-[11px] font-bold text-slate-100 bg-black/30 border border-white/10 rounded-full px-2.5 py-0.5 backdrop-blur-sm">{editionLabel(vm.run.game)}</span>
-              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-green-300 bg-green-500/15 border border-green-500/25 rounded-full px-2 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /> Aktiv</span>
-              {latest && <span className="text-[10px] font-black uppercase tracking-wide text-pk-yellow bg-pk-yellow/15 border border-pk-yellow/30 rounded-full px-2 py-0.5">Zuletzt gespielt</span>}
+            <span className="text-white font-black text-2xl drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">{vm.run.name}</span>
+            <div className="flex items-center gap-2 flex-wrap mt-2.5">
+              <span className="text-xs font-bold text-slate-100 bg-black/30 border border-white/10 rounded-full px-3 py-1 backdrop-blur-sm">{editionLabel(vm.run.game)}</span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-green-300 bg-green-500/15 border border-green-500/25 rounded-full px-2.5 py-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /> Aktiv</span>
+              {latest && <span className="text-[11px] font-black uppercase tracking-wide text-pk-yellow bg-pk-yellow/15 border border-pk-yellow/30 rounded-full px-2.5 py-1">Zuletzt gespielt</span>}
             </div>
-            <div className="flex items-center gap-3 mt-3 text-slate-300/90 text-xs flex-wrap">
-              <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> {vm.players.map((p) => p.name).join(' & ')}</span>
-              <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {relTime(vm.lastActivity)}</span>
+            <div className="flex items-center gap-3.5 mt-3.5 text-slate-300/90 text-sm flex-wrap">
+              <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {vm.players.map((p) => p.name).join(' & ')}</span>
+              <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> {relTime(vm.lastActivity)}</span>
               {lr?.seed != null
-                ? <><span className="font-mono flex items-center gap-1 text-slate-400"><Zap className="w-3 h-3" /> {lr.seed}</span>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-300/90"><Radio className="w-3 h-3" /> LiveSync bereit</span></>
+                ? <><span className="font-mono flex items-center gap-1 text-slate-400"><Zap className="w-3.5 h-3.5" /> {lr.seed}</span>
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-green-300/90"><Radio className="w-3.5 h-3.5" /> LiveSync bereit</span></>
                 : <span className="text-amber-400/90">hier noch nicht eingerichtet</span>}
             </div>
           </div>
           <RunMenu {...menu} />
         </div>
 
-        <div className="flex items-center gap-2.5 mt-4 flex-wrap">
-          <button onClick={onPlay} disabled={busy} className="btn-epic inline-flex items-center gap-2 px-5 py-2.5 text-sm">
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} {lr ? 'Weiterspielen' : 'Spielen'}
+        <div className="flex items-center gap-3 mt-5 flex-wrap">
+          <button onClick={onPlay} disabled={busy} className="btn-epic inline-flex items-center gap-2 px-6 py-3 text-[15px]">
+            {busy ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : <Play className="w-[18px] h-[18px]" />} {lr ? 'Weiterspielen' : 'Spielen'}
           </button>
-          <button onClick={onTracker} className="btn-soft inline-flex items-center gap-2 px-4 py-2.5 text-sm">Nur Tracker <ArrowRight className="w-4 h-4" /></button>
+          <button onClick={onTracker} className="btn-soft inline-flex items-center gap-2 px-5 py-3 text-[15px]">Nur Tracker <ArrowRight className="w-[18px] h-[18px]" /></button>
         </div>
       </div>
     </div>

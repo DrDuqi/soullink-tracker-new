@@ -165,25 +165,25 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="relative px-6 lg:px-8 py-8">
-      <div className="mx-auto max-w-[1180px] grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6 anim-fade-up">
+    <div className="relative px-6 lg:px-10 py-10">
+      <div className="mx-auto max-w-[1340px] grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-8 anim-fade-up">
         {/* ── MAIN ───────────────────────────────────────────── */}
         <div className="min-w-0">
-          <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
+          <div className="flex items-end justify-between gap-4 flex-wrap mb-8">
             <div>
-              <div className="text-slate-400 text-sm">Willkommen zurück,</div>
-              <h1 className="text-white font-black text-[2rem] leading-tight tracking-tight">{name} 👋</h1>
-              <p className="text-slate-500 text-sm mt-1">Bereit für ein neues Abenteuer?</p>
+              <div className="text-slate-400 text-[15px]">Willkommen zurück,</div>
+              <h1 className="text-white font-black text-[2.5rem] leading-tight tracking-tight">{name} 👋</h1>
+              <p className="text-slate-500 text-[15px] mt-1.5">Bereit für ein neues Abenteuer?</p>
             </div>
-            <div className="flex items-center gap-2.5">
-              <button onClick={() => navigate('/join')} className="btn-soft flex items-center gap-2 px-4 py-2.5 text-sm"><LogIn className="w-4 h-4" /> Beitreten</button>
-              <button onClick={() => navigate('/new')} className="btn-epic flex items-center gap-2 px-4 py-2.5 text-sm"><Plus className="w-4 h-4" /> Neuer SoulLink</button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => navigate('/join')} className="btn-soft flex items-center gap-2 px-5 py-3 text-[15px]"><LogIn className="w-[18px] h-[18px]" /> Beitreten</button>
+              <button onClick={() => navigate('/new')} className="btn-epic flex items-center gap-2 px-5 py-3 text-[15px]"><Plus className="w-[18px] h-[18px]" /> Neuer SoulLink</button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 mb-3.5">
-            <span className="w-7 h-7 rounded-lg bg-pk-red/15 flex items-center justify-center"><Swords className="w-4 h-4 text-pk-red" /></span>
-            <h2 className="text-white font-black text-lg">Deine SoulLinks</h2>
+          <div className="flex items-center gap-2.5 mb-4">
+            <span className="w-9 h-9 rounded-xl bg-pk-red/15 flex items-center justify-center"><Swords className="w-5 h-5 text-pk-red" /></span>
+            <h2 className="text-white font-black text-xl">Deine SoulLinks</h2>
           </div>
 
           {isLoading ? (
@@ -248,7 +248,7 @@ export default function DashboardPage() {
               )}
 
               {/* Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-7">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-9">
                 <StatCard icon={Swords} color="#ff6b6b" value={activeRuns.length} label="Aktive Runs" />
                 <StatCard icon={Sparkles} color="#4ade80" value={caught} label="Pokémon gefangen" />
                 <StatCard icon={Link2} color="#a78bfa" value={links} label="SoulLinks" />
@@ -259,28 +259,28 @@ export default function DashboardPage() {
         </div>
 
         {/* ── RIGHT RAIL ─────────────────────────────────────── */}
-        <aside className="space-y-4">
+        <aside className="space-y-5">
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] backdrop-blur-md p-5">
             <div className="flex items-center gap-3">
               <div className="relative shrink-0">
                 {avatarUrl
-                  ? <img src={avatarUrl} alt="" className="w-12 h-12 rounded-2xl object-cover ring-2 ring-pk-red/40" />
-                  : <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg" style={{ background: 'linear-gradient(135deg,#ff2d2d,#7a0010)' }}>{name.charAt(0).toUpperCase()}</div>}
+                  ? <img src={avatarUrl} alt="" className="w-14 h-14 rounded-2xl object-cover ring-2 ring-pk-red/40" />
+                  : <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-black text-xl" style={{ background: 'linear-gradient(135deg,#ff2d2d,#7a0010)' }}>{name.charAt(0).toUpperCase()}</div>}
                 <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-green-400 border-2 border-[#0c0c12]" />
               </div>
               <div className="min-w-0">
-                <div className="text-white font-black truncate">{name}</div>
-                <div className="text-green-400 text-xs font-bold flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Online</div>
+                <div className="text-white font-black text-lg truncate">{name}</div>
+                <div className="text-green-400 text-sm font-bold flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Online</div>
               </div>
             </div>
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-[11px] font-bold mb-1.5"><span className="text-pk-yellow">Level {lvl.level}</span><span className="text-slate-500">{lvl.into} / {lvl.span} XP</span></div>
-              <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(100, (lvl.into / lvl.span) * 100)}%`, background: 'linear-gradient(90deg,#ffcb05,#ff8a00)' }} /></div>
+            <div className="mt-5">
+              <div className="flex items-center justify-between text-xs font-bold mb-2"><span className="text-pk-yellow">Level {lvl.level}</span><span className="text-slate-500">{lvl.into} / {lvl.span} XP</span></div>
+              <div className="h-2.5 rounded-full bg-white/[0.06] overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(100, (lvl.into / lvl.span) * 100)}%`, background: 'linear-gradient(90deg,#ffcb05,#ff8a00)' }} /></div>
             </div>
           </div>
 
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] backdrop-blur-md p-5">
-            <div className="text-[11px] font-black uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2"><Gamepad2 className="w-3.5 h-3.5 text-green-400" /> Companion</div>
+            <div className="text-xs font-black uppercase tracking-widest text-slate-300 mb-3.5 flex items-center gap-2"><Gamepad2 className="w-4 h-4 text-green-400" /> Companion</div>
             <StatusRow label="Companion" value="Verbunden" />
             <StatusRow label="Live-Sync" value="Bereit" />
             <StatusRow label="Lua-Script" value="Aktiv" />
@@ -288,14 +288,14 @@ export default function DashboardPage() {
 
           {feed.length > 0 && (
             <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] backdrop-blur-md p-5">
-              <div className="text-[11px] font-black uppercase tracking-widest text-slate-300 mb-3">Aktivität</div>
-              <div className="space-y-3">
+              <div className="text-xs font-black uppercase tracking-widest text-slate-300 mb-3.5">Aktivität</div>
+              <div className="space-y-3.5">
                 {feed.map((a, i) => (
                   <div key={i} className="flex items-start gap-2.5">
                     <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-pk-red shrink-0" />
                     <div className="min-w-0">
-                      <div className="text-slate-300 text-xs leading-snug">{a.description}</div>
-                      <div className="text-slate-600 text-[10px] mt-0.5">{relTime(a.created_at)}</div>
+                      <div className="text-slate-300 text-sm leading-snug">{a.description}</div>
+                      <div className="text-slate-600 text-[11px] mt-0.5">{relTime(a.created_at)}</div>
                     </div>
                   </div>
                 ))}
@@ -304,9 +304,9 @@ export default function DashboardPage() {
           )}
 
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] backdrop-blur-md p-5">
-            <div className="text-[11px] font-black uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-pk-red" /> Neuigkeiten</div>
-            <p className="text-slate-400 text-xs leading-relaxed">Updates installiert SoulLink automatisch — kein manueller Download mehr nötig.</p>
-            <a href={LINKS.changelog} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-pk-red hover:text-white"><FileText className="w-3.5 h-3.5" /> Changelog ansehen</a>
+            <div className="text-xs font-black uppercase tracking-widest text-slate-300 mb-3.5 flex items-center gap-2"><Sparkles className="w-4 h-4 text-pk-red" /> Neuigkeiten</div>
+            <p className="text-slate-400 text-sm leading-relaxed">Updates installiert SoulLink automatisch — kein manueller Download mehr nötig.</p>
+            <a href={LINKS.changelog} target="_blank" rel="noreferrer" className="mt-3.5 inline-flex items-center gap-1.5 text-sm font-bold text-pk-red hover:text-white transition-colors"><FileText className="w-4 h-4" /> Changelog ansehen</a>
           </div>
         </aside>
       </div>
@@ -316,20 +316,20 @@ export default function DashboardPage() {
 
 function StatCard({ icon: Icon, color, value, label }: { icon: typeof Swords; color: string; value: number; label: string }) {
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.03] backdrop-blur-md p-4 transition-transform hover:-translate-y-0.5">
-      <span className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5" style={{ background: `${color}1f` }}><Icon className="w-[18px] h-[18px]" style={{ color }} /></span>
-      <div className="text-white font-black text-2xl leading-none">{value}</div>
-      <div className="text-slate-500 text-[11px] font-bold mt-1">{label}</div>
+    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.03] backdrop-blur-md p-5 transition-all duration-200 hover:-translate-y-0.5">
+      <span className="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style={{ background: `${color}1f` }}><Icon className="w-[22px] h-[22px]" style={{ color }} /></span>
+      <div className="text-white font-black text-3xl leading-none">{value}</div>
+      <div className="text-slate-500 text-xs font-bold mt-1.5">{label}</div>
     </div>
   )
 }
 
 function StatusRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center gap-2.5 py-1.5">
-      <span className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_1px_rgba(74,222,128,0.6)] shrink-0" />
-      <span className="text-slate-300 text-sm font-bold flex-1">{label}</span>
-      <span className="text-green-400 text-xs font-bold">{value}</span>
+    <div className="flex items-center gap-2.5 py-2">
+      <span className="w-2.5 h-2.5 rounded-full bg-green-400 shadow-[0_0_8px_1px_rgba(74,222,128,0.6)] shrink-0" />
+      <span className="text-slate-200 text-[15px] font-bold flex-1">{label}</span>
+      <span className="text-green-400 text-sm font-bold">{value}</span>
     </div>
   )
 }

@@ -16,26 +16,26 @@ export default function TypesPage() {
   const [matrix, setMatrix] = useState(false)
 
   return (
-    <div className="px-6 lg:px-8 py-8">
-      <div className="mx-auto max-w-[1080px] anim-fade-up">
-        <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
-          <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-xl bg-pk-red/15 flex items-center justify-center"><Grid3x3 className="text-pk-red" style={{ width: 18, height: 18 }} /></span>
-            <h1 className="text-white font-black text-3xl tracking-tight">{lang === 'de' ? 'Typen' : 'Types'}</h1>
+    <div className="px-6 lg:px-10 py-10">
+      <div className="mx-auto max-w-[1180px] anim-fade-up">
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+          <div className="flex items-center gap-3">
+            <span className="w-11 h-11 rounded-2xl bg-pk-red/15 flex items-center justify-center"><Grid3x3 className="text-pk-red" style={{ width: 24, height: 24 }} /></span>
+            <h1 className="text-white font-black text-4xl tracking-tight">{lang === 'de' ? 'Typen' : 'Types'}</h1>
           </div>
-          <button onClick={() => setMatrix((v) => !v)} className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-white/10 text-slate-200 hover:bg-white/5">
-            <Grid3x3 className="w-3.5 h-3.5" /> {matrix ? (lang === 'de' ? 'Typ-Übersicht' : 'Type overview') : (lang === 'de' ? 'Matrix anzeigen' : 'Show matrix')}
+          <button onClick={() => setMatrix((v) => !v)} className="inline-flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl border border-white/10 text-slate-200 hover:bg-white/5 transition-all duration-200">
+            <Grid3x3 className="w-4 h-4" /> {matrix ? (lang === 'de' ? 'Typ-Übersicht' : 'Type overview') : (lang === 'de' ? 'Matrix anzeigen' : 'Show matrix')}
           </button>
         </div>
-        <p className="text-slate-400 mb-5">{lang === 'de' ? 'Wähle einen Typ — sofort siehst du Stärken, Schwächen, Pokémon und starke Attacken.' : 'Pick a type — instantly see strengths, weaknesses, Pokémon and strong moves.'}</p>
+        <p className="text-slate-400 text-base mb-6">{lang === 'de' ? 'Wähle einen Typ — sofort siehst du Stärken, Schwächen, Pokémon und starke Attacken.' : 'Pick a type — instantly see strengths, weaknesses, Pokémon and strong moves.'}</p>
 
         {/* Big type chips */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2.5">
           {ALL_TYPES.map((t) => {
             const on = sel === t
             return (
               <button key={t} onClick={() => setSel(t)}
-                className="text-sm font-black rounded-xl px-3.5 py-2 transition-all"
+                className="text-base font-black rounded-xl px-4 py-2.5 transition-all duration-200 hover:scale-105"
                 style={on ? { background: typeColor(t), color: '#0b0b10', boxShadow: `0 0 0 2px #0b0b10, 0 0 0 4px ${typeColor(t)}` } : { background: `${typeColor(t)}26`, color: typeColor(t) }}>
                 {typeLabel(t, lang)}
               </button>
@@ -92,11 +92,11 @@ function TypeDetail({ type, lang, navigate }: { type: string; lang: Lang; naviga
       )}
 
       <Card icon={<Grid3x3 className="w-4 h-4" />} title={`${lang === 'de' ? 'Pokémon dieses Typs' : 'Pokémon of this type'} (${mons.length})`} accent={typeColor(type)} className="mt-4">
-        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))' }}>
+        <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(108px, 1fr))' }}>
           {mons.slice(0, 30).map((e) => (
-            <button key={e.id} onClick={() => navigate(`/dex/pokemon/${e.id}`)} className="flex flex-col items-center rounded-xl px-1 py-1.5 hover:bg-white/[0.06] transition-colors" style={{ contentVisibility: 'auto', containIntrinsicSize: '72px' } as React.CSSProperties}>
-              <img src={spriteUrl(e.id)} alt="" loading="lazy" draggable={false} className="w-11 h-11 object-contain" style={{ imageRendering: 'pixelated' }} />
-              <span className="text-[10px] font-bold text-slate-300 truncate max-w-full">{dexName(e, lang)}</span>
+            <button key={e.id} onClick={() => navigate(`/dex/pokemon/${e.id}`)} className="flex flex-col items-center rounded-xl px-1 py-2 hover:bg-white/[0.06] transition-all duration-200 hover:-translate-y-0.5" style={{ contentVisibility: 'auto', containIntrinsicSize: '96px' } as React.CSSProperties}>
+              <img src={spriteUrl(e.id)} alt="" loading="lazy" draggable={false} className="w-16 h-16 object-contain transition-transform duration-200 hover:scale-110" style={{ imageRendering: 'pixelated' }} />
+              <span className="text-xs font-bold text-slate-300 truncate max-w-full mt-0.5">{dexName(e, lang)}</span>
             </button>
           ))}
         </div>
@@ -108,8 +108,8 @@ function TypeDetail({ type, lang, navigate }: { type: string; lang: Lang; naviga
 
 function Card({ icon, title, accent, children, className = '' }: { icon: React.ReactNode; title: string; accent: string; children: React.ReactNode; className?: string }) {
   return (
-    <section className={`rounded-2xl border border-white/[0.07] p-4 ${className}`} style={{ background: 'rgba(22,22,31,0.7)' }}>
-      <div className="flex items-center gap-2 mb-3"><span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${accent}22`, color: accent }}>{icon}</span><h2 className="text-white font-bold text-sm">{title}</h2></div>
+    <section className={`rounded-2xl border border-white/[0.07] p-5 ${className}`} style={{ background: 'rgba(22,22,31,0.7)' }}>
+      <div className="flex items-center gap-2.5 mb-3.5"><span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${accent}22`, color: accent }}>{icon}</span><h2 className="text-white font-bold text-base">{title}</h2></div>
       {children}
     </section>
   )
