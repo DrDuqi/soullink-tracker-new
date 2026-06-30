@@ -735,10 +735,11 @@ export default function RunPage() {
           </div>
         </header>
 
-        {/* ─ Three-column layout — FULL width (no max-width / no mx-auto), so the run
-              uses the whole work area right of the sidebar; only ~24–32px outer padding. */}
-        <div className="flex-1 w-full px-6 2xl:px-8 pt-5 pb-9">
-          <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)_320px] 2xl:grid-cols-[360px_minmax(0,1fr)_400px] gap-6 2xl:gap-8 items-start">
+        {/* ─ Three-column layout — FULL width, PROPORTIONAL (≈18% / 60% / 22%). Columns
+              scale with the screen via fr units (min widths only as a safety floor), so the
+              center is the dominant focus and the whole work area is used. ~24–32px padding. */}
+        <div className="flex-1 w-full px-6 2xl:px-8 pt-6 pb-10">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(290px,18fr)_minmax(0,60fr)_minmax(330px,22fr)] gap-7 2xl:gap-9 items-start">
 
             {/* ░░ LEFT SIDEBAR — Run-Protokoll + permanenter Team-Coach ░░ */}
             <aside className="order-2 xl:order-1 min-w-0 xl:sticky xl:top-[4.75rem] xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-5">

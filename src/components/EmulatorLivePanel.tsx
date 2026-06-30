@@ -85,45 +85,45 @@ function MonRich({ mon, imported, game, currentLocationName, currentLocationId, 
   const title = mon.nickname || `#${mon.speciesId}`
 
   return (
-    <div className={`rounded-xl border p-4 transition-transform duration-200 hover:-translate-y-0.5 ${mon.fainted ? 'border-red-900/40 bg-red-950/15 opacity-70' : 'border-[#2e2e42] bg-[#1c1c26]'}`}>
-      <div className="flex items-center gap-3.5">
-        <img src={getSpriteUrl(mon.speciesId)} alt="" className={`w-16 h-16 object-contain shrink-0 ${mon.fainted ? 'grayscale' : ''}`} />
+    <div className={`rounded-2xl border p-5 transition-transform duration-200 hover:-translate-y-0.5 ${mon.fainted ? 'border-red-900/40 bg-red-950/15 opacity-70' : 'border-[#2e2e42] bg-[#1c1c26]'}`}>
+      <div className="flex items-center gap-4">
+        <img src={getSpriteUrl(mon.speciesId)} alt="" className={`w-24 h-24 object-contain shrink-0 ${mon.fainted ? 'grayscale' : ''}`} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-white text-base font-bold capitalize truncate">{title}</span>
-            {mon.nickname && <span className="text-slate-500 text-[11px]">#{mon.speciesId}</span>}
-            {mon.fainted ? <Skull className="w-4 h-4 text-red-400 shrink-0" /> : <Heart className="w-4 h-4 text-green-400 shrink-0" />}
+          <div className="flex items-center gap-2">
+            <span className="text-white text-xl font-black capitalize truncate">{title}</span>
+            {mon.nickname && <span className="text-slate-500 text-xs">#{mon.speciesId}</span>}
+            {mon.fainted ? <Skull className="w-5 h-5 text-red-400 shrink-0" /> : <Heart className="w-5 h-5 text-green-400 shrink-0" />}
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-            <span>Lv {mon.level}</span>
+          <div className="flex items-center gap-2.5 text-sm text-slate-400 mt-1.5">
+            <span className="font-bold">Lv {mon.level}</span>
             {mon.status !== 'ok' && <span className="font-bold" style={{ color: '#fbbf24' }}>{STATUS_LABEL_DE[mon.status]}</span>}
           </div>
           {/* HP bar */}
-          <div className="mt-1.5 flex items-center gap-2">
-            <div className="flex-1 h-2.5 rounded-full bg-white/5 overflow-hidden">
-              <div className="h-2.5 rounded-full transition-all duration-300" style={{ width: `${hpPct}%`, background: hpColor }} />
+          <div className="mt-2.5 flex items-center gap-2.5">
+            <div className="flex-1 h-3.5 rounded-full bg-white/5 overflow-hidden">
+              <div className="h-3.5 rounded-full transition-all duration-300" style={{ width: `${hpPct}%`, background: hpColor }} />
             </div>
-            <span className="text-[11px] text-slate-500 tabular-nums shrink-0">{mon.hp}/{mon.maxHp}</span>
+            <span className="text-xs text-slate-400 tabular-nums shrink-0 font-bold">{mon.hp}/{mon.maxHp}</span>
           </div>
         </div>
       </div>
 
       {/* Enriched detail */}
-      <div className="mt-3 pt-3 border-t border-[#2e2e42] space-y-1.5 text-[11px]">
-        <div className="flex flex-wrap gap-x-3.5 gap-y-1 text-slate-400">
-          <span>Wesen: <span className="text-slate-200">{nature ?? '—'}</span></span>
-          <span>Fähigkeit: <span className="text-slate-200">{ability ?? (mon.abilityId ? '…' : '—')}</span></span>
-          <span>Item: <span className="text-slate-200">{item ?? (mon.heldItemId ? '…' : '—')}</span></span>
-          {mon.metLocationName && <span>Fangort: <span className="text-slate-200">{mon.metLocationName}</span></span>}
+      <div className="mt-4 pt-4 border-t border-[#2e2e42] space-y-2 text-xs">
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-slate-400">
+          <span>Wesen: <span className="text-slate-200 font-bold">{nature ?? '—'}</span></span>
+          <span>Fähigkeit: <span className="text-slate-200 font-bold">{ability ?? (mon.abilityId ? '…' : '—')}</span></span>
+          <span>Item: <span className="text-slate-200 font-bold">{item ?? (mon.heldItemId ? '…' : '—')}</span></span>
+          {mon.metLocationName && <span>Fangort: <span className="text-slate-200 font-bold">{mon.metLocationName}</span></span>}
         </div>
-        <div className="flex flex-wrap gap-1.5 pt-0.5">
+        <div className="flex flex-wrap gap-2 pt-1">
           {(mon.moveIds ?? []).filter((x) => x > 0).length === 0 ? (
             <span className="text-slate-600">Keine Attacken</span>
           ) : (
             (mon.moveIds ?? []).filter((x) => x > 0).map((id, i) => {
               const mv = moves[i]
               return (
-                <span key={id} className="px-2 py-0.5 rounded text-[11px] font-bold text-white" style={{ background: mv ? getTypeColor(mv.type) : '#3e3e52' }}>
+                <span key={id} className="px-2.5 py-1 rounded-lg text-xs font-bold text-white" style={{ background: mv ? getTypeColor(mv.type) : '#3e3e52' }}>
                   {mv ? mv.name : `#${id}`}
                 </span>
               )
@@ -538,7 +538,7 @@ export default function EmulatorLivePanel({
       )}
 
       {!collapsed && enabled && !wrongRun && team.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4" style={{ background: '#161620' }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5" style={{ background: '#161620' }}>
           {team.map((m) => (
             <MonRich
               key={m.slot}

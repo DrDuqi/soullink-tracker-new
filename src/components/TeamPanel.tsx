@@ -115,12 +115,12 @@ function PlayerTeam({
   const [openSlotPicker, setOpenSlotPicker] = useState<number | null>(null)
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null)
 
-  const slotMinHeight = isMe ? 175 : 135
-  const spriteSize = isMe ? 'w-20 h-20' : 'w-14 h-14'
-  const nameClass = isMe ? 'text-sm font-bold' : 'text-xs font-bold'
-  const typeClass = isMe ? 'text-xs' : 'text-[10px]'
-  const badgeClass = isMe ? 'text-xs' : 'text-[10px]'
-  const cardPadding = isMe ? 'p-3' : 'p-2'
+  const slotMinHeight = isMe ? 232 : 184
+  const spriteSize = isMe ? 'w-28 h-28' : 'w-20 h-20'
+  const nameClass = isMe ? 'text-base font-bold' : 'text-sm font-bold'
+  const typeClass = isMe ? 'text-sm' : 'text-xs'
+  const badgeClass = isMe ? 'text-sm' : 'text-xs'
+  const cardPadding = isMe ? 'p-4' : 'p-3'
 
   function linked(enc: Encounter): LinkedInfo | null {
     return resolveLinkedInfo(enc, soulLinkPairs, encounters, players)
@@ -257,7 +257,7 @@ function PlayerTeam({
       </div>
 
       {/* 6 slots */}
-      <div className="grid grid-cols-3 gap-2 p-3">
+      <div className="grid grid-cols-3 gap-3 p-4">
         {[1, 2, 3, 4, 5, 6].map((pos) => {
           const slot = slots.find((s) => s.slot_position === pos)
           const enc = slot ? encounters.find((e) => e.id === slot.encounter_id) : null
