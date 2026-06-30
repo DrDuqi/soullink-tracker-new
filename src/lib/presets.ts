@@ -50,7 +50,7 @@ export async function deletePresetHttp(id: string): Promise<boolean> {
 
 /** Auto-import the newest .rnqs the user saved in FVX after `sinceMs` (no file dialog).
  *  `opts.name`/`opts.edition` name the preset so the user never types a filename. */
-export interface GrabResult { preset: Preset | null; detecting: boolean }
+export interface GrabResult { preset: Preset | null; detecting: boolean; error?: string | null }
 export async function grabRulesHttp(sinceMs: number, opts?: { name?: string; edition?: string | null }): Promise<GrabResult> {
   if (!USES_COMPANION) return { preset: null, detecting: false }
   try {
@@ -59,6 +59,6 @@ export async function grabRulesHttp(sinceMs: number, opts?: { name?: string; edi
     if (opts?.edition) q.set('edition', opts.edition)
     const r = await fetch(`${EMU_BASE}/api/presets/grab?${q.toString()}`, { method: 'POST' })
     const j = await r.json().catch(() => null)
-    return { preset: j?.ok && j.found ? (j.preset as Preset) : null, detecting: !!j?.detecting }
-  } catch { return { preset: null, detecting: false } }
+    return { preset: j?.ok && j.found ? (j.preset as Preset) : null, detecting: !!j?.detecting, error: j?.error ?? null }
+  } catch { return { preset: null, detecting: false, error: 'unreachable' } }
 }

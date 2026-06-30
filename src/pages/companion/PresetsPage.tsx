@@ -16,7 +16,6 @@ export default function PresetsPage() {
   const { profiles, update } = useProfiles()
   const [presets, setPresets] = useState<Preset[]>([])
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
@@ -64,8 +63,8 @@ export default function PresetsPage() {
     await reload()
     setPhase('done')
     setPhaseMsg(selected
-      ? `„${finalName}" wurde gespeichert und als aktives Preset für ${editionLabel(ek)} ausgewählt — du kannst direkt einen Run starten.`
-      : `„${finalName}" wurde für ${editionLabel(ek)} gespeichert. Richte die Edition in „Mein Setup" ein, dann lässt sie sich als Standard auswählen.`)
+      ? `Regeln erfolgreich übernommen: „${finalName}" ist jetzt das aktive Preset für ${editionLabel(ek)}. Du kannst direkt einen Run starten.`
+      : `Regeln erfolgreich übernommen: „${finalName}" wurde für ${editionLabel(ek)} gespeichert. Richte die Edition in „Mein Setup" ein, um sie als Standard zu setzen.`)
   }
 
   // Open the FVX editor, then WATCH for the .rnqs the user saves and import it
@@ -85,30 +84,42 @@ export default function PresetsPage() {
     const since = Date.now() - 3000
     setPhase('waiting')
     let elapsed = 0
+    let lastErr: string | null = null
     stopPoll()
     pollRef.current = setInterval(async () => {
-      elapsed += 2000
-      let res: { preset: Preset | null; detecting: boolean }
+      elapsed += 1500
+      let res: { preset: Preset | null; detecting: boolean; error?: string | null }
       try { res = await platform.grabRules(since, { name: wantName, edition: ek }) }
-      catch { res = { preset: null, detecting: false } }
+      catch { res = { preset: null, detecting: false, error: 'unreachable' } }
       if (res.preset) { stopPoll(); await finalizeNewPreset(res.preset, wantName, ek); return }
-      setPhase(res.detecting ? 'importing' : 'waiting')
-      if (elapsed >= 240000) {
-        stopPoll(); setPhase('timeout')
-        setPhaseMsg('Ich habe keine gespeicherte Regeldatei gefunden. Stelle sicher, dass du in FVX „Save Settings" geklickt und die Datei gespeichert hast.')
+      // A file was found but could not be saved as a preset → real, immediate failure.
+      if (res.error === 'import_failed') {
+        stopPoll(); setPhase('error')
+        setPhaseMsg('Eine Regeldatei wurde gefunden, ließ sich aber nicht als Preset speichern. Prüfe, ob es eine gültige .rnqs-Datei ist — oder wähle sie unten manuell aus.')
+        return
       }
-    }, 2000)
+      if (res.error) lastErr = res.error
+      setPhase(res.detecting ? 'importing' : 'waiting')
+      if (elapsed >= 30000) {   // clear answer after ~30s, never minutes of silence
+        stopPoll(); setPhase('timeout')
+        setPhaseMsg(lastErr === 'read_failed'
+          ? 'Eine Datei wurde gesehen, konnte aber nicht gelesen werden (evtl. noch gesperrt). Speichere sie erneut — oder wähle die .rnqs unten manuell aus.'
+          : 'Ich habe keine gespeicherte Regeldatei gefunden. Klicke in FVX wirklich auf „Save Settings" und speichere die Datei — oder wähle sie unten manuell aus.')
+      }
+    }, 1500)
   }
-  async function importPreset() {
-    setBusy(true); setNotice(null)
+  // Manual fallback: pick the .rnqs yourself → imported immediately with the typed name,
+  // assigned to the chosen edition and auto-selected (same finalize path as the auto-flow).
+  async function pickManual() {
+    const ek = editionKey
+    const wantName = presetName.trim() || `${editionLabel(ek)}-Regeln`
     const picked = await platform.pickFile('preset')
-    if (picked.path) {
-      const base = picked.path.split(/[\\/]/).pop()?.replace(/\.rnqs$/i, '') || 'Eigene Regeln'
-      const p = await platform.importPreset({ name: base, edition: editionKey, sourceFile: picked.path })
-      setNotice(p ? `Regeln „${p.name}" importiert.` : 'Import fehlgeschlagen.')
-      await reload()
-    }
-    setBusy(false)
+    if (!picked.path) return   // cancelled → leave the current state untouched
+    stopPoll(); setNotice(null); setPhase('importing')
+    if (!/\.rnqs$/i.test(picked.path)) { setPhase('error'); setPhaseMsg('Bitte eine FVX-Regeldatei (.rnqs) auswählen.'); return }
+    const p = await platform.importPreset({ name: wantName, edition: ek, sourceFile: picked.path })
+    if (p) await finalizeNewPreset(p, wantName, ek)
+    else { setPhase('error'); setPhaseMsg('Die Datei konnte nicht importiert werden. Ist es eine gültige .rnqs-Datei?') }
   }
   async function saveRename(id: string) {
     const n = editName.trim()
@@ -148,8 +159,8 @@ export default function PresetsPage() {
         <button onClick={openEditor} disabled={watching} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50" style={{ background: '#CC0000' }}>
           {watching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Eigene Regeln erstellen
         </button>
-        <button onClick={importPreset} disabled={busy || watching} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5 disabled:opacity-40">
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Regeln importieren
+        <button onClick={pickManual} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5">
+          <Upload className="w-4 h-4" /> Regeldatei manuell auswählen
         </button>
       </div>
       {notice && <p className="mt-3 text-sm text-slate-300 bg-[#16161f] border border-[#2e2e42] rounded-xl px-3.5 py-2.5 flex items-start gap-2"><ExternalLink className="w-4 h-4 text-pk-red shrink-0 mt-0.5" /> {notice}</p>}
@@ -172,6 +183,7 @@ export default function PresetsPage() {
                 <StepRow done={phase === 'importing'} active={phase === 'waiting'} label={'In FVX Regeln einstellen, dann „Save Settings" → speichern (Ort & Name egal)'} />
                 <StepRow active={phase === 'importing'} label="SoulLink erkennt & importiert die Datei automatisch" />
               </ol>
+              <button onClick={pickManual} className="mt-2 text-[11px] font-bold text-slate-400 hover:text-white underline-offset-2 hover:underline">Funktioniert nicht? Regeldatei manuell auswählen</button>
             </>
           )}
           {phase === 'done' && (
@@ -186,8 +198,9 @@ export default function PresetsPage() {
           {(phase === 'timeout' || phase === 'error') && (
             <div>
               <div className="flex items-start gap-2.5 text-amber-300 text-sm"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{phaseMsg}</span></div>
-              <div className="flex items-center gap-2 mt-3">
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
                 <button onClick={openEditor} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}><RotateCw className="w-4 h-4" /> Erneut versuchen</button>
+                <button onClick={pickManual} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5"><Upload className="w-4 h-4" /> Regeldatei manuell auswählen</button>
                 <button onClick={cancelCreate} className="text-[12px] font-bold text-slate-400 hover:text-white">Abbrechen</button>
               </div>
             </div>

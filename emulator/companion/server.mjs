@@ -30,7 +30,7 @@ import { spawn, exec } from 'node:child_process'
 import { initProfiles, listProfiles, createProfile, updateProfile, deleteProfile, duplicateProfile, setActiveProfile, getProfile, recordRun } from './profiles.mjs'
 import { initRandomizer, randomizerStatus, randomize, openRandomizer, installFvx, fvxInstallState } from './randomizer.mjs'
 import { validateRom } from './roms.mjs'
-import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs, presetInbox, startRnqsWatch, pollRnqsWatch, stopRnqsWatch, rnqsWatchBusy } from './presets.mjs'
+import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs, presetInbox, startRnqsWatch, pollRnqsWatch, stopRnqsWatch, rnqsWatchBusy, rnqsWatchError } from './presets.mjs'
 import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun, runIdForRom } from './runs.mjs'
 import { ensureRunBizhawkConfig } from './runConfig.mjs'
 import { installBizhawk, bizhawkInstallState } from './bizhawk.mjs'
@@ -742,13 +742,15 @@ function handleRequest(req, res) {
       const watchRoots = [home, process.env.USERPROFILE, fvx?.dir, fvx?.dir && dirname(fvx.dir), presetInbox()].filter(Boolean)
       startRnqsWatch({ sinceMs: since, name, edition, roots: watchRoots })
       let p = pollRnqsWatch()
-      if (p) stopRnqsWatch()
       let detecting = rnqsWatchBusy()   // watcher saw a fresh file, import not finished
-      // Fallback: the shallow scan over the explicit folder list (covers the rare case
-      // where recursive watch is unavailable). Same single capture gate → no duplicates.
-      if (!p) { const g = await grabLatestRnqs({ sinceMs: since, roots: [...roots], name, edition }); p = g.preset; detecting = detecting || g.detecting }
-      // `detecting` tells the UI a save was spotted and is being imported → real status.
-      sendJson(res, { ok: true, found: !!p, preset: p, detecting: !p && detecting })
+      let error = rnqsWatchError()
+      // Reliability net: the scan ALWAYS runs when the watcher hasn't delivered yet — it
+      // covers OneDrive-redirected folders where recursive fs.watch can miss events. Same
+      // idempotent capture gate → re-import just returns the existing preset (no duplicate).
+      if (!p) { const g = await grabLatestRnqs({ sinceMs: since, roots: [...roots], name, edition }); p = g.preset; detecting = detecting || g.detecting; error = error || g.error }
+      if (p) stopRnqsWatch()
+      // `detecting` = save spotted & importing; `error` = a concrete failure reason.
+      sendJson(res, { ok: true, found: !!p, preset: p, detecting: !p && detecting, error: p ? null : (error || null) })
     } catch { sendJson(res, { ok: false }, 500) }
     })()
     return

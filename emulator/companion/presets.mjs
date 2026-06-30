@@ -129,13 +129,13 @@ export function deletePreset(id) {
 }
 
 // ── Single atomic capture (used by BOTH the watcher and the polling fallback) ────
-// Guarantees a .rnqs is captured EXACTLY ONCE: (1) an in-flight lock per path blocks
-// parallel watcher/poll events, (2) we wait until the file is fully written (size stable)
-// so FVX's mid-write partial bytes never become a (corrupt, duplicate) preset, (3) a
-// per-path content hash blocks re-importing identical content. importPreset itself stays
-// idempotent by hash+edition as the final guard.
+// Captures a .rnqs robustly: (1) an in-flight lock per path blocks parallel watcher/poll
+// events, (2) we WAIT until the file is fully written (size stable over time) so FVX's
+// mid-write partial bytes never become a corrupt preset, (3) importPreset is idempotent
+// by content-hash+edition, so re-running on the same file simply RETURNS the existing
+// preset (never a duplicate, never null). Returns { preset, error } so a real failure
+// reason surfaces instead of a silent null.
 const _captureInFlight = new Set()
-const _capturedHash = new Map()
 function waitFileStable(path, tries = 25, interval = 200) {
   return new Promise((resolve) => {
     let last = -1, stable = 0, n = 0
@@ -149,23 +149,20 @@ function waitFileStable(path, tries = 25, interval = 200) {
   })
 }
 export async function captureRnqs(path, { name = 'Eigene Regeln', edition = null, sinceMs = 0 } = {}) {
-  if (!path || _captureInFlight.has(path)) return null
-  try { if (statSync(path).mtimeMs <= sinceMs) return null } catch { return null }
+  if (!path || _captureInFlight.has(path)) return { preset: null, error: null }
+  try { if (statSync(path).mtimeMs <= sinceMs) return { preset: null, error: null } } catch { return { preset: null, error: 'read_failed' } }
   _captureInFlight.add(path)
   try {
-    if (!(await waitFileStable(path))) return null            // FVX still writing → skip
-    const hash = rnqsHash(path)
-    if (hash && _capturedHash.get(path) === hash) return null  // exact content already captured
-    const preset = importPreset({ name, edition, sourceFile: path })
-    if (preset && hash) _capturedHash.set(path, hash)
-    return preset
+    if (!(await waitFileStable(path))) return { preset: null, error: 'unstable' }   // FVX still writing → retry next poll
+    const preset = importPreset({ name, edition, sourceFile: path })               // idempotent: new OR existing
+    return { preset, error: preset ? null : 'import_failed' }
   } finally { _captureInFlight.delete(path) }
 }
 
-// Polling fallback (when recursive watch is unavailable): find the NEWEST .rnqs saved
-// after `sinceMs` across the likely locations, then capture it through the single gate.
-// Returns { preset, detecting } so the UI can show a real "detected → importing" status:
-// `detecting` = a fresh candidate exists but isn't a finished preset yet (FVX still writing).
+// Polling fallback (and reliability net for OneDrive, where recursive fs.watch can miss
+// events): find the NEWEST .rnqs saved after `sinceMs` across the likely locations, then
+// capture it through the same stability+idempotent gate. Returns { preset, detecting,
+// error } — `detecting` = a fresh file exists but isn't a finished preset yet.
 export async function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene Regeln', edition = null } = {}) {
   let best = null, bestT = sinceMs
   const scan = (dir, depth) => {
@@ -175,65 +172,64 @@ export async function grabLatestRnqs({ sinceMs = 0, roots = [], name = 'Eigene R
       const p = join(dir, e.name)
       if (e.isFile() && /\.rnqs$/i.test(e.name)) {
         try { const t = statSync(p).mtimeMs; if (t > bestT) { bestT = t; best = p } } catch { /* ignore */ }
-      } else if (e.isDirectory() && depth > 0 && !/^(node_modules|\$Recycle|AppData)/i.test(e.name)) {
+      } else if (e.isDirectory() && depth > 0 && !/^(node_modules|\$Recycle|AppData|\.git)$/i.test(e.name)) {
         scan(p, depth - 1)
       }
     }
   }
-  for (const root of roots) if (root) scan(root, 1)
-  if (!best) return { preset: null, detecting: false }
-  const preset = await captureRnqs(best, { name: name || basename(best).replace(/\.rnqs$/i, ''), edition, sinceMs })
-  const fresh = !preset && (Date.now() - bestT < 12000)   // saw a new file, not finished yet
-  return { preset, detecting: fresh }
+  for (const root of roots) if (root) scan(root, 2)   // root + 2 levels deep (FVX often saves into a sub-folder)
+  if (!best) return { preset: null, detecting: false, error: null }
+  const { preset, error } = await captureRnqs(best, { name: name || basename(best).replace(/\.rnqs$/i, ''), edition, sinceMs })
+  const fresh = !preset && (Date.now() - bestT < 20000)   // saw a new file, not finished yet → keep showing "importing"
+  return { preset, detecting: fresh, error }
 }
 
 // ── Real-time, location-INDEPENDENT capture ──────────────────────────────────
-// Watching the user's home recursively catches a .rnqs the instant FVX writes it —
-// no matter which folder the dialog happened to open in (FVX folder, Desktop, OneDrive,
-// a sub-folder …). The session is short-lived (started when the editor opens, stopped on
-// the first hit or after a timeout) and import COPIES the file into the managed Presets
-// folder, so the user truly never thinks about location or filename. Best-effort: if
-// recursive watch isn't available, the polling scan above still works as a fallback.
-let WATCH = null   // { since, name, edition, found, detecting, watchers:[], timer }
-export function stopRnqsWatch() {
-  if (!WATCH) return
-  for (const w of WATCH.watchers) { try { w.close() } catch { /* ignore */ } }
-  if (WATCH.timer) { try { clearTimeout(WATCH.timer) } catch { /* ignore */ } }
-  WATCH = null
+// Watching the user's home recursively catches a .rnqs the instant FVX writes it — no
+// matter which folder the dialog used. CRITICAL: the found preset is PERSISTED on the
+// session (CAP.found) and survives the watchers being closed, so a poll that arrives
+// after the watcher fires still receives it (the old code nulled the session on the hit
+// and lost the result → status bounced back to "waiting"). A new editor session (new
+// `sinceMs`) resets the session.
+let CAP = null   // { since, name, edition, found, detecting, error, watchers:[], timer }
+function closeWatchers() {
+  if (!CAP) return
+  for (const w of CAP.watchers) { try { w.close() } catch { /* ignore */ } }
+  CAP.watchers = []
+  if (CAP.timer) { try { clearTimeout(CAP.timer) } catch { /* ignore */ } CAP.timer = null }
 }
-export function pollRnqsWatch() { return WATCH?.found || null }
-// True while a fresh .rnqs has been seen but its import isn't finished yet → the UI shows
-// "detected → importing" instead of staying on "waiting".
-export function rnqsWatchBusy() { return !!(WATCH && WATCH.detecting && !WATCH.found) }
+export function stopRnqsWatch() { closeWatchers() }              // stops fs handles, KEEPS CAP.found
+export function pollRnqsWatch() { return CAP?.found || null }
+export function rnqsWatchBusy() { return !!(CAP && CAP.detecting && !CAP.found) }
+export function rnqsWatchError() { return (CAP && !CAP.found && CAP.error) || null }
 
 /** Start (or keep) a recursive watch for the newest .rnqs after `sinceMs`. Idempotent
- *  per `sinceMs` so repeated polls don't restart it. `roots` should be high-level dirs
- *  (home, FVX folder) — recursion covers everything beneath. Auto-stops after 5 min. */
+ *  per `sinceMs` so repeated polls keep the same session (and its found preset). */
 export function startRnqsWatch({ sinceMs = 0, name = 'Eigene Regeln', edition = null, roots = [] } = {}) {
-  if (WATCH && WATCH.since === sinceMs) return WATCH.found
-  stopRnqsWatch()
-  const state = { since: sinceMs, name, edition, found: null, detecting: false, watchers: [], timer: null }
+  if (CAP && CAP.since === sinceMs) return CAP.found       // same session → keep state + found
+  closeWatchers()
+  CAP = { since: sinceMs, name, edition, found: null, detecting: false, error: null, watchers: [], timer: null }
   const seen = new Set()
   for (const root of roots) {
     if (!root || !existsSync(root)) continue
     try {
       const w = watch(root, { recursive: true }, (_ev, file) => {
-        if (state.found || !file || !/\.rnqs$/i.test(String(file))) return
+        if (!CAP || CAP.found || !file || !/\.rnqs$/i.test(String(file))) return
         const p = join(root, String(file))
         if (seen.has(p)) return; seen.add(p)
-        // Only act on a file newer than when the editor opened.
-        try { if (statSync(p).mtimeMs <= state.since) { seen.delete(p); return } } catch { seen.delete(p); return }
-        state.detecting = true   // a fresh file appeared → UI flips to "wird importiert"
-        // Single gate: waits for the file to finish writing, dedups by content. We may
-        // see the same file again later (re-save) → captureRnqs decides idempotently.
-        captureRnqs(p, { name: state.name, edition: state.edition, sinceMs: state.since })
-          .then((preset) => { if (preset && !state.found) { state.found = preset; stopRnqsWatch() } else { seen.delete(p); state.detecting = false } })
-          .catch(() => { seen.delete(p); state.detecting = false })
+        try { if (statSync(p).mtimeMs <= CAP.since) { seen.delete(p); return } } catch { seen.delete(p); return }
+        CAP.detecting = true   // a fresh file appeared → UI flips to "wird importiert"
+        captureRnqs(p, { name: CAP.name, edition: CAP.edition, sinceMs: CAP.since })
+          .then(({ preset, error }) => {
+            if (!CAP) return
+            if (preset) { CAP.found = preset; closeWatchers() }   // persist; stop fs handles but KEEP found
+            else { seen.delete(p); CAP.detecting = false; if (error) CAP.error = error }
+          })
+          .catch(() => { if (CAP) CAP.detecting = false; seen.delete(p) })
       })
-      state.watchers.push(w)
-    } catch { /* recursive watch unsupported on this root — fallback scan covers it */ }
+      CAP.watchers.push(w)
+    } catch { /* recursive watch unsupported on this root — the scan covers it */ }
   }
-  state.timer = setTimeout(() => stopRnqsWatch(), 5 * 60 * 1000)
-  WATCH = state
+  CAP.timer = setTimeout(() => closeWatchers(), 5 * 60 * 1000)
   return null
 }
