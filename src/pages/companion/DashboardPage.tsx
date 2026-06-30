@@ -14,7 +14,6 @@ import { renameRun, deleteRunRemote, setRunStatus, newAttemptRemote, loadRun } f
 import { createRun } from '../../lib/createRun'
 import RunCard from '../../components/dashboard/RunCard'
 import RunMenu from '../../components/dashboard/RunMenu'
-import DashboardAtmosphere from '../../components/dashboard/DashboardAtmosphere'
 import type { LocalRun } from '../../lib/profiles'
 
 const EDITIONS: Record<string, string> = {
@@ -167,7 +166,6 @@ export default function DashboardPage() {
 
   return (
     <div className="relative px-6 lg:px-8 py-8">
-      <DashboardAtmosphere />
       <div className="mx-auto max-w-[1180px] grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6 anim-fade-up">
         {/* ── MAIN ───────────────────────────────────────────── */}
         <div className="min-w-0">
