@@ -770,42 +770,46 @@ export default function RunPage() {
               />
             </aside>
 
-            {/* ░░ CENTER — Spielbereich ░░ */}
-            <main className="order-1 xl:order-2 min-w-0 space-y-7">
+            {/* ░░ CENTER — der eigentliche Spielbereich (Hero → Team → Encounter → Box) ░░ */}
+            <main className="order-1 xl:order-2 min-w-0 space-y-8">
 
               {/* Pending requests (only in my view) */}
               {isMyFocus && pendingRequests.length > 0 && myPlayerId && (
                 <RequestsPanel requests={pendingRequests} myPlayerId={myPlayerId} />
               )}
 
-              {/* Player focus cards */}
-              <div className="grid grid-cols-2 gap-4 lg:gap-5">
-                <PlayerStatCard
-                  player={myPlayer}
-                  isMe={true}
-                  isActive={isMyFocus}
-                  encounters={myEncounters}
-                  pairs={pairs}
-                  teamCount={myTeamCount}
-                  avatarUrl={avatarOf(myPlayer)}
-                  onClick={() => setFocusedPlayerId(myPlayerId ?? null)}
-                />
-                <PlayerStatCard
-                  player={partnerPlayer}
-                  isMe={false}
-                  isActive={!isMyFocus}
-                  encounters={partnerEncounters}
-                  pairs={pairs}
-                  teamCount={partnerTeamCount}
-                  avatarUrl={avatarOf(partnerPlayer)}
-                  onClick={() => setFocusedPlayerId(partnerPlayer?.id ?? null)}
-                />
-              </div>
+              {/* ░ HERO — Live-Sync / „Weiterspielen": der #1 Fokus beim Öffnen des Runs ░ */}
+              {isMyFocus && liveSyncMode && LIVE_SURFACE && (
+                <section className="anim-fade-up">
+                  <SectionLabel label="Dein Abenteuer · Live-Sync" />
+                  <div className="rounded-2xl transition-transform duration-200" style={{ boxShadow: '0 28px 72px -32px rgba(204,0,0,0.6)' }}>
+                    <EmulatorLivePanel
+                      game={currentRun.game}
+                      runId={currentRun.id}
+                      importedSpeciesIds={myEncounterSpeciesIds}
+                      importedPids={myEncounterPids}
+                      onImport={(p, route) => { setEmuPrefill(p); setAddEncounterRoute(route); setShowAddEncounter(true) }}
+                    />
+                  </div>
+                </section>
+              )}
+
+              {/* On the website a Live-Sync run is a MANUAL tracker — point to the Companion. */}
+              {isMyFocus && liveSyncMode && !LIVE_SURFACE && (
+                <div className="rounded-2xl border border-pk-red/30 bg-gradient-to-r from-pk-red/10 to-transparent p-4 flex items-center gap-3 flex-wrap">
+                  <span className="text-xl">🖊</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-white font-black text-sm">Browser-Tracker (manuell)</div>
+                    <div className="text-slate-400 text-xs mt-0.5">Pokémon, Routen, SoulLinks & Box trägst du hier von Hand ein. Für automatischen Live-Sync mit BizHawk brauchst du den Companion.</div>
+                  </div>
+                  <a href={LINKS.download} className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>Companion herunterladen</a>
+                </div>
+              )}
 
               {/* Hauptteam (shared, always editable for my slots) */}
               {!is3 && players.length === 2 && (
                 <div>
-                  <SectionLabel label="Hauptteam" sub={`${teamSlots.length} Pokémon`} />
+                  <SectionLabel label="Mein Team" sub={`${teamSlots.length} Pokémon`} />
                   <TeamPanel
                     runId={currentRun.id}
                     players={players}
@@ -820,7 +824,7 @@ export default function RunPage() {
               {/* Hauptteam für 3-Spieler-Runs (3 Spalten, direkte Add/Remove) */}
               {is3 && (
                 <div>
-                  <SectionLabel label="Hauptteam" sub={`${teamSlots.length} Pokémon`} />
+                  <SectionLabel label="Mein Team" sub={`${teamSlots.length} Pokémon`} />
                   <TeamPanel3
                     runId={currentRun.id}
                     players={players}
@@ -866,29 +870,6 @@ export default function RunPage() {
                   <button onClick={() => setShowSoulLink(true)} className="btn-ghost flex items-center gap-2.5 py-4 px-7 text-base">
                     <Link2 className="w-5 h-5" /> Pokémon verlinken
                   </button>
-                </div>
-              )}
-
-              {/* Emulator live-team — only inside the Companion (it runs BizHawk). */}
-              {isMyFocus && liveSyncMode && LIVE_SURFACE && (
-                <EmulatorLivePanel
-                  game={currentRun.game}
-                  runId={currentRun.id}
-                  importedSpeciesIds={myEncounterSpeciesIds}
-                  importedPids={myEncounterPids}
-                  onImport={(p, route) => { setEmuPrefill(p); setAddEncounterRoute(route); setShowAddEncounter(true) }}
-                />
-              )}
-
-              {/* On the website a Live-Sync run is a MANUAL tracker — point to the Companion. */}
-              {isMyFocus && liveSyncMode && !LIVE_SURFACE && (
-                <div className="rounded-2xl border border-pk-red/30 bg-gradient-to-r from-pk-red/10 to-transparent p-4 flex items-center gap-3 flex-wrap">
-                  <span className="text-xl">🖊</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-white font-black text-sm">Browser-Tracker (manuell)</div>
-                    <div className="text-slate-400 text-xs mt-0.5">Pokémon, Routen, SoulLinks & Box trägst du hier von Hand ein. Für automatischen Live-Sync mit BizHawk brauchst du den Companion.</div>
-                  </div>
-                  <a href={LINKS.download} className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#CC0000' }}>Companion herunterladen</a>
                 </div>
               )}
 
@@ -1062,8 +1043,14 @@ export default function RunPage() {
               </div>
             </main>
 
-            {/* ░░ RIGHT SIDEBAR — Spieler · Checkliste · Typen · Statistik ░░ */}
+            {/* ░░ RIGHT SIDEBAR — unterstützend: Spieler · Checkliste · Typen · Statistik ░░ */}
             <aside className="order-3 min-w-0 xl:sticky xl:top-[4.75rem] xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-5">
+
+              {/* Spieler-Fokus (ich ↔ Partner) — unterstützend, daher rechts */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3">
+                <PlayerStatCard player={myPlayer} isMe isActive={isMyFocus} encounters={myEncounters} pairs={pairs} teamCount={myTeamCount} avatarUrl={avatarOf(myPlayer)} onClick={() => setFocusedPlayerId(myPlayerId ?? null)} />
+                <PlayerStatCard player={partnerPlayer} isMe={false} isActive={!isMyFocus} encounters={partnerEncounters} pairs={pairs} teamCount={partnerTeamCount} avatarUrl={avatarOf(partnerPlayer)} onClick={() => setFocusedPlayerId(partnerPlayer?.id ?? null)} />
+              </div>
 
               {/* Run roster + online status */}
               <PlayersPanel
