@@ -10,7 +10,7 @@ import ChangelogModal from './ChangelogModal'
 // version + changelog, downloads with a progress bar on "Jetzt aktualisieren", then
 // the app installs and restarts itself. The browser download is only the last-resort
 // fallback shown when the self-update errors.
-interface UpdateEvent { type: 'available' | 'progress' | 'downloaded' | 'error' | 'phase' | 'none'; version?: string | null; notes?: string | null; percent?: number; message?: string; phase?: string }
+interface UpdateEvent { type: 'available' | 'progress' | 'downloaded' | 'error' | 'phase' | 'none'; version?: string | null; notes?: string | null; percent?: number; bytesPerSecond?: number; message?: string; phase?: string }
 interface NativeApp {
   checkForUpdates?: () => Promise<{ state: string; current: string; latest?: string | null; notes?: string | null }>
   startUpdate?: () => void
@@ -20,7 +20,7 @@ function nativeApp(): NativeApp | null {
   return (typeof window !== 'undefined' ? (window as unknown as { soullinkNative?: NativeApp }).soullinkNative : null) ?? null
 }
 
-type Phase = 'hidden' | 'available' | 'downloading' | 'installing' | 'restarting' | 'done' | 'uptodate' | 'error'
+type Phase = 'hidden' | 'available' | 'checking' | 'downloading' | 'installing' | 'restarting' | 'done' | 'uptodate' | 'error'
 
 export default function UpdateOverlay() {
   const lang = useSettings((s) => s.language)
@@ -29,6 +29,7 @@ export default function UpdateOverlay() {
   const [version, setVersion] = useState<string | null>(null)
   const [notes, setNotes] = useState<string | null>(null)
   const [percent, setPercent] = useState(0)
+  const [speed, setSpeed] = useState(0)   // bytes/second during download
   const [error, setError] = useState<string | null>(null)
   const [showLog, setShowLog] = useState(false)
   const dismissed = useRef<string | null>(null)   // version the user closed → don't re-nag
@@ -44,8 +45,8 @@ export default function UpdateOverlay() {
     }
     const off = n.onUpdate((e) => {
       if (e.type === 'available') showAvailable(e.version ?? null, e.notes ?? null)
-      else if (e.type === 'progress') { setPhase((p) => (p === 'installing' || p === 'restarting' ? p : 'downloading')); setPercent(Math.round(e.percent || 0)) }
-      else if (e.type === 'phase') { if (e.phase === 'installing' || e.phase === 'restarting' || e.phase === 'downloading') setPhase(e.phase) }
+      else if (e.type === 'progress') { setPhase((p) => (p === 'installing' || p === 'restarting' ? p : 'downloading')); setPercent(Math.round(e.percent || 0)); setSpeed(e.bytesPerSecond || 0) }
+      else if (e.type === 'phase') { if (e.phase === 'checking' || e.phase === 'installing' || e.phase === 'restarting' || e.phase === 'downloading') setPhase(e.phase as Phase) }
       else if (e.type === 'downloaded') setPercent(100)
       else if (e.type === 'none') { setPhase('uptodate'); setTimeout(() => setPhase((p) => (p === 'uptodate' ? 'hidden' : p)), 2800) }
       else if (e.type === 'error') { setError(e.message || null); setPhase('error') }
@@ -57,7 +58,8 @@ export default function UpdateOverlay() {
 
   if (!IN_COMPANION_WINDOW || phase === 'hidden') return null
 
-  function startUpdate() { setError(null); setPhase('downloading'); setPercent(0); nativeApp()?.startUpdate?.() }
+  function startUpdate() { if (phase === 'checking' || phase === 'downloading' || phase === 'installing' || phase === 'restarting') return; setError(null); setPhase('checking'); setPercent(0); setSpeed(0); nativeApp()?.startUpdate?.() }
+  const fmtSpeed = (bps: number) => bps >= 1_000_000 ? `${(bps / 1_000_000).toFixed(1)} MB/s` : bps > 0 ? `${Math.round(bps / 1000)} KB/s` : ''
   function dismiss() { if (version) dismissed.current = version; setPhase('hidden') }
 
   return (
@@ -84,13 +86,19 @@ export default function UpdateOverlay() {
               </>
             )}
 
+            {phase === 'checking' && (
+              <div className="flex items-center gap-2.5 text-white font-bold text-sm"><Loader2 className="w-4 h-4 animate-spin text-pk-red" /> {tr('Suche nach Update …', 'Checking for update …')}</div>
+            )}
+
             {phase === 'downloading' && (
               <>
-                <div className="flex items-center gap-2.5 text-white font-bold text-sm"><Loader2 className="w-4 h-4 animate-spin text-pk-red" /> {tr('Update wird geladen …', 'Downloading update …')}</div>
+                <div className="flex items-center gap-2.5 text-white font-bold text-sm"><Loader2 className="w-4 h-4 animate-spin text-pk-red" /> {tr('Download läuft …', 'Downloading …')}</div>
                 <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
                   <div className="h-2 rounded-full transition-[width] duration-200" style={{ width: `${percent}%`, background: 'linear-gradient(90deg, var(--color-pk-red), #ff7a59)' }} />
                 </div>
-                <div className="text-right text-slate-400 text-xs mt-1.5 font-mono">{percent}%</div>
+                <div className="flex items-center justify-between text-slate-400 text-xs mt-1.5 font-mono">
+                  <span>{fmtSpeed(speed)}</span><span>{percent}%</span>
+                </div>
               </>
             )}
 
