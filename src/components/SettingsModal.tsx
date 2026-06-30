@@ -71,11 +71,15 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const updQ = useUpdateInfo()
   const upd = updQ.data
   const updChecking = updQ.isFetching
-  const recheck = () => updQ.refetch()
+  const recheck = () => {
+    try { console.info('[update] „Erneut prüfen" geklickt → Updateprüfung angefordert (installiert v' + (upd?.installed ?? '?') + ')') } catch { /* ignore */ }
+    updQ.refetch()
+  }
   // Map a clean, friendly message to an error code — never the raw electron/GitHub text.
   function errMsg(code?: string | null): string {
     if (code === 'offline') return t('settings.checkOffline')
     if (code === 'temporarily_unavailable') return t('settings.checkTemp')
+    if (code === 'timeout') return t('settings.checkTimeout')
     return t('settings.checkFailed')
   }
 
@@ -218,7 +222,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                     <div>
                       <div className="flex items-center justify-between gap-3">
                         <span className="flex items-center gap-2 text-green-400 font-bold text-sm"><Check className="w-4 h-4" /> {t('settings.upToDate')} (v{upd.installed})</span>
-                        <button onClick={recheck} className="text-xs font-bold text-slate-500 hover:text-white">{t('settings.recheck')}</button>
+                        <button onClick={recheck} disabled={updChecking} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white disabled:opacity-60 transition-colors"><RefreshCw className={`w-3.5 h-3.5 ${updChecking ? 'animate-spin' : ''}`} /> {updChecking ? t('settings.checking') : t('settings.recheck')}</button>
                       </div>
                       <div className="text-slate-500 text-xs mt-1">{t('settings.lastCheckOk')} · {t('settings.noUpdates')}</div>
                     </div>
@@ -237,7 +241,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                     <div>
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-amber-400 text-sm">{errMsg(upd.code)}</span>
-                        <button onClick={recheck} className="text-xs font-bold text-white px-2.5 py-1 rounded-lg" style={{ background: 'var(--color-pk-red)' }}>{t('settings.tryAgain')}</button>
+                        <button onClick={recheck} disabled={updChecking} className="inline-flex items-center gap-1.5 text-xs font-bold text-white px-2.5 py-1 rounded-lg disabled:opacity-70" style={{ background: 'var(--color-pk-red)' }}><RefreshCw className={`w-3.5 h-3.5 ${updChecking ? 'animate-spin' : ''}`} /> {updChecking ? t('settings.checking') : t('settings.tryAgain')}</button>
                       </div>
                       {upd.detail && (
                         <div className="mt-1.5">

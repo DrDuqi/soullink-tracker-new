@@ -216,26 +216,37 @@ ipcMain.handle('app:version', () => app.getVersion())
 // "✓ aktuell" or "neue Version → Jetzt aktualisieren" — no native dialog, no download.
 ipcMain.handle('app:check-updates', async () => {
   const current = app.getVersion()
-  if (!app.isPackaged) return { state: 'dev', current }
-  const au = getUpdater(); if (!au) return { state: 'error', current, code: 'no_updater', detail: 'Updater nicht verfügbar' }
+  slog('[check] ── Updateprüfung gestartet · installiert v' + current + ' · packaged=' + app.isPackaged)
+  if (!app.isPackaged) { slog('[check] dev-Build → übersprungen'); return { state: 'dev', current } }
+  const au = getUpdater(); if (!au) { slog('[check] FEHLER: Updater nicht verfügbar'); return { state: 'error', current, code: 'no_updater', detail: 'Updater nicht verfügbar' } }
   wireUpdater(au)
+  try { let feed = null; try { feed = au.getFeedURL && au.getFeedURL() } catch { /* ignore */ } slog('[check] Quelle: ' + (feed || 'GitHub Releases (DrDuqi/soullink-tracker-new)') + ' · Channel: ' + (au.channel || 'latest')) } catch { /* ignore */ }
   _suppressDialog = true
+  const t0 = Date.now()
   try {
-    const r = await au.checkForUpdates()
+    slog('[check] Anfrage an GitHub gestartet …')
+    // electron-updater has NO built-in timeout: a stalled network would leave checkForUpdates()
+    // pending forever → the IPC never resolves → the renderer query freezes and "Erneut prüfen"
+    // becomes a no-op. A hard race guarantees this handler ALWAYS returns.
+    const r = await Promise.race([
+      au.checkForUpdates(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout: keine Antwort von GitHub innerhalb 15s')), 15_000)),
+    ])
     const latest = (r && r.updateInfo && r.updateInfo.version) || null
     const available = !!(latest && semverGt(latest, current))
+    slog('[check] Antwort nach ' + (Date.now() - t0) + 'ms · gefunden v' + (latest || '—') + ' · ' + (available ? 'UPDATE VERFÜGBAR' : 'kein Update (aktuell)'))
     let notes = (r && r.updateInfo && r.updateInfo.releaseNotes) || null
     if (Array.isArray(notes)) notes = notes.map((n) => (n && n.note) || '').join('\n')
     return { state: available ? 'available' : 'current', current, latest, notes, date: (r && r.updateInfo && r.updateInfo.releaseDate) || null }
   } catch (e) {
-    slogErr('app:check-updates', e)
-    // Clean code for the UI (offline / just-published CDN gap / other). The raw text is
-    // returned as `detail` only — shown behind an optional "Details anzeigen".
+    slogErr('[check] FEHLER nach ' + (Date.now() - t0) + 'ms', e)
+    if (e && e.stack) slog('[check] Stacktrace: ' + String(e.stack).split('\n').slice(0, 4).join(' | '))
     const raw = (e && e.message) || String(e)
     let code = 'check_failed'
-    if (/net::|ENOTFOUND|getaddrinfo|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH/i.test(raw)) code = 'offline'
+    if (/timeout/i.test(raw)) code = 'timeout'
+    else if (/net::|ENOTFOUND|getaddrinfo|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH/i.test(raw)) code = 'offline'
     else if (/404|cannot find|not found|latest\.yml/i.test(raw)) code = 'temporarily_unavailable'
-    return { state: 'error', current, code, detail: raw }
+    return { state: 'error', current, code, detail: raw + (e && e.stack ? '\n' + e.stack : '') }
   }
   finally { _suppressDialog = false }
 })
