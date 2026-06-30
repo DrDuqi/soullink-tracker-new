@@ -70,9 +70,9 @@ function PokeBall({ className = '' }: { className?: string }) {
 
 function SectionLabel({ label, sub, className = '' }: { label: string; sub?: string; className?: string }) {
   return (
-    <div className={`flex items-center gap-2 mb-4 ${className}`}>
-      <span className="text-slate-300 text-xs font-black uppercase tracking-widest shrink-0">{label}</span>
-      {sub && <span className="text-slate-600 text-xs shrink-0">{sub}</span>}
+    <div className={`flex items-center gap-2.5 mb-4 ${className}`}>
+      <span className="text-slate-200 text-sm font-black uppercase tracking-widest shrink-0">{label}</span>
+      {sub && <span className="text-slate-500 text-sm shrink-0">{sub}</span>}
       <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, #2e2e42, transparent)' }} />
     </div>
   )
@@ -98,47 +98,47 @@ function PlayerStatCard({
   return (
     <button
       onClick={onClick}
-      className="rounded-2xl border p-4 lg:p-5 text-left transition-all w-full group"
+      className="rounded-2xl border p-5 lg:p-6 text-left transition-all duration-200 ease-out w-full group hover:-translate-y-0.5"
       style={{
         background: isActive ? `${accentColor}12` : '#1c1c26',
         borderColor: isActive ? accentColor : '#2e2e42',
-        boxShadow: isActive ? `0 0 28px ${accentColor}22, inset 0 0 0 1px ${accentColor}20` : 'none',
+        boxShadow: isActive ? `0 0 32px ${accentColor}26, inset 0 0 0 1px ${accentColor}20` : 'none',
       }}
     >
-      <div className="flex items-start gap-2.5 mb-3">
-        <ShinyAvatar src={avatarUrl} size={36} className="mt-0.5" />
+      <div className="flex items-start gap-3 mb-4">
+        <ShinyAvatar src={avatarUrl} size={48} className="mt-0.5" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-white font-black text-base leading-tight truncate">{player?.name ?? '…'}</span>
+            <span className="text-white font-black text-lg leading-tight truncate">{player?.name ?? '…'}</span>
             {isMe ? (
-              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0" style={{ background: '#CC000022', color: '#CC0000', border: '1px solid #CC000040' }}>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0" style={{ background: '#CC000022', color: '#CC0000', border: '1px solid #CC000040' }}>
                 DU
               </span>
             ) : (
-              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5" style={{ background: '#FFCB0518', color: '#FFCB05', border: '1px solid #FFCB0540' }}>
-                <Eye className="w-2.5 h-2.5" /> PARTNER
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 flex items-center gap-0.5" style={{ background: '#FFCB0518', color: '#FFCB05', border: '1px solid #FFCB0540' }}>
+                <Eye className="w-3 h-3" /> PARTNER
               </span>
             )}
           </div>
           {isActive && (
-            <div className="text-[10px] font-bold mt-0.5 flex items-center gap-1" style={{ color: accentColor }}>
-              {isMe ? '● Meine Ansicht – bearbeitbar' : <><Lock className="w-2.5 h-2.5" /> Partner-Ansicht (Read-only)</>}
+            <div className="text-[11px] font-bold mt-1 flex items-center gap-1" style={{ color: accentColor }}>
+              {isMe ? '● Meine Ansicht – bearbeitbar' : <><Lock className="w-3 h-3" /> Partner-Ansicht (Read-only)</>}
             </div>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-2 lg:gap-3 text-xs font-bold flex-wrap">
-        <span className="flex items-center gap-1 text-green-400">
-          <Heart className="w-3 h-3" />{alive}
+      <div className="flex items-center gap-3 lg:gap-4 text-sm font-bold flex-wrap">
+        <span className="flex items-center gap-1.5 text-green-400">
+          <Heart className="w-4 h-4" />{alive}
         </span>
-        <span className="flex items-center gap-1 text-red-400">
-          <Skull className="w-3 h-3" />{dead}
+        <span className="flex items-center gap-1.5 text-red-400">
+          <Skull className="w-4 h-4" />{dead}
         </span>
-        <span className="flex items-center gap-1 text-pk-red/60">
-          <Link2 className="w-3 h-3" />{pairs.length}
+        <span className="flex items-center gap-1.5 text-pk-red/60">
+          <Link2 className="w-4 h-4" />{pairs.length}
         </span>
-        <span className="ml-auto text-slate-600 tabular-nums">{teamCount}/6</span>
+        <span className="ml-auto text-slate-500 tabular-nums text-base">{teamCount}/6</span>
       </div>
     </button>
   )
@@ -652,7 +652,7 @@ export default function RunPage() {
 
         {/* ─ Sticky header ──────────────────────────────────────────────── */}
         <header className="sticky top-0 z-40 border-b border-white/5 backdrop-blur-2xl" style={{ background: 'rgba(17,17,22,0.92)' }}>
-          <div className="max-w-[1880px] 2xl:max-w-[2240px] mx-auto px-5 lg:px-8 2xl:px-12">
+          <div className="w-full px-6 2xl:px-8">
             <div className="flex items-center justify-between py-3 gap-3">
 
               <div className="flex items-center gap-3">
@@ -678,11 +678,11 @@ export default function RunPage() {
                       <button onClick={() => setEditingName(false)} className="text-slate-500 hover:text-white p-1.5"><X className="w-4 h-4" /></button>
                     </div>
                   ) : (
-                    <h1 className="text-white font-black text-lg leading-tight flex items-center gap-1.5">
+                    <h1 className="text-white font-black text-xl leading-tight flex items-center gap-1.5">
                       {currentRun.name}
                       {isOwner && (
                         <button onClick={() => { setNameDraft(currentRun.name); setEditingName(true) }} className="text-slate-600 hover:text-slate-300 transition-colors" title="Run-Namen ändern">
-                          <Pencil className="w-3.5 h-3.5" />
+                          <Pencil className="w-4 h-4" />
                         </button>
                       )}
                     </h1>
@@ -735,9 +735,10 @@ export default function RunPage() {
           </div>
         </header>
 
-        {/* ─ Three-column layout ────────────────────────────────────────── */}
-        <div className="flex-1 max-w-[1880px] 2xl:max-w-[2240px] mx-auto w-full px-5 lg:px-8 2xl:px-12 pt-5 pb-9">
-          <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)_360px] 2xl:grid-cols-[360px_minmax(0,1fr)_400px] gap-6 2xl:gap-7 items-start">
+        {/* ─ Three-column layout — FULL width (no max-width / no mx-auto), so the run
+              uses the whole work area right of the sidebar; only ~24–32px outer padding. */}
+        <div className="flex-1 w-full px-6 2xl:px-8 pt-5 pb-9">
+          <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)_320px] 2xl:grid-cols-[360px_minmax(0,1fr)_400px] gap-6 2xl:gap-8 items-start">
 
             {/* ░░ LEFT SIDEBAR — Run-Protokoll + permanenter Team-Coach ░░ */}
             <aside className="order-2 xl:order-1 min-w-0 xl:sticky xl:top-[4.75rem] xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-5">
