@@ -1,6 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
 import { Wifi, WifiOff, CheckCircle2, ArrowUpCircle, AlertTriangle, Download } from 'lucide-react'
-import { companionInfo, latestCompanionVersion, updateState } from '../lib/appInfo'
+import { useUpdateInfo } from '../lib/updates'
 import { DOWNLOADS } from '../lib/downloads'
 import { IN_COMPANION_WINDOW } from '../lib/companion'
 
@@ -8,17 +7,18 @@ function startInAppUpdate() {
   try { (window as unknown as { soullinkNative?: { startUpdate?: () => void } }).soullinkNative?.startUpdate?.() } catch { /* ignore */ }
 }
 
-// Companion version / update status. `hideWhenCurrent` lets callers (e.g. the
-// live-sync panel) show it only when something needs attention.
+// Companion version / update status. Reads from the SINGLE update source (useUpdateInfo)
+// so "Installiert"/"Neueste" ALWAYS match the update box, the overlay and the auto-updater.
+// `hideWhenCurrent` lets callers (e.g. the live-sync panel) show it only when something
+// needs attention.
 export default function CompanionVersion({ hideWhenCurrent = false, className = '' }: { hideWhenCurrent?: boolean; className?: string }) {
-  const { data: comp } = useQuery({ queryKey: ['companion-info'], queryFn: () => companionInfo(), staleTime: 10_000, refetchInterval: 8_000 })
-  const { data: latest } = useQuery({ queryKey: ['companion-latest'], queryFn: () => latestCompanionVersion(), staleTime: 60_000, refetchOnWindowFocus: true, refetchOnMount: true })
-
-  const running = !!comp?.ok
-  const installed = comp?.version && comp.version !== 'dev' ? comp.version : null
-  const state = updateState(installed, latest ?? null)
+  const { data } = useUpdateInfo()
+  const running = !!data?.running
+  const installed = data?.installed ?? null
+  const latest = data?.latest ?? null
+  const state = data?.state ?? 'unknown'
   // running but no version → the build can't report it (or predates this fix)
-  const unknownVersion = running && !installed
+  const unknownVersion = running && !installed && state !== 'dev'
 
   if (hideWhenCurrent && running && installed && state === 'current') return null
 

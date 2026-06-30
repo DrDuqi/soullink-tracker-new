@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useSettings, ACCENTS, type Accent, type Lang, type BgMode } from '../store/settingsStore'
 import BackgroundGallery, { BackgroundPreview } from './BackgroundGallery'
+import { useUpdateInfo } from '../lib/updates'
 import { LANGUAGES, useT } from '../lib/i18n'
 import { companionInfo, APP_VERSION, LINKS } from '../lib/appInfo'
 import { IN_COMPANION_WINDOW } from '../lib/companion'
@@ -63,19 +64,16 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
   const [section, setSection] = useState<Section>('appearance')
   const [showChangelog, setShowChangelog] = useState(false)
-  const [updChecking, setUpdChecking] = useState(false)
-  const [upd, setUpd] = useState<UpdateResult | null>(null)
   const [showErrDetails, setShowErrDetails] = useState(false)
 
-  async function checkUpdates() {
-    const n = nativeApp(); if (!n?.checkForUpdates) return
-    setUpdChecking(true); setUpd(null); setShowErrDetails(false)
-    try { setUpd(await n.checkForUpdates()) }
-    catch (e) { setUpd({ state: 'error', current: '', code: 'check_failed', detail: e instanceof Error ? e.message : String(e) }) }
-    setUpdChecking(false)
-  }
+  // SINGLE update source (same hook as CompanionVersion + the overlay's IPC) → the version
+  // card, the update box and About can never disagree.
+  const updQ = useUpdateInfo()
+  const upd = updQ.data
+  const updChecking = updQ.isFetching
+  const recheck = () => updQ.refetch()
   // Map a clean, friendly message to an error code — never the raw electron/GitHub text.
-  function errMsg(code?: string): string {
+  function errMsg(code?: string | null): string {
     if (code === 'offline') return t('settings.checkOffline')
     if (code === 'temporarily_unavailable') return t('settings.checkTemp')
     return t('settings.checkFailed')
@@ -212,22 +210,22 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               {/* Updates — real check (companion) or download CTA (website). */}
               {IN_COMPANION_WINDOW ? (
                 <div className="rounded-2xl border border-[#2e2e42] bg-[#1c1c26] p-4 mb-3">
-                  {(!upd || updChecking) ? (
-                    <button onClick={checkUpdates} disabled={updChecking} className="lp-action w-full justify-center">
+                  {(!upd || (updChecking && !upd.installed)) ? (
+                    <button onClick={recheck} disabled={updChecking} className="lp-action w-full justify-center">
                       <RefreshCw className={`w-4 h-4 ${updChecking ? 'animate-spin' : ''}`} /> {updChecking ? t('settings.checking') : t('settings.checkUpdates')}
                     </button>
                   ) : upd.state === 'current' ? (
                     <div>
                       <div className="flex items-center justify-between gap-3">
-                        <span className="flex items-center gap-2 text-green-400 font-bold text-sm"><Check className="w-4 h-4" /> {t('settings.upToDate')} (v{upd.current})</span>
-                        <button onClick={checkUpdates} className="text-xs font-bold text-slate-500 hover:text-white">{t('settings.recheck')}</button>
+                        <span className="flex items-center gap-2 text-green-400 font-bold text-sm"><Check className="w-4 h-4" /> {t('settings.upToDate')} (v{upd.installed})</span>
+                        <button onClick={recheck} className="text-xs font-bold text-slate-500 hover:text-white">{t('settings.recheck')}</button>
                       </div>
                       <div className="text-slate-500 text-xs mt-1">{t('settings.lastCheckOk')} · {t('settings.noUpdates')}</div>
                     </div>
-                  ) : upd.state === 'available' ? (
+                  ) : upd.state === 'outdated' ? (
                     <div>
                       <div className="flex items-center gap-2 text-white font-black"><Download className="w-4 h-4 text-pk-red" /> {t('settings.newVersionAvail')}: v{upd.latest}</div>
-                      <div className="text-slate-500 text-xs mt-0.5">{t('settings.youUse')} v{upd.current}.</div>
+                      <div className="text-slate-500 text-xs mt-0.5">{t('settings.youUse')} v{upd.installed}.</div>
                       <div className="flex items-center gap-2 mt-3 flex-wrap">
                         <button onClick={() => nativeApp()?.startUpdate?.()} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-black text-sm text-white" style={{ background: '#CC0000' }}><Download className="w-4 h-4" /> {t('settings.updateNow')}</button>
                         <button onClick={() => setShowChangelog(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-sm text-slate-200 border border-[#3a3a4e] hover:bg-white/5"><ScrollText className="w-4 h-4" /> {t('settings.whatsNew')}</button>
@@ -239,7 +237,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                     <div>
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-amber-400 text-sm">{errMsg(upd.code)}</span>
-                        <button onClick={checkUpdates} className="text-xs font-bold text-white px-2.5 py-1 rounded-lg" style={{ background: 'var(--color-pk-red)' }}>{t('settings.tryAgain')}</button>
+                        <button onClick={recheck} className="text-xs font-bold text-white px-2.5 py-1 rounded-lg" style={{ background: 'var(--color-pk-red)' }}>{t('settings.tryAgain')}</button>
                       </div>
                       {upd.detail && (
                         <div className="mt-1.5">
@@ -264,8 +262,9 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           {section === 'about' && (
             <Block title={t('settings.about')}>
               <div className="rounded-2xl border border-[#2e2e42] bg-[#1c1c26] divide-y divide-[#2e2e42] mb-4">
-                <SettingRow title={t('settings.appVersion')}><span className="text-slate-400 text-sm font-mono">v{APP_VERSION}</span></SettingRow>
-                <SettingRow title={t('settings.companionVersion')}><span className="text-slate-400 text-sm font-mono">{comp?.version ?? '—'}</span></SettingRow>
+                {/* ONE version, from the single update source (the running app). */}
+                <SettingRow title={t('settings.appVersion')}><span className="text-slate-400 text-sm font-mono">{upd?.installed ? `v${upd.installed}` : (IN_COMPANION_WINDOW ? '—' : `v${APP_VERSION}`)}</span></SettingRow>
+                {!IN_COMPANION_WINDOW && <SettingRow title={t('settings.companionVersion')}><span className="text-slate-400 text-sm font-mono">{comp?.version ?? '—'}</span></SettingRow>}
               </div>
               <div className="grid sm:grid-cols-3 gap-3">
                 <button type="button" onClick={() => setShowChangelog(true)} className="lp-action"><ScrollText className="w-4 h-4" /> {t('menu.changelog')}</button>
