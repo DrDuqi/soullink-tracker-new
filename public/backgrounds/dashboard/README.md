@@ -1,22 +1,26 @@
-# Dashboard-Hintergründe (zufällig)
+# Dashboard-Hintergründe
 
-Fertige 16:9-Artworks, die der Companion als Vollbild-Hintergrund hinter der UI anzeigt
-(`background-size: cover`, zentriert, `no-repeat`, responsive). Beim Öffnen des Dashboards
-bzw. App-Start wird **zufällig eines** der vorhandenen Bilder gewählt und bleibt für die
-Ansicht gleich — **keine** Bindung an die Edition.
+Die komplette Hintergrund-Galerie des Companions wird **ausschließlich** aus diesem Ordner
++ `manifest.json` erzeugt. Es ist **nichts** im Code fest verdrahtet — neue Bilder
+erscheinen automatisch in der Galerie, im Zufallsmodus und sind auswählbar.
 
-## So fügst du Bilder hinzu
-1. Lege deine `.webp`-Artworks in **diesen Ordner** (`public/backgrounds/dashboard/`).
-2. Trage die Dateinamen in **`manifest.json`** ein (das ist die Zufalls-Quelle), z. B.:
+## Neues Bild hinzufügen (ohne Codeänderung)
+1. `.webp` (empfohlen, 16:9, ~2560×1440) in **diesen Ordner** legen.
+2. Dateinamen in **`manifest.json`** eintragen:
    ```json
-   ["gengar.webp", "charizard.webp", "pikachu.webp"]
+   ["artwork01.webp", "artwork02.webp", "gengar.webp", "..."]
    ```
-3. Fehlt ein im Manifest gelisteter Datei, wird sie automatisch übersprungen.
-   Ist keine Datei vorhanden, wird `default.webp` genutzt.
+3. Fertig. Das Bild ist sofort in **Einstellungen → Darstellung → Hintergrund** verfügbar.
 
-Aktuell erwartet das Manifest: `gengar.webp`, `charizard.webp`, `pikachu.webp`
-(plus optional `default.webp` als Fallback). Format: **WebP**, **16:9**, empfohlen
-**2560×1440** (mind. 1920×1080).
+- Eine im Manifest gelistete, aber fehlende Datei wird automatisch übersprungen.
+- `default.webp` ist optional (letzter Fallback, falls eine Datei fehlt).
 
-Hinweis: Die hochgeladenen Bilder müssen manuell hier abgelegt werden (mit genau diesen
-Dateinamen) — der Code bindet sie dann automatisch zufällig ein.
+## Verhalten (in den Einstellungen wählbar)
+- **Zufällig** — beim App-Start wird genau ein Bild zufällig gewählt und bleibt die
+  ganze Sitzung gleich (optional nur aus Favoriten). Re-Roll erst beim nächsten App-Start.
+- **Bild auswählen** — Galerie mit Vorschau/Hover/Glow; Klick übernimmt das Bild sofort.
+- **Favoriten** — pro Bild mit dem Stern markierbar; der Zufallsmodus kann auf Favoriten
+  beschränkt werden.
+
+Darstellung: `cover` / `center` / `no-repeat`, vollbild, responsiv, ~50 % dunkles
+Overlay + dezente Vignette; das Glassmorphism der Panels bleibt unverändert.

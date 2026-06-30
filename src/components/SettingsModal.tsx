@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Palette, Languages, Gamepad2, Bell, Zap, Package, Info, Check, Settings as SettingsIcon,
-  Monitor, RefreshCw, RotateCcw, Code2, MessageCircle, ScrollText, Download,
+  Monitor, RefreshCw, RotateCcw, Code2, MessageCircle, ScrollText, Download, Shuffle, Image as ImageIcon,
 } from 'lucide-react'
-import { useSettings, ACCENTS, type Accent, type Lang } from '../store/settingsStore'
+import { useSettings, ACCENTS, type Accent, type Lang, type BgMode } from '../store/settingsStore'
+import BackgroundGallery, { BackgroundPreview } from './BackgroundGallery'
 import { LANGUAGES, useT } from '../lib/i18n'
 import { companionInfo, APP_VERSION, LINKS } from '../lib/appInfo'
 import { IN_COMPANION_WINDOW } from '../lib/companion'
@@ -137,6 +138,26 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                     )
                   })}
                 </div>
+              </Block>
+
+              {/* Dashboard-Hintergrund: Modus, Vorschau, Favoriten, Galerie — alles aus manifest.json */}
+              <Block title={t('settings.background')}>
+                <BackgroundPreview />
+                <div className="mt-3">
+                  <Choice<BgMode> value={s.background.mode} onChange={(v) => s.setBg({ mode: v })}
+                    options={[
+                      { value: 'random', label: t('settings.bgRandom'), hint: t('settings.bgRandomHint'), icon: <Shuffle className="w-4 h-4 text-slate-400" /> },
+                      { value: 'selected', label: t('settings.bgSelect'), hint: t('settings.bgSelectHint'), icon: <ImageIcon className="w-4 h-4 text-slate-400" /> },
+                    ]} />
+                </div>
+                {s.background.mode === 'random' && (
+                  <div className="mt-3">
+                    <SettingRow title={t('settings.bgFavOnly')} hint={t('settings.bgFavOnlyHint')}>
+                      <Toggle on={s.background.randomFavoritesOnly} onChange={(v) => s.setBg({ randomFavoritesOnly: v })} />
+                    </SettingRow>
+                  </div>
+                )}
+                {s.background.mode === 'selected' && <div className="mt-4"><BackgroundGallery /></div>}
               </Block>
             </>
           )}

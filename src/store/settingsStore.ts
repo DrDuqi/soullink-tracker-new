@@ -20,6 +20,11 @@ export const ACCENTS: Record<Accent, { label: string; base: string; dark: string
 export interface NotifPrefs { caught: boolean; partner: boolean; companion: boolean; updates: boolean }
 export interface PerfPrefs { reduceMotion: boolean; disableBg: boolean }
 
+// Dashboard background preferences (persisted). `selected`/`favorites` store manifest
+// FILENAMES (not paths) so they survive folder/path changes; nothing is hard-coded.
+export type BgMode = 'random' | 'selected'
+export interface BgPrefs { mode: BgMode; selected: string | null; favorites: string[]; randomFavoritesOnly: boolean }
+
 interface SettingsState {
   theme: ThemeMode
   accent: Accent
@@ -28,9 +33,12 @@ interface SettingsState {
   defaultPlayers: 2 | 3
   notif: NotifPrefs
   perf: PerfPrefs
+  background: BgPrefs
   update: (patch: Partial<Pick<SettingsState, 'theme' | 'accent' | 'language' | 'defaultRunMode' | 'defaultPlayers'>>) => void
   setNotif: (k: keyof NotifPrefs, v: boolean) => void
   setPerf: (k: keyof PerfPrefs, v: boolean) => void
+  setBg: (patch: Partial<BgPrefs>) => void
+  toggleBgFavorite: (name: string) => void
 }
 
 export const useSettings = create<SettingsState>()(persist((set) => ({
@@ -41,10 +49,23 @@ export const useSettings = create<SettingsState>()(persist((set) => ({
   defaultPlayers: 2,
   notif: { caught: true, partner: true, companion: true, updates: true },
   perf: { reduceMotion: false, disableBg: false },
+  background: { mode: 'random', selected: null, favorites: [], randomFavoritesOnly: false },
   update: (patch) => set(patch),
   setNotif: (k, v) => set((s) => ({ notif: { ...s.notif, [k]: v } })),
   setPerf: (k, v) => set((s) => ({ perf: { ...s.perf, [k]: v } })),
-}), { name: 'soullink-settings' }))
+  setBg: (patch) => set((s) => ({ background: { ...s.background, ...patch } })),
+  toggleBgFavorite: (name) => set((s) => ({
+    background: { ...s.background, favorites: s.background.favorites.includes(name) ? s.background.favorites.filter((f) => f !== name) : [...s.background.favorites, name] },
+  })),
+}), {
+  name: 'soullink-settings',
+  // Merge so a freshly-added slice (e.g. `background`) keeps its defaults when older
+  // persisted state lacks it — never leaves a sub-object undefined.
+  merge: (persisted, current) => {
+    const p = (persisted ?? {}) as Partial<SettingsState>
+    return { ...current, ...p, background: { ...current.background, ...(p.background ?? {}) } }
+  },
+}))
 
 /** Non-reactive read — handy for one-off checks (e.g. before showing a toast). */
 export function notifEnabled(k: keyof NotifPrefs): boolean {
