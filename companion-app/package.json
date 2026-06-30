@@ -27,6 +27,7 @@
     "extraResources": [
       { "from": "../emulator/companion", "to": "companion", "filter": ["*.mjs"] },
       { "from": "../emulator/bizhawk/soullink_sync.lua", "to": "companion/soullink_sync.lua" },
+      { "from": "../emulator/bizhawk/soullink_gen3.lua", "to": "companion/soullink_gen3.lua" },
       { "from": "../dist", "to": "web" },
       { "from": "../presets", "to": "presets" }
     ],

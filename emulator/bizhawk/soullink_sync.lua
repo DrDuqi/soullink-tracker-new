@@ -12,7 +12,9 @@
 ============================================================================]]--
 
 local CONFIG = {
-  game            = "platinum",
+  -- Edition wird vom Companion gesetzt (SOULLINK_GAME). Gen4-Parsing bleibt identisch;
+  -- nur die gemeldete game-ID folgt der gewählten Edition (Platin/Diamant/Perl/HG/SS).
+  game            = (os.getenv("SOULLINK_GAME") or "platinum"):lower(),
   -- "file" (Standard, funktioniert ohne BizHawk-Startparameter) | "http" | "console"
   output          = "file",
   http_url        = "http://localhost:5173/api/emulator-sync",
@@ -109,10 +111,16 @@ local ORDERS = {
 -- (Platinum party ≈ 0x27Exxx). The auto-scan checks THIS window first → finds the
 -- party in a few frames instead of sweeping all ~4 MB (which caused the freezes).
 -- A full-RAM scan still runs as a one-time fallback if the window comes up empty.
+-- All Gen4 editions share the same party structure (236-byte mons, ≤493 species) →
+-- one profile shape, registered per edition. The auto-scan finds the exact address.
+local GEN4 = { gen = 4, domain = "Main RAM", mon_size = 236, max_species = 493, party_addr = nil, scan_lo = 0x200000, scan_hi = 0x300000 }
+local function gen4Profile() local p = {}; for k, v in pairs(GEN4) do p[k] = v end; return p end
 local PROFILES = {
-  platinum  = { gen = 4, domain = "Main RAM", mon_size = 236, max_species = 493, party_addr = nil, scan_lo = 0x200000, scan_hi = 0x300000 },
-  heartgold = { gen = 4, domain = "Main RAM", mon_size = 236, max_species = 493, party_addr = nil, scan_lo = 0x200000, scan_hi = 0x300000 },
+  platinum = gen4Profile(), diamond = gen4Profile(), pearl = gen4Profile(),
+  heartgold = gen4Profile(), soulsilver = gen4Profile(),
 }
+-- Unknown edition id → treat as Gen4 (never crash on PROFILES[game] == nil).
+setmetatable(PROFILES, { __index = function() return gen4Profile() end })
 
 local STATUS_BITS = { [0x08]="psn", [0x10]="brn", [0x20]="frz", [0x40]="par", [0x80]="tox" }
 local function statusToStr(w)

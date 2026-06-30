@@ -32,6 +32,7 @@ import { initRandomizer, randomizerStatus, randomize, openRandomizer, installFvx
 import { validateRom } from './roms.mjs'
 import { initPresets, listPresets, getPresetFile, importPreset, renamePreset, deletePreset, grabLatestRnqs, presetInbox, startRnqsWatch, pollRnqsWatch, stopRnqsWatch, rnqsWatchBusy, rnqsWatchError } from './presets.mjs'
 import { initRuns, runFolder, recordLocalRun, getLocalRun, listLocalRuns, writeRunMetadata, archiveLocalRun, deleteLocalRun, runIdForRom } from './runs.mjs'
+import { liveSyncFor } from './liveSync.mjs'
 import { ensureRunBizhawkConfig } from './runConfig.mjs'
 import { installBizhawk, bizhawkInstallState } from './bizhawk.mjs'
 
@@ -239,23 +240,30 @@ export function buildDiagnose() {
 // the writable copy the packaged app sets (SOULLINK_LUA), an optional stored
 // override, the copy next to the Companion, then the in-repo script. The user
 // never picks it — it is always the Companion's own asset.
-function luaCandidates(storedLua) {
-  return [
-    ['SOULLINK_LUA', process.env.SOULLINK_LUA],
-    ['stored/sent', storedLua],
-    ['HERE/soullink_sync.lua', join(HERE, 'soullink_sync.lua')],
-    ['HERE/lua/soullink_sync.lua', join(HERE, 'lua', 'soullink_sync.lua')],
-    ['ROOT/emulator/bizhawk/soullink_sync.lua', join(ROOT, 'emulator', 'bizhawk', 'soullink_sync.lua')],
-  ]
+// Resolve ANY engine basename (e.g. soullink_sync.lua / soullink_gen3.lua) across the
+// known locations: the writable copy dir (SOULLINK_LUA_DIR), next to SOULLINK_LUA, an
+// optional stored override's dir, next to the Companion, then the in-repo script.
+function luaDirs(storedLua) {
+  const dirs = []
+  if (process.env.SOULLINK_LUA_DIR) dirs.push(process.env.SOULLINK_LUA_DIR)
+  if (process.env.SOULLINK_LUA) dirs.push(dirname(process.env.SOULLINK_LUA))
+  if (storedLua) dirs.push(dirname(storedLua))
+  dirs.push(HERE, join(HERE, 'lua'), join(ROOT, 'emulator', 'bizhawk'))
+  return [...new Set(dirs)]
 }
-function resolveLua(storedLua) {
-  for (const [, p] of luaCandidates(storedLua)) { try { if (p && existsSync(p)) return p } catch { /* skip */ } }
+function luaCandidatesFor(basename, storedLua) {
+  return luaDirs(storedLua).map((d) => [d, join(d, basename)])
+}
+function resolveLuaFile(basename, storedLua) {
+  for (const [, p] of luaCandidatesFor(basename, storedLua)) { try { if (existsSync(p)) return p } catch { /* skip */ } }
   return null
 }
-// Human-readable "which candidate exists" string for debug logs / error detail.
-function luaDebug(storedLua) {
-  return luaCandidates(storedLua).map(([k, p]) => `${k}=${p ? (existsSync(p) ? 'OK' : 'fehlt') : '-'}`).join(' · ')
+function luaDebugFor(basename, storedLua) {
+  return luaCandidatesFor(basename, storedLua).map(([d, p]) => `${d}=${existsSync(p) ? 'OK' : 'fehlt'}`).join(' · ')
 }
+// Gen4 default (used by effectiveConfig + back-compat callers).
+function resolveLua(storedLua) { return resolveLuaFile('soullink_sync.lua', storedLua) }
+function luaDebug(storedLua) { return luaDebugFor('soullink_sync.lua', storedLua) }
 
 // Effective config = saved paths ∪ auto-detection. `ready` means the website can
 // skip the wizard and go straight to "Lua-Sync verbinden".
@@ -939,27 +947,48 @@ function handleRequest(req, res) {
       const eff = effectiveConfig()
       const bizhawk = clean(cfg.bizhawk) || eff.config.bizhawk || ''
       const rom = clean(cfg.rom) || eff.config.rom || ''
-      const lua = eff.config.lua || clean(cfg.lua) || ''
       const runId = cfg.runId ? String(cfg.runId) : (rom ? runIdForRom(rom) : null)
       const restart = !!cfg.restart
+
+      // ── Edition-aware LiveSync: the registry maps the run's edition → generation →
+      // the right Lua engine + emulator code + RAM domain. The user NEVER picks a Lua.
+      const localRun = runId ? getLocalRun(runId) : null
+      const runGame = localRun?.edition || cfg.game || null
+      let ls = liveSyncFor(runGame)
+      // Legacy/edition-unknown fallback by ROM platform: .gba → Gen3, else Gen4. The Gen3
+      // engine self-scans EWRAM, so even without the exact edition it finds the party.
+      if (!ls.key) {
+        const ext = (String(rom).toLowerCase().match(/\.(gba|nds|gbc|gb)$/) || [])[1]
+        if (ext === 'gba') ls = { key: null, gen: 3, platform: 'gba', emu: '', lua: 'soullink_gen3.lua', domain: 'System Bus', supported: true }
+      }
+      // Engine choice: registered-but-unsupported (Gen5) → ROM-only, no parser, no crash.
+      // Supported → its generation engine. Unknown edition → Gen4 default (legacy).
+      const luaBasename = (ls.key && !ls.supported) ? null : (ls.lua || 'soullink_sync.lua')
+      const lua = luaBasename ? resolveLuaFile(luaBasename, clean(cfg.lua) || eff.config.lua) : null
 
       console.log('\n[launch] ── Request ─────────────────────────────')
       console.log('[launch] restart:', restart, '· EmuHawk:', bizhawk || '(leer)')
       console.log('[launch] ROM :', rom || '(leer)', '· existiert:', rom ? existsSync(rom) : false)
-      console.log('[launch] Lua : gesendet=%s · verwendet=%s · existiert=%s', clean(cfg.lua) || '(leer)', lua || '(leer)', lua ? existsSync(lua) : false)
-      console.log('[launch] Lua-Kandidaten:', luaDebug(clean(cfg.lua)))
+      console.log('[launch] Edition: %s → gen%s · %s · domain=%s · engine=%s', ls.key || runGame || '(unbekannt)', ls.gen ?? '?', ls.supported ? 'unterstützt' : (ls.key ? 'noch nicht unterstützt' : 'Standard'), ls.domain || '-', luaBasename || '(keine — ROM-only)')
+      if (luaBasename) {
+        console.log('[launch] Lua : %s · existiert=%s', lua || '(nicht gefunden)', lua ? existsSync(lua) : false)
+        console.log('[launch] Lua-Kandidaten:', luaDebugFor(luaBasename, clean(cfg.lua)))
+      }
 
       if (!bizhawk || !existsSync(bizhawk)) { console.error('[launch] BizHawk fehlt:', bizhawk); sendJson(res, { ok: false, error: 'bizhawk_not_found' }); return }
       if (!rom || !existsSync(rom)) { console.error('[launch] ROM fehlt:', rom); sendJson(res, { ok: false, error: 'rom_not_found' }); return }
-      if (!lua || !existsSync(lua)) {
-        const dbg = luaDebug(clean(cfg.lua))
+      // Only an error when an engine IS expected but its file is missing. An unsupported
+      // generation (luaBasename === null) launches ROM-only on purpose (no LiveSync).
+      if (luaBasename && (!lua || !existsSync(lua))) {
+        const dbg = luaDebugFor(luaBasename, clean(cfg.lua))
         console.error('[launch] Lua fehlt — kein Kandidat existiert:', dbg)
-        sendJson(res, { ok: false, error: 'lua_not_found', detail: 'Sync-Script nirgends gefunden. Geprüft: ' + dbg })
+        sendJson(res, { ok: false, error: 'lua_not_found', detail: `Sync-Script ${luaBasename} nirgends gefunden. Geprüft: ` + dbg })
         return
       }
+      if (!luaBasename) console.log('[launch] ⚠ LiveSync für', ls.key, '(Gen' + ls.gen + ') noch nicht verfügbar — Spiel startet ohne Team-Sync.')
 
       // Paths are valid → remember them for next time (any browser, no wizard).
-      saveConfig({ bizhawk, rom, syncFolder: dirname(lua) })
+      saveConfig({ bizhawk, rom, syncFolder: lua ? dirname(lua) : eff.config.syncFolder })
 
       // The Lua writes to the AppData team file (passed via env below) → read it.
       currentTeamFile = TEAM_FILE
@@ -999,8 +1028,11 @@ function handleRequest(req, res) {
       const folder = bizhawkFolderInfo(cwd)
       if (!folder.complete) console.log('[launch] ⚠ Ordner ohne BizHawk-DLLs — evtl. falsche/lose EmuHawk.exe.')
 
-      // Tell the Lua where to write (AppData) so both sides always agree.
+      // Tell the Lua where to write (AppData) so both sides always agree, and WHICH
+      // edition/RAM-domain it is parsing (the engine reads SOULLINK_GAME/SOULLINK_DOMAIN).
       const launchEnv = { ...process.env, SOULLINK_TEAM_FILE: TEAM_FILE }
+      if (ls.emu) launchEnv.SOULLINK_GAME = ls.emu
+      if (ls.domain) launchEnv.SOULLINK_DOMAIN = ls.domain
       // Auto-Continue: the Lua taps A until the team loads. ONLY for "Weiterspielen"
       // (cfg.autoContinue) AND only when a SaveRAM actually exists for this run — so a
       // brand-new game is never auto-advanced past its intro/starter choice.
@@ -1015,18 +1047,21 @@ function handleRequest(req, res) {
         launchEnv.SOULLINK_VERSION = appVersion || ''
         console.log('[dev] Diagnose-Log →', join(devDir, 'current.log'))
       }
-      // --config (per-run sandbox) MUST come first; ROM + --lua follow.
+      // --config (per-run sandbox) MUST come first; ROM + --lua follow. An unsupported
+      // generation (no engine) launches the ROM ONLY (no --lua) so it still plays.
       const cfgArg = runConfig ? ['--config=' + runConfig] : []
-      const variants = [
+      const variants = lua ? [
         { label: 'rom --lua', args: [...cfgArg, rom, '--lua=' + lua] },
         { label: '--lua rom', args: [...cfgArg, '--lua=' + lua, rom] },
+      ] : [
+        { label: 'rom (ohne Lua)', args: [...cfgArg, rom] },
       ]
       let last = null
       for (const v of variants) {
         const r = await tryLaunch(bizhawk, v.args, cwd, 2500, launchEnv)
         last = r
         console.log(`[launch] "${v.label}" alive=${r.alive} exit=${r.code} (${hex32(r.code)}) pid=${r.pid ?? '-'}`)
-        if (r.alive) { bizhawkAlive = true; lastAliveCheck = Date.now(); currentRunId = runId ?? runIdForRom(rom); console.log('[launch] aktiver Run:', currentRunId || '(unbekannt)'); sendJson(res, { ok: true, launched: true, lua: true, restarted: running && doRestart, variant: v.label }); return }
+        if (r.alive) { bizhawkAlive = true; lastAliveCheck = Date.now(); currentRunId = runId ?? runIdForRom(rom); console.log('[launch] aktiver Run:', currentRunId || '(unbekannt)'); sendJson(res, { ok: true, launched: true, lua: !!lua, liveSync: !!lua, edition: ls.key || null, restarted: running && doRestart, variant: v.label }); return }
       }
 
       const code = last?.code ?? null

@@ -52,9 +52,13 @@ if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0) }
 const serverPath = app.isPackaged
   ? path.join(process.resourcesPath, 'companion', 'server.mjs')
   : path.join(__dirname, '..', 'emulator', 'companion', 'server.mjs')
-const luaSrc = app.isPackaged
-  ? path.join(process.resourcesPath, 'companion', 'soullink_sync.lua')
-  : path.join(__dirname, '..', 'emulator', 'bizhawk', 'soullink_sync.lua')
+// The per-generation Lua engines live next to each other (packaged: resources/companion,
+// dev: emulator/bizhawk). The server's LiveSync registry picks the right one per edition.
+const luaSrcDir = app.isPackaged
+  ? path.join(process.resourcesPath, 'companion')
+  : path.join(__dirname, '..', 'emulator', 'bizhawk')
+const LUA_ENGINES = ['soullink_sync.lua', 'soullink_gen3.lua']   // gen4 (NDS) · gen3 (GBA)
+const luaSrc = path.join(luaSrcDir, 'soullink_sync.lua')          // gen4 default (back-compat)
 
 function trayImage() {
   const png = path.join(__dirname, 'assets', 'icon.png')
@@ -303,12 +307,17 @@ ipcMain.on('app:start-update', async () => {
 async function startServer() {
   const userData = app.getPath('userData')
   slog(`userData = ${userData}`)
-  // The Lua writes its team JSON next to itself, so it must live in a WRITABLE
-  // folder (resources/ is read-only). Copy it into userData on every launch (so
-  // app updates also ship a fresh Lua) and point the server there.
-  const luaDst = path.join(userData, 'soullink_sync.lua')
-  try { fs.copyFileSync(luaSrc, luaDst); process.env.SOULLINK_LUA = luaDst; slog('✓ Lua kopiert') }
-  catch (e) { console.error('[companion] Lua-Kopie fehlgeschlagen:', e); slogErr('Lua-Kopie', e) }
+  // Copy ALL generation Lua engines into a WRITABLE userData folder (resources/ is
+  // read-only) on every launch (so updates ship fresh engines). SOULLINK_LUA_DIR lets
+  // the server resolve any engine by basename; SOULLINK_LUA keeps the Gen4 default for
+  // back-compat. The server's LiveSync registry chooses the engine per edition.
+  for (const name of LUA_ENGINES) {
+    try { fs.copyFileSync(path.join(luaSrcDir, name), path.join(userData, name)) }
+    catch (e) { console.error('[companion] Lua-Kopie fehlgeschlagen (' + name + '):', e); slogErr('Lua-Kopie ' + name, e) }
+  }
+  process.env.SOULLINK_LUA_DIR = userData
+  process.env.SOULLINK_LUA = path.join(userData, 'soullink_sync.lua')
+  slog('✓ Lua-Engines kopiert (' + LUA_ENGINES.join(', ') + ')')
   process.env.SOULLINK_COMPANION_CONFIG = path.join(userData, 'companion-config.json')
 
   try {
