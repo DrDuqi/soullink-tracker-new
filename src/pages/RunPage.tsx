@@ -24,8 +24,8 @@ import SoulLinkTripleCard from '../components/SoulLinkTripleCard'
 import RequestsPanel from '../components/RequestsPanel'
 import RunMonCard from '../components/RunMonCard'
 import HeroCoachStrip from '../components/HeroCoachStrip'
-import { buildCoachReport } from '../lib/coach/coach'
-import { typeLabel } from '../lib/dex/dex'
+import { useCoachReport } from '../hooks/useCoachReport'
+import type { CoachEvent, CoachEventKind } from '../lib/coach/types'
 import TeamPanel3 from '../components/TeamPanel3'
 import RouteChecklist3 from '../components/RouteChecklist3'
 import ActivityFeed from '../components/ActivityFeed'
@@ -285,10 +285,40 @@ export default function RunPage() {
     return alive.filter((e) => !slotSet.has(e.id))
   })()
 
-  // Coach interpretation layer — the ONLY place natural-language coaching is produced.
-  // Phase 3 swaps buildCoachReport() for a live LLM returning the same shape; the UI is ready.
+  // ─ SoulGuide live context ────────────────────────────────────────────────
+  // The analysis engine stays the fact source; the coach layer interprets it + the live
+  // run state. Everything below recomputes reactively, so the coach updates on its own
+  // (evolution, catch, death, box move, arena change) — no buttons.
   const coachLang = useSettings((s) => s.language)
-  const coachReport = useMemo(() => buildCoachReport(guide, (t) => typeLabel(t, coachLang)), [guide, coachLang])
+  const liveRoute = useEmuTeamStore((s) => s.currentLocationName)
+  const myDeadCount = myEncounters.filter((e) => e.status === 'dead').length
+  const myBoxCount = (() => {
+    const aliveMon = myEncounters.filter((e) => e.status !== 'dead')
+    if (liveConnected) return aliveMon.filter((e) => !(e.emu_pid && livePids.has(e.emu_pid))).length
+    const slotSet = new Set(teamSlots.filter((t) => t.player_id === myPlayerId).map((t) => t.encounter_id))
+    return aliveMon.filter((e) => !slotSet.has(e.id)).length
+  })()
+  const recentEvent = useMemo<CoachEvent | null>(() => {
+    const KIND: Record<string, CoachEventKind> = {
+      pokemon_died: 'death', death_confirmed: 'death',
+      pokemon_evolved: 'evolve', pokemon_revived: 'revive', soul_link_created: 'link',
+    }
+    const cutoff = Date.now() - 3 * 60 * 1000
+    const hit = activityLog
+      .filter((e) => KIND[e.event_type] && e.player_id === myPlayerId)
+      .sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime())[0]
+    if (!hit || new Date(hit.created_at).getTime() < cutoff) return null
+    return { kind: KIND[hit.event_type], name: hit.pokemon_name ?? '' }
+  }, [activityLog, myPlayerId])
+  const coachReport = useCoachReport({
+    analysis: guide,
+    boxCount: myBoxCount,
+    deadCount: myDeadCount,
+    route: liveRoute,
+    recentEvent,
+    hasPartner: guide.hasPartner,
+    lang: coachLang,
+  })
 
   const linkedIds = new Set(
     soulLinks.flatMap((l) => [l.encounter1_id, l.encounter2_id, l.encounter3_id]).filter(Boolean) as string[]
