@@ -21,7 +21,13 @@ export function deriveTeamGroups(
   const liveByPid = new Map(liveTeam.filter((m) => m.pid != null).map((m) => [String(m.pid), m]))
   const mySlotEncIds = new Set(teamSlots.filter((s) => s.player_id === myPlayerId).map((s) => s.encounter_id))
 
-  const inTeam = (e: Encounter) => (connected && !!e.emu_pid && liveByPid.has(e.emu_pid)) || mySlotEncIds.has(e.id)
+  // While CONNECTED the emulator party is the SINGLE source of truth for team
+  // membership — team_slots (manual/persisted) are ignored, so a Pokémon that gets
+  // moved to the PC box leaves the team and lands in the box instantly (and can never
+  // show in both). Only when disconnected do we fall back to the manual team_slots.
+  const inTeam = (e: Encounter) => connected
+    ? (!!e.emu_pid && liveByPid.has(e.emu_pid))
+    : mySlotEncIds.has(e.id)
   const slotOf = (e: Encounter): number => {
     const m = e.emu_pid ? liveByPid.get(e.emu_pid) : undefined
     return m?.slot ?? 99

@@ -22,7 +22,8 @@ import EncounterCard from '../components/EncounterCard'
 import SoulLinkPairCard from '../components/SoulLinkPairCard'
 import SoulLinkTripleCard from '../components/SoulLinkTripleCard'
 import RequestsPanel from '../components/RequestsPanel'
-import TeamPanel from '../components/TeamPanel'
+import RunMonCard from '../components/RunMonCard'
+import HeroCoachStrip, { type CoachHint } from '../components/HeroCoachStrip'
 import TeamPanel3 from '../components/TeamPanel3'
 import RouteChecklist3 from '../components/RouteChecklist3'
 import ActivityFeed from '../components/ActivityFeed'
@@ -330,6 +331,28 @@ export default function RunPage() {
   )
   const partnerEncounters = encounters.filter((e) => e.player_id !== myPlayerId) as Encounter[]
   const focusedEncounters = isMyFocus ? myEncounters : partnerEncounters
+
+  // Live party membership (pids only) → Team/Box follow the emulator WITHOUT re-rendering
+  // this page on every HP tick. When connected, the party is the single truth: anything
+  // alive that isn't in the party is in the Box (so team↔box moves reflect instantly).
+  const livePidKey = useEmuTeamStore((s) => (s.connected ? s.team.filter((m) => m.pid != null).map((m) => String(m.pid)).sort().join(',') : ''))
+  const liveConnected = useEmuTeamStore((s) => s.connected)
+  const livePids = useMemo(() => new Set(livePidKey ? livePidKey.split(',') : []), [livePidKey])
+
+  const focusedDead = focusedEncounters.filter((e) => e.status === 'dead')
+  const focusedBox = (() => {
+    const alive = focusedEncounters.filter((e) => e.status !== 'dead')
+    if (isMyFocus && liveConnected) return alive.filter((e) => !(e.emu_pid && livePids.has(e.emu_pid)))
+    const ownerId = isMyFocus ? myPlayerId : partnerPlayer?.id
+    const slotSet = new Set(teamSlots.filter((s) => s.player_id === ownerId).map((s) => s.encounter_id))
+    return alive.filter((e) => !slotSet.has(e.id))
+  })()
+
+  // Reserved SoulGuide hero hints — deterministic today; Phase 3 live AI feeds the same prop.
+  const coachHints: CoachHint[] = guide.empty ? [] : [
+    { text: guide.status, tone: guide.status.startsWith('Anfällig') ? 'warn' : 'info' },
+    ...(guide.gym ? [{ text: `Nächste Arena: ${guide.gym.name} — ${guide.risk.label}`, tone: (guide.gymInsight.risk === 'easy' ? 'good' : guide.gymInsight.risk === 'hard' ? 'warn' : 'info') as CoachHint['tone'] }] : []),
+  ]
 
   const linkedIds = new Set(
     soulLinks.flatMap((l) => [l.encounter1_id, l.encounter2_id, l.encounter3_id]).filter(Boolean) as string[]
@@ -802,25 +825,14 @@ export default function RunPage() {
                       </div>
                     </>
                   )}
+
+                  {/* Reserved SoulGuide live-coach slot (Phase 3 fills these hints with live AI) */}
+                  <HeroCoachStrip hints={coachHints} />
                 </section>
               )}
 
-              {/* Hauptteam (shared, always editable for my slots) */}
-              {!is3 && players.length === 2 && (
-                <div>
-                  <SectionLabel label="Mein Team" sub={`${teamSlots.length} Pokémon`} />
-                  <TeamPanel
-                    runId={currentRun.id}
-                    players={players}
-                    myPlayerId={myPlayerId ?? ''}
-                    encounters={encounters as Encounter[]}
-                    soulLinkPairs={pairs}
-                    onSelectEncounter={(enc) => setSelectedEncounter(enc)}
-                    onNavigateToPairs={() => setMainView('pairs')}
-                  />
-                </div>
-              )}
-              {/* Hauptteam für 3-Spieler-Runs (3 Spalten, direkte Add/Remove) */}
+              {/* Mein Team — 3-Spieler nutzt das Slot-Band; 2-Spieler zeigt das Live-Team
+                    (die einzige Team-Anzeige) unten in TeamOverview. Keine Doppelung mehr. */}
               {is3 && (
                 <div>
                   <SectionLabel label="Mein Team" sub={`${teamSlots.length} Pokémon`} />
@@ -860,8 +872,8 @@ export default function RunPage() {
                 </div>
               )}
 
-              {/* Team / Box / Besiegt / Partner — derived from the live emulator team (by PID), fallback to team_slots */}
-              {isMyFocus && (
+              {/* Mein Team (live) + Partner-Team — 2-Spieler. Box/Besiegt leben im Box-Tab. */}
+              {isMyFocus && !is3 && (
                 <TeamOverview
                   myEncounters={myEncounters}
                   partnerEncounters={partnerEncounters}
@@ -882,7 +894,7 @@ export default function RunPage() {
                     {([
                       { key: 'encounters', icon: <LayoutGrid className="w-4 h-4" />, label: isMyFocus ? 'Encounter' : (focusedPlayer?.name ?? 'Partner'), count: focusedEncounters.length },
                       { key: 'pairs', icon: <Link2 className="w-4 h-4" />, label: 'SoulLinks', count: is3 ? groups.length : pairs.length },
-                      { key: 'box', icon: <Archive className="w-4 h-4" />, label: 'Box', count: focusedEncounters.filter((e) => e.status === 'boxed').length },
+                      { key: 'box', icon: <Archive className="w-4 h-4" />, label: 'Box', count: focusedBox.length },
                       { key: 'story', icon: <BookOpen className="w-4 h-4" />, label: 'Story', count: null },
                       { key: 'soulguide', icon: <Sparkles className="w-4 h-4" />, label: 'SoulGuide', count: null },
                     ] as const).map((t) => {
@@ -910,7 +922,7 @@ export default function RunPage() {
                     </span>
                   )}
 
-                  {(mainView === 'encounters' || mainView === 'box') && (
+                  {mainView === 'encounters' && (
                     <div className="flex rounded-xl p-1 shrink-0" style={{ background: '#1c1c26', border: '1px solid #2e2e42' }}>
                       <button
                         onClick={() => setViewMode('grid')}
@@ -949,22 +961,35 @@ export default function RunPage() {
                   )
                 )}
 
-                {/* BOX view — boxed Pokémon of the focused player */}
+                {/* BOX view — live-derived: alive & not in the team (updates instantly with the
+                    emulator party), plus a Besiegt section. Same card design as the team. */}
                 {mainView === 'box' && (
-                  (() => {
-                    const boxed = focusedEncounters.filter((e) => e.status === 'boxed')
-                    return boxed.length === 0 ? (
-                      <EmptyState
-                        icon={<Archive className="w-12 h-12" />}
-                        title="Box ist leer"
-                        desc="Hierher kommen Pokémon, die du eingelagert hast — am Leben, aber nicht im Team."
-                      />
-                    ) : viewMode === 'list' ? (
-                      <div className="space-y-3">{boxed.map((enc) => renderEnc(enc, true))}</div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{boxed.map((enc) => renderEnc(enc, false))}</div>
-                    )
-                  })()
+                  (focusedBox.length === 0 && focusedDead.length === 0) ? (
+                    <EmptyState
+                      icon={<Archive className="w-12 h-12" />}
+                      title="Box ist leer"
+                      desc="Lebende Pokémon außerhalb deines Teams erscheinen hier automatisch — live aus dem Emulator."
+                    />
+                  ) : (
+                    <div className="space-y-7">
+                      {focusedBox.length > 0 && (
+                        <div>
+                          <SectionLabel label="In Box" sub={`${focusedBox.length} Pokémon`} />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3">
+                            {focusedBox.map((e) => <RunMonCard key={e.id} enc={e} onClick={() => setSelectedEncounter(e)} />)}
+                          </div>
+                        </div>
+                      )}
+                      {focusedDead.length > 0 && (
+                        <div>
+                          <SectionLabel label="Besiegt" sub={`${focusedDead.length} Pokémon`} />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3">
+                            {focusedDead.map((e) => <RunMonCard key={e.id} enc={e} onClick={() => setSelectedEncounter(e)} />)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
                 )}
 
                 {/* STORY GUIDE view */}
