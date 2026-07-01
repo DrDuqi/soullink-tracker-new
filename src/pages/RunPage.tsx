@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Plus, Link2, Copy, Check, ArrowLeft, Heart, Skull,
-  LayoutGrid, List, Zap, Eye, Lock, Pencil, X, BookOpen, Archive, BarChart3,
+  LayoutGrid, List, Zap, Eye, Lock, Pencil, X, BookOpen, Archive, Sparkles,
 } from 'lucide-react'
 import { useRunStore } from '../store/runStore'
 import { useEncounters, useReorderEncounters, useUpdateEncounterStatus } from '../hooks/useEncounters'
@@ -26,9 +26,10 @@ import TeamPanel from '../components/TeamPanel'
 import TeamPanel3 from '../components/TeamPanel3'
 import RouteChecklist3 from '../components/RouteChecklist3'
 import ActivityFeed from '../components/ActivityFeed'
-import TypeEffectChart from '../components/TypeEffectChart'
 import RouteChecklist from '../components/RouteChecklist'
-import TeamAnalysisPanel from '../components/TeamAnalysisPanel'
+import SoulGuidePreview from '../components/SoulGuidePreview'
+import SoulGuidePanel from '../components/SoulGuidePanel'
+import { useTeamAnalysis } from '../hooks/useTeamAnalysis'
 import PokemonDetailModal from '../components/PokemonDetailModal'
 import QuickLook from '../components/QuickLook'
 import SlotPickerModal from '../components/SlotPickerModal'
@@ -200,7 +201,7 @@ export default function RunPage() {
   const [showSoulLink, setShowSoulLink] = useState(false)
   const [copied, setCopied] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [mainView, setMainView] = useState<'encounters' | 'pairs' | 'box' | 'story' | 'stats'>('encounters')
+  const [mainView, setMainView] = useState<'encounters' | 'pairs' | 'box' | 'story' | 'soulguide'>('encounters')
   const [selectedEncounter, setSelectedEncounter] = useState<Encounter | null>(null)
   const [slotPickerEncounter, setSlotPickerEncounter] = useState<Encounter | null>(null)
   const [dragOverEncId, setDragOverEncId] = useState<string | null>(null)
@@ -266,6 +267,18 @@ export default function RunPage() {
   const is3 = maxPlayers === 3   // 3-Spieler-SoulLink-Logik nur bei max_players = 3
   // Triple-Gruppen (nur bei 3 Spielern genutzt; bei 2 Spielern bleibt alles wie bisher).
   const groups = useSoulLinkGroups(runId ?? null, encounters as Encounter[], players, maxPlayers)
+
+  // THE single analysis source — computed once, shared by the dock preview + the SoulGuide tab.
+  const guide = useTeamAnalysis({
+    runId: runId ?? '',
+    game: currentRun?.game ?? '',
+    players,
+    myPlayerId: myPlayerId ?? '',
+    encounters: encounters as Encounter[],
+    teamSlots,
+    soulLinkPairs: is3 ? [] : pairs,
+    useLiveTeam: true,
+  })
 
   // Default focused player = me
   useEffect(() => {
@@ -636,11 +649,6 @@ export default function RunPage() {
     )
   }
 
-  // ─ Right sidebar quick stats for the focused player ───────────────────────
-  const fAlive = focusedEncounters.filter((e) => e.status === 'alive').length
-  const fDead = focusedEncounters.filter((e) => e.status === 'dead').length
-  const fBoxed = focusedEncounters.filter((e) => e.status === 'boxed').length
-
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
@@ -876,7 +884,7 @@ export default function RunPage() {
                       { key: 'pairs', icon: <Link2 className="w-4 h-4" />, label: 'SoulLinks', count: is3 ? groups.length : pairs.length },
                       { key: 'box', icon: <Archive className="w-4 h-4" />, label: 'Box', count: focusedEncounters.filter((e) => e.status === 'boxed').length },
                       { key: 'story', icon: <BookOpen className="w-4 h-4" />, label: 'Story', count: null },
-                      { key: 'stats', icon: <BarChart3 className="w-4 h-4" />, label: 'Statistik', count: null },
+                      { key: 'soulguide', icon: <Sparkles className="w-4 h-4" />, label: 'SoulGuide', count: null },
                     ] as const).map((t) => {
                       const active = mainView === t.key
                       return (
@@ -964,23 +972,10 @@ export default function RunPage() {
                   <StoryGuide runGame={currentRun?.game ?? null} caughtLocations={storyCaughtLocations} />
                 )}
 
-                {/* STATISTIK view — Zahlen + Typ-Effektivität (aus dem Dock hierher) */}
-                {mainView === 'stats' && (
-                  <div className="space-y-5">
-                    <div className="grid grid-cols-3 gap-4">
-                      {[
-                        { v: fAlive, label: 'Am Leben', color: '#4ade80' },
-                        { v: fDead, label: 'Besiegt', color: '#f87171' },
-                        { v: fBoxed, label: 'In Box', color: '#FFCB05' },
-                      ].map((s) => (
-                        <div key={s.label} className="rounded-2xl border border-[#2e2e42] py-6 text-center" style={{ background: '#161620' }}>
-                          <div className="font-black text-4xl tabular-nums leading-none" style={{ color: s.color }}>{s.v}</div>
-                          <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mt-2">{s.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <TypeEffectChart defaultOpen />
-                  </div>
+                {/* SOULGUIDE view — the ONE analysis surface (score, recommendations, balance,
+                    roles, coverage, type analysis, arena prep, box picks, SoulLinks, types …) */}
+                {mainView === 'soulguide' && (
+                  <SoulGuidePanel data={guide} onSelectEncounter={(enc) => setSelectedEncounter(enc)} />
                 )}
 
                 {/* PAIRS view */}
@@ -1119,19 +1114,8 @@ export default function RunPage() {
                 <ActivityFeed runId={currentRun.id} players={players} myPlayerId={myPlayerId} collapsible defaultOpen />
               )}
 
-              {/* Team-Coach — läuft live mit */}
-              <TeamAnalysisPanel
-                runId={currentRun.id}
-                game={currentRun.game}
-                players={players}
-                myPlayerId={myPlayerId ?? ''}
-                encounters={encounters as Encounter[]}
-                teamSlots={teamSlots}
-                soulLinkPairs={is3 ? [] : pairs}
-                onSelectEncounter={(enc) => setSelectedEncounter(enc)}
-                useLiveTeam
-                defaultOpen
-              />
+              {/* SoulGuide — kleine Vorschau; öffnet den einzigen Analyseort (SoulGuide-Tab) */}
+              <SoulGuidePreview data={guide} onOpen={() => setMainView('soulguide')} />
             </aside>
 
           </div>
