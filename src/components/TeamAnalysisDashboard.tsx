@@ -1,10 +1,18 @@
 import { useEffect } from 'react'
-import { X, AlertTriangle, ShieldCheck, Swords, Sparkles, Activity, Lightbulb, Link2, Star } from 'lucide-react'
+import { X, AlertTriangle, ShieldCheck, Swords, Sparkles, Activity, Lightbulb, Link2, Star, Trophy } from 'lucide-react'
 import { getSpriteUrl } from '../lib/pokemon-api'
 import { typeColor, typeLabel } from '../lib/dex/dex'
 import { useSettings } from '../store/settingsStore'
 import { UTIL_LABEL, type UtilityReport, type UtilTag } from '../lib/analysis/utility'
-import type { FullAnalysis, TeamDashboard, SoulLinkInsight, BoxRec } from '../lib/analysis/teamAnalysis'
+import type { FullAnalysis, TeamDashboard, SoulLinkInsight, BoxRec, GymInsight, CarryEntry } from '../lib/analysis/teamAnalysis'
+import type { GymLeader } from '../lib/analysis/gyms'
+import type { Encounter } from '../types/database'
+
+const GYM_RISK = {
+  easy: { dot: '🟢', label: 'Einfach', color: '#4ade80' },
+  mid:  { dot: '🟡', label: 'Mittel',  color: '#fbbf24' },
+  hard: { dot: '🔴', label: 'Hoch',    color: '#f87171' },
+} as const
 
 // The "coach" dashboard — a structured, action-oriented read of the SAME analysis the
 // sidebar summarises (no duplicate engine). Cards · warnings · recommendations · bars ·
@@ -16,10 +24,16 @@ interface Props {
   sl: SoulLinkInsight
   hasPartner: boolean
   boxRecs: BoxRec[]
+  gymInsight?: GymInsight
+  gyms?: GymLeader[]
+  gymIdx?: number
+  onGymChange?: (i: number) => void
+  carries?: CarryEntry[]
+  onSelectEncounter?: (enc: Encounter) => void
   onClose: () => void
 }
 
-export default function TeamAnalysisDashboard({ analysis, dashboard, utility, sl, hasPartner, boxRecs, onClose }: Props) {
+export default function TeamAnalysisDashboard({ analysis, dashboard, utility, sl, hasPartner, boxRecs, gymInsight, gyms, gymIdx = 0, onGymChange, carries, onSelectEncounter, onClose }: Props) {
   const lang = useSettings((s) => s.language)
   const tl = (t: string) => typeLabel(t, lang)
   useEffect(() => {
@@ -83,6 +97,64 @@ export default function TeamAnalysisDashboard({ analysis, dashboard, utility, sl
               </div>
             )}
           </Card>
+
+          {/* Next gym leader — full-width, actionable */}
+          {gymInsight && gyms && gyms.length > 0 && (
+            <Card icon={<Trophy className="w-4 h-4" />} title="Nächster Arenaleiter" accent="#FFCB05" full>
+              <div className="flex items-center gap-2 flex-wrap mb-3">
+                <select value={gymIdx} onChange={(e) => onGymChange?.(Number(e.target.value))} className="bg-[#16161f] border border-[#2e2e42] rounded-lg px-2.5 py-1.5 text-white text-xs font-bold outline-none focus:border-pk-red">
+                  {gyms.map((g, i) => <option key={i} value={i}>{i + 1}. {g.name} ({tl(g.type)})</option>)}
+                </select>
+                {(() => { const r = GYM_RISK[gymInsight.risk]; return (
+                  <span className="text-xs font-black px-2.5 py-1 rounded-full" style={{ color: r.color, background: `${r.color}1e`, border: `1px solid ${r.color}55` }}>{r.dot} {r.label}</span>
+                ) })()}
+                <div className="flex flex-wrap gap-1">{gymInsight.recommendedTypes.map((t) => <TypeChip key={t} type={t} label={tl(t)} />)}</div>
+              </div>
+              <ul className="space-y-1 mb-3">
+                {gymInsight.riskReasons.map((r, i) => (
+                  <li key={i} className="text-sm text-slate-200 flex items-start gap-2"><span className={r.ok ? 'text-green-400' : 'text-amber-400'}>{r.ok ? '✔' : '⚠'}</span>{r.text}</li>
+                ))}
+              </ul>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {[
+                  { label: 'Sehr gut', list: gymInsight.excellent, color: '#4ade80' },
+                  { label: 'Geeignet', list: gymInsight.good, color: '#86efac' },
+                  { label: 'Schlechtes Matchup', list: gymInsight.bad, color: '#fbbf24' },
+                  { label: 'Nicht mitnehmen', list: gymInsight.avoid, color: '#f87171' },
+                ].filter((g) => g.list.length > 0).map((g) => (
+                  <div key={g.label}>
+                    <div className="text-[11px] font-bold mb-1.5" style={{ color: g.color }}>{g.label}</div>
+                    <div className="flex flex-wrap gap-1.5">{g.list.map((enc) => <MonChip key={enc.id} enc={enc} onClick={onSelectEncounter ? () => onSelectEncounter(enc) : undefined} />)}</div>
+                  </div>
+                ))}
+              </div>
+              {gymInsight.dangers.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-white/10">
+                  <SubLabel>Besondere Gefahren</SubLabel>
+                  <ul className="mt-1 space-y-0.5">{gymInsight.dangers.map((d, i) => <li key={i} className="text-xs text-slate-400">• {d}</li>)}</ul>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Top carries */}
+          {carries && carries.length > 0 && (
+            <Card icon={<Star className="w-4 h-4" />} title="Top-Carry-Pokémon" accent="#FFCB05">
+              <div className="space-y-2">
+                {carries.map((c) => (
+                  <button key={c.enc.id} onClick={onSelectEncounter ? () => onSelectEncounter(c.enc) : undefined} className="w-full flex items-center gap-3 rounded-xl border border-white/[0.07] px-3 py-2 text-left hover:border-white/20 transition-colors" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                    <span className="text-lg shrink-0">{c.medal}</span>
+                    {c.enc.pokemon_id != null && <img src={getSpriteUrl(c.enc.pokemon_id)} className="w-10 h-10 object-contain shrink-0" alt="" style={{ imageRendering: 'pixelated' }} />}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-bold text-slate-100 capitalize truncate">{c.enc.nickname ?? c.enc.pokemon_name}</div>
+                      <div className="text-slate-500 text-[11px] truncate">{c.reasons.join(' · ')}</div>
+                    </div>
+                    <span className="text-sm font-black tabular-nums shrink-0" style={{ color: '#FFCB05' }}>{c.score}</span>
+                  </button>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Team balance */}
           <Card icon={<Activity className="w-4 h-4" />} title="Team-Balance" accent="#60a5fa">
@@ -188,6 +260,14 @@ function Card({ icon, title, accent, children, full }: { icon: React.ReactNode; 
 const SubLabel = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => <div className={`text-[11px] font-bold uppercase tracking-wide text-slate-500 ${className}`}>{children}</div>
 const Empty = () => <p className="text-slate-500 text-sm">Noch keine Daten – Team zusammenstellen.</p>
 const Badge = ({ children }: { children: React.ReactNode }) => <span className="text-xs font-bold rounded-lg px-2 py-1 border border-white/10 text-slate-200" style={{ background: 'rgba(255,255,255,0.03)' }}>{children}</span>
+function MonChip({ enc, onClick }: { enc: Encounter; onClick?: () => void }) {
+  return (
+    <button onClick={onClick} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#16161f] border border-[#2e2e42] hover:border-slate-600 transition-colors">
+      {enc.pokemon_id != null && <img src={getSpriteUrl(enc.pokemon_id)} className="w-6 h-6 object-contain shrink-0" alt="" />}
+      <span className="text-[11px] text-slate-200 capitalize truncate max-w-[90px]">{enc.nickname ?? enc.pokemon_name}</span>
+    </button>
+  )
+}
 function Bar({ value, max, color, thin }: { value: number; max: number; color: string; thin?: boolean }) {
   return <span className={`block rounded-full bg-white/[0.07] overflow-hidden ${thin ? 'h-1.5' : 'h-2'}`}><span className="block h-full rounded-full" style={{ width: `${Math.min(100, (value / max) * 100)}%`, background: color }} /></span>
 }
