@@ -23,7 +23,9 @@ import SoulLinkPairCard from '../components/SoulLinkPairCard'
 import SoulLinkTripleCard from '../components/SoulLinkTripleCard'
 import RequestsPanel from '../components/RequestsPanel'
 import RunMonCard from '../components/RunMonCard'
-import HeroCoachStrip, { type CoachHint } from '../components/HeroCoachStrip'
+import HeroCoachStrip from '../components/HeroCoachStrip'
+import { buildCoachReport } from '../lib/coach/coach'
+import { typeLabel } from '../lib/dex/dex'
 import TeamPanel3 from '../components/TeamPanel3'
 import RouteChecklist3 from '../components/RouteChecklist3'
 import ActivityFeed from '../components/ActivityFeed'
@@ -47,6 +49,7 @@ import { useRunMode, setRunMode, type RunMode } from '../lib/runMode'
 import { IN_COMPANION_WINDOW } from '../lib/companion'
 import { LINKS } from '../lib/appInfo'
 import { useEmuTeamStore } from '../store/emuTeamStore'
+import { useSettings } from '../store/settingsStore'
 
 // Emulator Live-Sync belongs to the Companion (it launches BizHawk). Show it only
 // inside the Companion window (or the dev server for testing); on the public website
@@ -348,11 +351,10 @@ export default function RunPage() {
     return alive.filter((e) => !slotSet.has(e.id))
   })()
 
-  // Reserved SoulGuide hero hints — deterministic today; Phase 3 live AI feeds the same prop.
-  const coachHints: CoachHint[] = guide.empty ? [] : [
-    { text: guide.status, tone: guide.status.startsWith('Anfällig') ? 'warn' : 'info' },
-    ...(guide.gym ? [{ text: `Nächste Arena: ${guide.gym.name} — ${guide.risk.label}`, tone: (guide.gymInsight.risk === 'easy' ? 'good' : guide.gymInsight.risk === 'hard' ? 'warn' : 'info') as CoachHint['tone'] }] : []),
-  ]
+  // Coach interpretation layer — the ONLY place natural-language coaching is produced.
+  // Phase 3 swaps buildCoachReport() for a live LLM returning the same shape; the UI is ready.
+  const coachLang = useSettings((s) => s.language)
+  const coachReport = useMemo(() => buildCoachReport(guide, (t) => typeLabel(t, coachLang)), [guide, coachLang])
 
   const linkedIds = new Set(
     soulLinks.flatMap((l) => [l.encounter1_id, l.encounter2_id, l.encounter3_id]).filter(Boolean) as string[]
@@ -739,46 +741,46 @@ export default function RunPage() {
               {/* ░░ HERO — der Mittelpunkt: „Weiterspielen" + Run-Puls. Glasfläche ÜBER dem
                     Hintergrund-Galerie-Bild (kein eigenes Bild), hebt sich durch Glow/Licht ab. ░░ */}
               {isMyFocus && (
-                <section className="hero-glass anim-fade-up p-6 2xl:p-8">
-                  {/* Eyebrow · großer Kino-Titel · Status · Run-Puls */}
-                  <div className="flex items-start justify-between gap-6 mb-7">
+                <section className="hero-glass anim-fade-up p-5 2xl:p-6">
+                  {/* Eyebrow · Kino-Titel · Status · Run-Puls — kompakt */}
+                  <div className="flex items-start justify-between gap-5 mb-4">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-pk-red text-[11px] font-black uppercase tracking-[0.3em] mb-3">
-                        <Zap className="w-3.5 h-3.5" /> Dein Abenteuer
+                      <div className="flex items-center gap-2 text-pk-red text-[10px] font-black uppercase tracking-[0.3em] mb-2">
+                        <Zap className="w-3 h-3" /> Dein Abenteuer
                       </div>
                       {editingName ? (
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveRunName(); if (e.key === 'Escape') setEditingName(false) }} autoFocus maxLength={60} className="bg-[#16161f] border border-[#2e2e42] rounded-xl px-3 py-2 text-white font-black text-3xl outline-none focus:border-pk-red" />
+                          <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveRunName(); if (e.key === 'Escape') setEditingName(false) }} autoFocus maxLength={60} className="bg-[#16161f] border border-[#2e2e42] rounded-xl px-3 py-1.5 text-white font-black text-2xl outline-none focus:border-pk-red" />
                           <button onClick={saveRunName} disabled={savingName} className="text-sm font-bold px-3 py-2 rounded-lg" style={{ background: '#CC0000', color: '#fff' }}>{savingName ? '…' : 'Speichern'}</button>
-                          <button onClick={() => setEditingName(false)} className="text-slate-500 hover:text-white p-2"><X className="w-5 h-5" /></button>
+                          <button onClick={() => setEditingName(false)} className="text-slate-500 hover:text-white p-1.5"><X className="w-5 h-5" /></button>
                         </div>
                       ) : (
-                        <h1 className="text-white font-black text-4xl 2xl:text-[3.25rem] leading-[1.04] tracking-tight flex items-center gap-3 group">
+                        <h1 className="text-white font-black text-3xl 2xl:text-[2.5rem] leading-[1.05] tracking-tight flex items-center gap-2.5 group">
                           <span className="truncate">{currentRun.name}</span>
                           {isOwner && (
-                            <button onClick={() => { setNameDraft(currentRun.name); setEditingName(true) }} className="text-slate-600 hover:text-slate-300 transition-all opacity-0 group-hover:opacity-100 shrink-0" title="Run-Namen ändern"><Pencil className="w-5 h-5" /></button>
+                            <button onClick={() => { setNameDraft(currentRun.name); setEditingName(true) }} className="text-slate-600 hover:text-slate-300 transition-all opacity-0 group-hover:opacity-100 shrink-0" title="Run-Namen ändern"><Pencil className="w-4 h-4" /></button>
                           )}
                         </h1>
                       )}
-                      <div className="flex items-center gap-3 mt-3.5 text-sm">
+                      <div className="flex items-center gap-2.5 mt-2 text-sm">
                         <button onClick={() => isOwner && setShowEditEdition(true)} className="font-bold text-slate-200 flex items-center gap-1.5 hover:text-white transition-colors">{currentRun.game}{isOwner && <Pencil className="w-3 h-3 text-slate-500" />}</button>
                         <span className="text-slate-600">·</span>
                         <button onClick={() => isMember && setShowModeModal(true)} className="font-bold flex items-center gap-2 transition-colors" style={{ color: liveSyncMode ? '#4ade80' : '#94a3b8' }}>
-                          <span className={liveSyncMode ? 'ls-radar' : ''} style={{ width: 9, height: 9, borderRadius: 999, background: liveSyncMode ? '#4ade80' : '#64748b', display: 'inline-block' }} />
+                          <span className={liveSyncMode ? 'ls-radar' : ''} style={{ width: 8, height: 8, borderRadius: 999, background: liveSyncMode ? '#4ade80' : '#64748b', display: 'inline-block' }} />
                           {liveSyncMode ? 'Live-Sync' : 'Manueller Tracker'}
                         </button>
                       </div>
                     </div>
-                    <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+                    <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-2.5 shrink-0">
                       {[
                         { label: 'Team', value: `${myTeamCount}/6`, color: '#e2e8f0' },
                         { label: 'Gefangen', value: myEncounters.length, color: '#e2e8f0' },
                         { label: 'Am Leben', value: myEncounters.filter((e) => e.status === 'alive').length, color: '#4ade80' },
                         { label: 'SoulLinks', value: is3 ? groups.length : pairs.length, color: '#ff6b6b' },
                       ].map((s) => (
-                        <div key={s.label} className="hero-stat rounded-2xl px-5 py-3.5 text-center min-w-[92px]" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}>
-                          <div className="font-black text-2xl 2xl:text-3xl tabular-nums leading-none" style={{ color: s.color }}>{s.value}</div>
-                          <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mt-2">{s.label}</div>
+                        <div key={s.label} className="hero-stat rounded-xl px-3.5 py-2 text-center min-w-[74px]" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                          <div className="font-black text-xl 2xl:text-2xl tabular-nums leading-none" style={{ color: s.color }}>{s.value}</div>
+                          <div className="text-slate-500 text-[9px] font-bold uppercase tracking-wider mt-1">{s.label}</div>
                         </div>
                       ))}
                     </div>
@@ -795,12 +797,12 @@ export default function RunPage() {
                         onImport={(p, route) => { setEmuPrefill(p); setAddEncounterRoute(route); setShowAddEncounter(true) }}
                         compact
                       />
-                      <div className="flex flex-wrap gap-3 mt-5">
-                        <button onClick={() => { setAddEncounterRoute(undefined); setShowAddEncounter(true) }} className="btn-primary flex items-center gap-2.5 py-3.5 px-6 text-base">
-                          <Plus className="w-5 h-5" /> Encounter hinzufügen
+                      <div className="flex flex-wrap gap-3 mt-4">
+                        <button onClick={() => { setAddEncounterRoute(undefined); setShowAddEncounter(true) }} className="btn-primary flex items-center gap-2 py-3 px-5 text-sm">
+                          <Plus className="w-4 h-4" /> Encounter hinzufügen
                         </button>
-                        <button onClick={() => setShowSoulLink(true)} className="btn-ghost flex items-center gap-2.5 py-3.5 px-6 text-base">
-                          <Link2 className="w-5 h-5" /> Pokémon verlinken
+                        <button onClick={() => setShowSoulLink(true)} className="btn-ghost flex items-center gap-2 py-3 px-5 text-sm">
+                          <Link2 className="w-4 h-4" /> Pokémon verlinken
                         </button>
                       </div>
                     </>
@@ -815,19 +817,19 @@ export default function RunPage() {
                           <a href={LINKS.download} className="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-xl font-black text-sm text-white" style={{ background: '#CC0000' }}>Companion holen</a>
                         </div>
                       )}
-                      <div className="flex flex-wrap items-center gap-3.5">
-                        <button onClick={() => { setAddEncounterRoute(undefined); setShowAddEncounter(true) }} className="hero-cta inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-black text-lg text-white">
-                          <Plus className="w-6 h-6" /> Encounter hinzufügen
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button onClick={() => { setAddEncounterRoute(undefined); setShowAddEncounter(true) }} className="hero-cta inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl font-black text-base text-white">
+                          <Plus className="w-5 h-5" /> Encounter hinzufügen
                         </button>
-                        <button onClick={() => setShowSoulLink(true)} className="btn-ghost flex items-center gap-2.5 py-4 px-7 text-base">
+                        <button onClick={() => setShowSoulLink(true)} className="btn-ghost flex items-center gap-2.5 py-3 px-6 text-sm">
                           <Link2 className="w-5 h-5" /> Pokémon verlinken
                         </button>
                       </div>
                     </>
                   )}
 
-                  {/* Reserved SoulGuide live-coach slot (Phase 3 fills these hints with live AI) */}
-                  <HeroCoachStrip hints={coachHints} />
+                  {/* SoulGuide preview in the hero — one coach line, opens the full SoulGuide */}
+                  <HeroCoachStrip headline={coachReport.headline} onOpen={() => setMainView('soulguide')} />
                 </section>
               )}
 
@@ -1000,7 +1002,7 @@ export default function RunPage() {
                 {/* SOULGUIDE view — the ONE analysis surface (score, recommendations, balance,
                     roles, coverage, type analysis, arena prep, box picks, SoulLinks, types …) */}
                 {mainView === 'soulguide' && (
-                  <SoulGuidePanel data={guide} onSelectEncounter={(enc) => setSelectedEncounter(enc)} />
+                  <SoulGuidePanel data={guide} report={coachReport} onSelectEncounter={(enc) => setSelectedEncounter(enc)} />
                 )}
 
                 {/* PAIRS view */}
@@ -1140,7 +1142,7 @@ export default function RunPage() {
               )}
 
               {/* SoulGuide — kleine Vorschau; öffnet den einzigen Analyseort (SoulGuide-Tab) */}
-              <SoulGuidePreview data={guide} onOpen={() => setMainView('soulguide')} />
+              <SoulGuidePreview data={guide} report={coachReport} onOpen={() => setMainView('soulguide')} />
             </aside>
 
           </div>
