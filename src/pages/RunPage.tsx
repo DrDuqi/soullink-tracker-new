@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Plus, Link2, Copy, Check, ArrowLeft, Heart, Skull,
+  Plus, Link2, Copy, Check, ArrowLeft, Heart,
   LayoutGrid, List, Zap, Eye, Lock, Pencil, X, BookOpen, Archive, Sparkles,
 } from 'lucide-react'
 import { useRunStore } from '../store/runStore'
@@ -58,7 +58,7 @@ const LIVE_SURFACE = IN_COMPANION_WINDOW || import.meta.env.DEV
 import { usePresence } from '../hooks/usePresence'
 import { useCompanion } from '../hooks/useCompanion'
 import { useAuth } from '../contexts/AuthContext'
-import type { Encounter, Run, Player, SoulLinkPair, LinkRequest, ActivityLogEntry } from '../types/database'
+import type { Encounter, Run, Player, LinkRequest, ActivityLogEntry } from '../types/database'
 
 // ─── Small shared helpers ─────────────────────────────────────────────────────
 function PokeBall({ className = '' }: { className?: string }) {
@@ -80,72 +80,6 @@ function SectionLabel({ label, sub, className = '' }: { label: string; sub?: str
       {sub && <span className="text-slate-500 text-sm shrink-0">{sub}</span>}
       <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, #2e2e42, transparent)' }} />
     </div>
-  )
-}
-
-function PlayerStatCard({
-  player, isMe, isActive, encounters, pairs, teamCount, onClick, avatarUrl,
-}: {
-  player: Player | undefined
-  isMe: boolean
-  isActive: boolean
-  encounters: Encounter[]
-  pairs: SoulLinkPair[]
-  teamCount: number
-  onClick: () => void
-  avatarUrl?: string | null
-}) {
-  const alive = encounters.filter((e) => e.status === 'alive').length
-  const dead = encounters.filter((e) => e.status === 'dead').length
-
-  const accentColor = isMe ? '#CC0000' : '#FFCB05'
-
-  return (
-    <button
-      onClick={onClick}
-      className="rounded-2xl border p-5 lg:p-6 text-left transition-all duration-200 ease-out w-full group hover:-translate-y-0.5"
-      style={{
-        background: isActive ? `${accentColor}12` : '#1c1c26',
-        borderColor: isActive ? accentColor : '#2e2e42',
-        boxShadow: isActive ? `0 0 32px ${accentColor}26, inset 0 0 0 1px ${accentColor}20` : 'none',
-      }}
-    >
-      <div className="flex items-start gap-3 mb-4">
-        <ShinyAvatar src={avatarUrl} size={48} className="mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-white font-black text-lg leading-tight truncate">{player?.name ?? '…'}</span>
-            {isMe ? (
-              <span className="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0" style={{ background: '#CC000022', color: '#CC0000', border: '1px solid #CC000040' }}>
-                DU
-              </span>
-            ) : (
-              <span className="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 flex items-center gap-0.5" style={{ background: '#FFCB0518', color: '#FFCB05', border: '1px solid #FFCB0540' }}>
-                <Eye className="w-3 h-3" /> PARTNER
-              </span>
-            )}
-          </div>
-          {isActive && (
-            <div className="text-[11px] font-bold mt-1 flex items-center gap-1" style={{ color: accentColor }}>
-              {isMe ? '● Meine Ansicht – bearbeitbar' : <><Lock className="w-3 h-3" /> Partner-Ansicht (Read-only)</>}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 lg:gap-4 text-sm font-bold flex-wrap">
-        <span className="flex items-center gap-1.5 text-green-400">
-          <Heart className="w-4 h-4" />{alive}
-        </span>
-        <span className="flex items-center gap-1.5 text-red-400">
-          <Skull className="w-4 h-4" />{dead}
-        </span>
-        <span className="flex items-center gap-1.5 text-pk-red/60">
-          <Link2 className="w-4 h-4" />{pairs.length}
-        </span>
-        <span className="ml-auto text-slate-500 tabular-nums text-base">{teamCount}/6</span>
-      </div>
-    </button>
   )
 }
 
@@ -609,7 +543,6 @@ export default function RunPage() {
   }
 
   const myTeamCount = teamSlots.filter((s) => s.player_id === myPlayerId).length
-  const partnerTeamCount = partnerPlayer ? teamSlots.filter((s) => s.player_id === partnerPlayer.id).length : 0
 
   // ─ Encounter card renderer (with optional DnD reorder wrapper) ────────────
   function renderEnc(enc: Encounter, compact: boolean) {
@@ -706,6 +639,33 @@ export default function RunPage() {
                     <Zap className="w-3.5 h-3.5" />{pendingRequests.length} offen
                   </span>
                 )}
+
+                {/* Kompakte Online-Spielerleiste (aus dem Hero hierher) — Klick wechselt die Ansicht */}
+                <div className="hidden lg:flex items-center gap-1.5 mr-1">
+                  {([[myPlayer, true], [partnerPlayer, false]] as const).map(([p, isMe]) => {
+                    if (!p) return null
+                    const focused = isMyFocus === isMe
+                    const online = isMe || onlinePlayers.has(p.id)
+                    const alive = (isMe ? myEncounters : partnerEncounters).filter((e) => e.status === 'alive').length
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => setFocusedPlayerId(isMe ? (myPlayerId ?? null) : p.id)}
+                        title={`${p.name} · Ansicht wechseln`}
+                        className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl border transition-colors"
+                        style={{ background: focused ? 'rgba(204,0,0,0.14)' : '#1c1c26', borderColor: focused ? 'rgba(204,0,0,0.42)' : '#2e2e42' }}
+                      >
+                        <span className="relative shrink-0">
+                          <ShinyAvatar src={avatarOf(p)} size={22} />
+                          <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border-2 border-[#111116]" style={{ background: online ? '#4ade80' : '#64748b' }} />
+                        </span>
+                        <span className="text-xs font-bold text-slate-200 max-w-[84px] truncate hidden xl:block">{p.name}</span>
+                        <span className="flex items-center gap-0.5 text-[10px] font-bold text-green-400"><Heart className="w-3 h-3" />{alive}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
                 <button
                   onClick={copyShareCode}
                   className="flex items-center gap-1.5 text-xs font-mono font-bold px-3 py-2 rounded-xl transition-all border"
@@ -731,7 +691,7 @@ export default function RunPage() {
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px] 2xl:grid-cols-[minmax(0,1fr)_372px] gap-7 2xl:gap-8 items-start">
 
             {/* ░░ MAIN STAGE COLUMN — Inszenierung: Bühne → Team-Band → Konsole ░░ */}
-            <main className="min-w-0 space-y-8">
+            <main className="min-w-0 space-y-6">
 
               {/* Pending requests (only in my view) */}
               {isMyFocus && pendingRequests.length > 0 && myPlayerId && (
@@ -741,47 +701,39 @@ export default function RunPage() {
               {/* ░░ HERO — der Mittelpunkt: „Weiterspielen" + Run-Puls. Glasfläche ÜBER dem
                     Hintergrund-Galerie-Bild (kein eigenes Bild), hebt sich durch Glow/Licht ab. ░░ */}
               {isMyFocus && (
-                <section className="hero-glass anim-fade-up p-5 2xl:p-6">
-                  {/* Eyebrow · Kino-Titel · Status · Run-Puls — kompakt */}
-                  <div className="flex items-start justify-between gap-5 mb-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-pk-red text-[10px] font-black uppercase tracking-[0.3em] mb-2">
-                        <Zap className="w-3 h-3" /> Dein Abenteuer
+                <section className="hero-glass anim-fade-up p-4 2xl:p-5">
+                  {/* Kino-Titel · Status · Run-Puls — kompakt */}
+                  <div className="mb-3.5">
+                    {editingName ? (
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveRunName(); if (e.key === 'Escape') setEditingName(false) }} autoFocus maxLength={60} className="bg-[#16161f] border border-[#2e2e42] rounded-xl px-3 py-1.5 text-white font-black text-2xl outline-none focus:border-pk-red" />
+                        <button onClick={saveRunName} disabled={savingName} className="text-sm font-bold px-3 py-2 rounded-lg" style={{ background: '#CC0000', color: '#fff' }}>{savingName ? '…' : 'Speichern'}</button>
+                        <button onClick={() => setEditingName(false)} className="text-slate-500 hover:text-white p-1.5"><X className="w-5 h-5" /></button>
                       </div>
-                      {editingName ? (
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveRunName(); if (e.key === 'Escape') setEditingName(false) }} autoFocus maxLength={60} className="bg-[#16161f] border border-[#2e2e42] rounded-xl px-3 py-1.5 text-white font-black text-2xl outline-none focus:border-pk-red" />
-                          <button onClick={saveRunName} disabled={savingName} className="text-sm font-bold px-3 py-2 rounded-lg" style={{ background: '#CC0000', color: '#fff' }}>{savingName ? '…' : 'Speichern'}</button>
-                          <button onClick={() => setEditingName(false)} className="text-slate-500 hover:text-white p-1.5"><X className="w-5 h-5" /></button>
-                        </div>
-                      ) : (
-                        <h1 className="text-white font-black text-3xl 2xl:text-[2.5rem] leading-[1.05] tracking-tight flex items-center gap-2.5 group">
-                          <span className="truncate">{currentRun.name}</span>
-                          {isOwner && (
-                            <button onClick={() => { setNameDraft(currentRun.name); setEditingName(true) }} className="text-slate-600 hover:text-slate-300 transition-all opacity-0 group-hover:opacity-100 shrink-0" title="Run-Namen ändern"><Pencil className="w-4 h-4" /></button>
-                          )}
-                        </h1>
-                      )}
-                      <div className="flex items-center gap-2.5 mt-2 text-sm">
-                        <button onClick={() => isOwner && setShowEditEdition(true)} className="font-bold text-slate-200 flex items-center gap-1.5 hover:text-white transition-colors">{currentRun.game}{isOwner && <Pencil className="w-3 h-3 text-slate-500" />}</button>
-                        <span className="text-slate-600">·</span>
-                        <button onClick={() => isMember && setShowModeModal(true)} className="font-bold flex items-center gap-2 transition-colors" style={{ color: liveSyncMode ? '#4ade80' : '#94a3b8' }}>
-                          <span className={liveSyncMode ? 'ls-radar' : ''} style={{ width: 8, height: 8, borderRadius: 999, background: liveSyncMode ? '#4ade80' : '#64748b', display: 'inline-block' }} />
-                          {liveSyncMode ? 'Live-Sync' : 'Manueller Tracker'}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-2.5 shrink-0">
+                    ) : (
+                      <h1 className="text-white font-black text-2xl 2xl:text-3xl leading-tight tracking-tight flex items-center gap-2 group">
+                        <span className="truncate">{currentRun.name}</span>
+                        {isOwner && (
+                          <button onClick={() => { setNameDraft(currentRun.name); setEditingName(true) }} className="text-slate-600 hover:text-slate-300 transition-all opacity-0 group-hover:opacity-100 shrink-0" title="Run-Namen ändern"><Pencil className="w-4 h-4" /></button>
+                        )}
+                      </h1>
+                    )}
+                    {/* Edition · Modus · Run-Puls — alles in EINER dünnen Zeile (keine großen KPI-Karten) */}
+                    <div className="flex items-center gap-x-3 gap-y-1.5 flex-wrap mt-2 text-sm">
+                      <button onClick={() => isOwner && setShowEditEdition(true)} className="font-bold text-slate-200 flex items-center gap-1.5 hover:text-white transition-colors">{currentRun.game}{isOwner && <Pencil className="w-3 h-3 text-slate-500" />}</button>
+                      <span className="text-slate-600">·</span>
+                      <button onClick={() => isMember && setShowModeModal(true)} className="font-bold flex items-center gap-2 transition-colors" style={{ color: liveSyncMode ? '#4ade80' : '#94a3b8' }}>
+                        <span className={liveSyncMode ? 'ls-radar' : ''} style={{ width: 8, height: 8, borderRadius: 999, background: liveSyncMode ? '#4ade80' : '#64748b', display: 'inline-block' }} />
+                        {liveSyncMode ? 'Live-Sync' : 'Manuell'}
+                      </button>
+                      <span className="w-px h-3.5 bg-white/10 hidden sm:block" />
                       {[
                         { label: 'Team', value: `${myTeamCount}/6`, color: '#e2e8f0' },
                         { label: 'Gefangen', value: myEncounters.length, color: '#e2e8f0' },
                         { label: 'Am Leben', value: myEncounters.filter((e) => e.status === 'alive').length, color: '#4ade80' },
                         { label: 'SoulLinks', value: is3 ? groups.length : pairs.length, color: '#ff6b6b' },
                       ].map((s) => (
-                        <div key={s.label} className="hero-stat rounded-xl px-3.5 py-2 text-center min-w-[74px]" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}>
-                          <div className="font-black text-xl 2xl:text-2xl tabular-nums leading-none" style={{ color: s.color }}>{s.value}</div>
-                          <div className="text-slate-500 text-[9px] font-bold uppercase tracking-wider mt-1">{s.label}</div>
-                        </div>
+                        <span key={s.label} className="text-xs tabular-nums"><span className="font-black" style={{ color: s.color }}>{s.value}</span> <span className="text-slate-500">{s.label}</span></span>
                       ))}
                     </div>
                   </div>
@@ -1085,11 +1037,7 @@ export default function RunPage() {
                   konkurriert aber nie mit der Mitte: Spieler · Checkliste · Protokoll · Coach ░░ */}
             <aside className="min-w-0 xl:sticky xl:top-[4.75rem] xl:max-h-[calc(100vh_-_5.5rem)] xl:overflow-y-auto space-y-4 anim-fade-up delay-2">
 
-              {/* Spieler */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3">
-                <PlayerStatCard player={myPlayer} isMe isActive={isMyFocus} encounters={myEncounters} pairs={pairs} teamCount={myTeamCount} avatarUrl={avatarOf(myPlayer)} onClick={() => setFocusedPlayerId(myPlayerId ?? null)} />
-                <PlayerStatCard player={partnerPlayer} isMe={false} isActive={!isMyFocus} encounters={partnerEncounters} pairs={pairs} teamCount={partnerTeamCount} avatarUrl={avatarOf(partnerPlayer)} onClick={() => setFocusedPlayerId(partnerPlayer?.id ?? null)} />
-              </div>
+              {/* Spieler-Fokuskarten sind in die kompakte Header-Online-Leiste gewandert. */}
               <PlayersPanel
                 players={players}
                 maxPlayers={maxPlayers}
