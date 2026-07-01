@@ -26,7 +26,7 @@ export default function TeamPanel({
   const orderedPlayers = [myPlayer, partnerPlayer].filter(Boolean) as Player[]
 
   return (
-    <div className="grid gap-4" style={{ gridTemplateColumns: '3fr 2fr' }}>
+    <div className="grid grid-cols-1 gap-5">
       {orderedPlayers.map((player) => {
         const isMe = player.id === myPlayerId
         const playerSlots = teamSlots.filter((s) => s.player_id === player.id)
@@ -256,8 +256,8 @@ function PlayerTeam({
         <span className="text-slate-500 text-xs">{slots.length}/6</span>
       </div>
 
-      {/* 6 slots */}
-      <div className="grid grid-cols-3 gap-3 p-4">
+      {/* 6 slots — horizontal roster band on wide screens */}
+      <div className="grid grid-cols-3 xl:grid-cols-6 gap-3 p-4">
         {[1, 2, 3, 4, 5, 6].map((pos) => {
           const slot = slots.find((s) => s.slot_position === pos)
           const enc = slot ? encounters.find((e) => e.id === slot.encounter_id) : null

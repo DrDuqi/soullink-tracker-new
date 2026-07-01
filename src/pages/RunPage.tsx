@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Plus, Link2, Copy, Check, ArrowLeft, Heart, Skull,
-  LayoutGrid, List, Zap, Eye, Lock, Pencil, Gamepad2, X, BookOpen, Archive,
+  LayoutGrid, List, Zap, Eye, Lock, Pencil, X, BookOpen, Archive, BarChart3,
 } from 'lucide-react'
 import { useRunStore } from '../store/runStore'
 import { useEncounters, useReorderEncounters, useUpdateEncounterStatus } from '../hooks/useEncounters'
@@ -200,7 +200,7 @@ export default function RunPage() {
   const [showSoulLink, setShowSoulLink] = useState(false)
   const [copied, setCopied] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [mainView, setMainView] = useState<'encounters' | 'pairs' | 'box' | 'story'>('encounters')
+  const [mainView, setMainView] = useState<'encounters' | 'pairs' | 'box' | 'story' | 'stats'>('encounters')
   const [selectedEncounter, setSelectedEncounter] = useState<Encounter | null>(null)
   const [slotPickerEncounter, setSlotPickerEncounter] = useState<Encounter | null>(null)
   const [dragOverEncId, setDragOverEncId] = useState<string | null>(null)
@@ -663,53 +663,7 @@ export default function RunPage() {
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <PokeBall className="w-7 h-7 text-pk-red hidden sm:block" />
-                <div>
-                  {editingName ? (
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        value={nameDraft}
-                        onChange={(e) => setNameDraft(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') saveRunName(); if (e.key === 'Escape') setEditingName(false) }}
-                        autoFocus
-                        maxLength={60}
-                        className="bg-[#16161f] border border-[#2e2e42] rounded-lg px-2 py-1 text-white font-bold text-base outline-none focus:border-pk-red"
-                      />
-                      <button onClick={saveRunName} disabled={savingName} className="text-xs font-bold px-2 py-1.5 rounded-lg" style={{ background: '#CC0000', color: '#fff' }}>{savingName ? '…' : 'Speichern'}</button>
-                      <button onClick={() => setEditingName(false)} className="text-slate-500 hover:text-white p-1.5"><X className="w-4 h-4" /></button>
-                    </div>
-                  ) : (
-                    <h1 className="text-white font-black text-xl leading-tight flex items-center gap-1.5">
-                      {currentRun.name}
-                      {isOwner && (
-                        <button onClick={() => { setNameDraft(currentRun.name); setEditingName(true) }} className="text-slate-600 hover:text-slate-300 transition-colors" title="Run-Namen ändern">
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                      )}
-                    </h1>
-                  )}
-                  <div className="flex items-center gap-2">
-                    {isOwner ? (
-                      <button
-                        onClick={() => setShowEditEdition(true)}
-                        className="text-slate-500 hover:text-slate-200 text-xs font-medium flex items-center gap-1 transition-colors"
-                        title="Run-Edition ändern"
-                      >
-                        {currentRun.game} <Pencil className="w-3 h-3" />
-                      </button>
-                    ) : (
-                      <div className="text-slate-500 text-xs font-medium">{currentRun.game}</div>
-                    )}
-                    {isMember && (
-                      <button
-                        onClick={() => setShowModeModal(true)}
-                        className="text-slate-500 hover:text-slate-200 text-xs font-medium flex items-center gap-1 transition-colors"
-                        title="Spielmodus ändern"
-                      >
-                        · {liveSyncMode ? <><Zap className="w-3 h-3" /> Live-Sync</> : <><Gamepad2 className="w-3 h-3" /> Manuell</>}
-                      </button>
-                    )}
-                  </div>
-                </div>
+                <button onClick={() => navigate('/')} className="text-slate-400 hover:text-white text-sm font-bold transition-colors">Zur Übersicht</button>
               </div>
 
               <div className="flex items-center gap-2">
@@ -741,37 +695,10 @@ export default function RunPage() {
               that made the middle feel small and the left too wide). min-w-0 children +
               wrapping content prevent overflow. Below 2xl, safe fixed side columns. */}
         <div className="flex-1 w-full px-6 2xl:px-8 pt-6 pb-10">
-          <div className="grid grid-cols-1 xl:grid-cols-[270px_minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,18fr)_minmax(0,62fr)_minmax(0,20fr)] gap-7 2xl:gap-9 items-start">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px] 2xl:grid-cols-[minmax(0,1fr)_372px] gap-7 2xl:gap-8 items-start">
 
-            {/* ░░ LEFT SIDEBAR — Run-Protokoll + permanenter Team-Coach ░░ */}
-            <aside className="order-2 xl:order-1 min-w-0 xl:sticky xl:top-[4.75rem] xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-5">
-              {myPlayerId && (
-                <ActivityFeed
-                  runId={currentRun.id}
-                  players={players}
-                  myPlayerId={myPlayerId}
-                  collapsible
-                  defaultOpen
-                />
-              )}
-
-              {/* Permanenter Team-Coach — immer offen, läuft live mit */}
-              <TeamAnalysisPanel
-                runId={currentRun.id}
-                game={currentRun.game}
-                players={players}
-                myPlayerId={myPlayerId ?? ''}
-                encounters={encounters as Encounter[]}
-                teamSlots={teamSlots}
-                soulLinkPairs={is3 ? [] : pairs}
-                onSelectEncounter={(enc) => setSelectedEncounter(enc)}
-                useLiveTeam
-                defaultOpen
-              />
-            </aside>
-
-            {/* ░░ CENTER — der eigentliche Spielbereich (Hero → Team → Encounter → Box) ░░ */}
-            <main className="order-1 xl:order-2 min-w-0 space-y-8">
+            {/* ░░ MAIN STAGE COLUMN — Inszenierung: Bühne → Team-Band → Konsole ░░ */}
+            <main className="min-w-0 space-y-8">
 
               {/* Pending requests (only in my view) */}
               {isMyFocus && pendingRequests.length > 0 && myPlayerId && (
@@ -782,25 +709,45 @@ export default function RunPage() {
                     Hintergrund-Galerie-Bild (kein eigenes Bild), hebt sich durch Glow/Licht ab. ░░ */}
               {isMyFocus && (
                 <section className="hero-glass anim-fade-up p-6 2xl:p-8">
-                  {/* Eyebrow · Titel · Run-Puls */}
-                  <div className="flex items-start justify-between gap-5 mb-6">
+                  {/* Eyebrow · großer Kino-Titel · Status · Run-Puls */}
+                  <div className="flex items-start justify-between gap-6 mb-7">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-pk-red text-[11px] font-black uppercase tracking-[0.25em] mb-2">
+                      <div className="flex items-center gap-2 text-pk-red text-[11px] font-black uppercase tracking-[0.3em] mb-3">
                         <Zap className="w-3.5 h-3.5" /> Dein Abenteuer
                       </div>
-                      <h2 className="text-white font-black text-2xl 2xl:text-[1.75rem] leading-tight truncate">{currentRun.name}</h2>
-                      <div className="text-slate-400 text-sm font-medium mt-1">{currentRun.game} · {liveSyncMode ? 'Live-Sync' : 'Manueller Tracker'}</div>
+                      {editingName ? (
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveRunName(); if (e.key === 'Escape') setEditingName(false) }} autoFocus maxLength={60} className="bg-[#16161f] border border-[#2e2e42] rounded-xl px-3 py-2 text-white font-black text-3xl outline-none focus:border-pk-red" />
+                          <button onClick={saveRunName} disabled={savingName} className="text-sm font-bold px-3 py-2 rounded-lg" style={{ background: '#CC0000', color: '#fff' }}>{savingName ? '…' : 'Speichern'}</button>
+                          <button onClick={() => setEditingName(false)} className="text-slate-500 hover:text-white p-2"><X className="w-5 h-5" /></button>
+                        </div>
+                      ) : (
+                        <h1 className="text-white font-black text-4xl 2xl:text-[3.25rem] leading-[1.04] tracking-tight flex items-center gap-3 group">
+                          <span className="truncate">{currentRun.name}</span>
+                          {isOwner && (
+                            <button onClick={() => { setNameDraft(currentRun.name); setEditingName(true) }} className="text-slate-600 hover:text-slate-300 transition-all opacity-0 group-hover:opacity-100 shrink-0" title="Run-Namen ändern"><Pencil className="w-5 h-5" /></button>
+                          )}
+                        </h1>
+                      )}
+                      <div className="flex items-center gap-3 mt-3.5 text-sm">
+                        <button onClick={() => isOwner && setShowEditEdition(true)} className="font-bold text-slate-200 flex items-center gap-1.5 hover:text-white transition-colors">{currentRun.game}{isOwner && <Pencil className="w-3 h-3 text-slate-500" />}</button>
+                        <span className="text-slate-600">·</span>
+                        <button onClick={() => isMember && setShowModeModal(true)} className="font-bold flex items-center gap-2 transition-colors" style={{ color: liveSyncMode ? '#4ade80' : '#94a3b8' }}>
+                          <span className={liveSyncMode ? 'ls-radar' : ''} style={{ width: 9, height: 9, borderRadius: 999, background: liveSyncMode ? '#4ade80' : '#64748b', display: 'inline-block' }} />
+                          {liveSyncMode ? 'Live-Sync' : 'Manueller Tracker'}
+                        </button>
+                      </div>
                     </div>
-                    <div className="hidden md:grid grid-cols-4 gap-2.5 shrink-0">
+                    <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
                       {[
                         { label: 'Team', value: `${myTeamCount}/6`, color: '#e2e8f0' },
                         { label: 'Gefangen', value: myEncounters.length, color: '#e2e8f0' },
                         { label: 'Am Leben', value: myEncounters.filter((e) => e.status === 'alive').length, color: '#4ade80' },
                         { label: 'SoulLinks', value: is3 ? groups.length : pairs.length, color: '#ff6b6b' },
                       ].map((s) => (
-                        <div key={s.label} className="hero-stat rounded-xl px-4 py-2.5 text-center min-w-[80px]" style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                          <div className="font-black text-xl 2xl:text-2xl tabular-nums leading-none" style={{ color: s.color }}>{s.value}</div>
-                          <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mt-1.5">{s.label}</div>
+                        <div key={s.label} className="hero-stat rounded-2xl px-5 py-3.5 text-center min-w-[92px]" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                          <div className="font-black text-2xl 2xl:text-3xl tabular-nums leading-none" style={{ color: s.color }}>{s.value}</div>
+                          <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mt-2">{s.label}</div>
                         </div>
                       ))}
                     </div>
@@ -929,6 +876,7 @@ export default function RunPage() {
                       { key: 'pairs', icon: <Link2 className="w-4 h-4" />, label: 'SoulLinks', count: is3 ? groups.length : pairs.length },
                       { key: 'box', icon: <Archive className="w-4 h-4" />, label: 'Box', count: focusedEncounters.filter((e) => e.status === 'boxed').length },
                       { key: 'story', icon: <BookOpen className="w-4 h-4" />, label: 'Story', count: null },
+                      { key: 'stats', icon: <BarChart3 className="w-4 h-4" />, label: 'Statistik', count: null },
                     ] as const).map((t) => {
                       const active = mainView === t.key
                       return (
@@ -1016,6 +964,25 @@ export default function RunPage() {
                   <StoryGuide runGame={currentRun?.game ?? null} caughtLocations={storyCaughtLocations} />
                 )}
 
+                {/* STATISTIK view — Zahlen + Typ-Effektivität (aus dem Dock hierher) */}
+                {mainView === 'stats' && (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-3 gap-4">
+                      {[
+                        { v: fAlive, label: 'Am Leben', color: '#4ade80' },
+                        { v: fDead, label: 'Besiegt', color: '#f87171' },
+                        { v: fBoxed, label: 'In Box', color: '#FFCB05' },
+                      ].map((s) => (
+                        <div key={s.label} className="rounded-2xl border border-[#2e2e42] py-6 text-center" style={{ background: '#161620' }}>
+                          <div className="font-black text-4xl tabular-nums leading-none" style={{ color: s.color }}>{s.v}</div>
+                          <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mt-2">{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <TypeEffectChart defaultOpen />
+                  </div>
+                )}
+
                 {/* PAIRS view */}
                 {mainView === 'pairs' && (
                   <div className="space-y-4">
@@ -1092,16 +1059,15 @@ export default function RunPage() {
               </div>
             </main>
 
-            {/* ░░ RIGHT SIDEBAR — unterstützend: Spieler · Checkliste · Typen · Statistik ░░ */}
-            <aside className="order-3 min-w-0 xl:sticky xl:top-[4.75rem] xl:max-h-[calc(100vh_-_6rem)] xl:overflow-y-auto space-y-5">
+            {/* ░░ DOCK — schlanke, dauerhaft sichtbare Info-Leiste. Begleitet das Spiel,
+                  konkurriert aber nie mit der Mitte: Spieler · Checkliste · Protokoll · Coach ░░ */}
+            <aside className="min-w-0 xl:sticky xl:top-[4.75rem] xl:max-h-[calc(100vh_-_5.5rem)] xl:overflow-y-auto space-y-4 anim-fade-up delay-2">
 
-              {/* Spieler-Fokus (ich ↔ Partner) — unterstützend, daher rechts */}
+              {/* Spieler */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3">
                 <PlayerStatCard player={myPlayer} isMe isActive={isMyFocus} encounters={myEncounters} pairs={pairs} teamCount={myTeamCount} avatarUrl={avatarOf(myPlayer)} onClick={() => setFocusedPlayerId(myPlayerId ?? null)} />
                 <PlayerStatCard player={partnerPlayer} isMe={false} isActive={!isMyFocus} encounters={partnerEncounters} pairs={pairs} teamCount={partnerTeamCount} avatarUrl={avatarOf(partnerPlayer)} onClick={() => setFocusedPlayerId(partnerPlayer?.id ?? null)} />
               </div>
-
-              {/* Run roster + online status */}
               <PlayersPanel
                 players={players}
                 maxPlayers={maxPlayers}
@@ -1111,7 +1077,7 @@ export default function RunPage() {
                 avatars={memberAvatars}
               />
 
-              {/* Encounter checklist (3-Spieler: eigene N-Spieler-Variante) */}
+              {/* Encounter-Checkliste */}
               {is3 ? (
                 <RouteChecklist3
                   game={currentRun.game}
@@ -1148,30 +1114,24 @@ export default function RunPage() {
                 />
               )}
 
-              {/* Type effectiveness */}
-              <TypeEffectChart collapsible defaultOpen />
+              {/* Run-Protokoll */}
+              {myPlayerId && (
+                <ActivityFeed runId={currentRun.id} players={players} myPlayerId={myPlayerId} collapsible defaultOpen />
+              )}
 
-              {/* Quick stats for the focused player */}
-              <div className="rounded-2xl border border-[#2e2e42] overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3" style={{ background: '#1c1c26' }}>
-                  <span className="text-slate-200 text-xs font-black uppercase tracking-widest">Statistik</span>
-                  <span className="text-slate-600 text-[10px] truncate">{focusedPlayer?.name ?? ''}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 p-3 text-center" style={{ background: '#161620' }}>
-                  <div>
-                    <div className="text-green-400 font-black text-lg">{fAlive}</div>
-                    <div className="text-slate-600 text-[10px] font-bold">Am Leben</div>
-                  </div>
-                  <div>
-                    <div className="text-red-400 font-black text-lg">{fDead}</div>
-                    <div className="text-slate-600 text-[10px] font-bold">Besiegt</div>
-                  </div>
-                  <div>
-                    <div className="text-pk-yellow font-black text-lg">{fBoxed}</div>
-                    <div className="text-slate-600 text-[10px] font-bold">In Box</div>
-                  </div>
-                </div>
-              </div>
+              {/* Team-Coach — läuft live mit */}
+              <TeamAnalysisPanel
+                runId={currentRun.id}
+                game={currentRun.game}
+                players={players}
+                myPlayerId={myPlayerId ?? ''}
+                encounters={encounters as Encounter[]}
+                teamSlots={teamSlots}
+                soulLinkPairs={is3 ? [] : pairs}
+                onSelectEncounter={(enc) => setSelectedEncounter(enc)}
+                useLiveTeam
+                defaultOpen
+              />
             </aside>
 
           </div>
