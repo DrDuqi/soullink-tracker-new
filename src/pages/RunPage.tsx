@@ -865,6 +865,7 @@ export default function RunPage() {
                   players={players}
                   myPlayerId={myPlayerId ?? ''}
                   game={currentRun.game}
+                  soulLinkPairs={pairs}
                   onSelectEncounter={(e) => setSelectedEncounter(e)}
                   onImport={(p, route) => { setEmuPrefill(p); setAddEncounterRoute(route); setShowAddEncounter(true) }}
                 />

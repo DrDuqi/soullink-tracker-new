@@ -7,7 +7,10 @@ import { useEmuTeamStore } from '../store/emuTeamStore'
 import { deriveTeamGroups } from '../lib/teamGroups'
 import { buildLivePrefill, type EncounterPrefill } from '../lib/liveSync'
 import type { EmulatorMon } from '../lib/emulatorSync'
-import type { Encounter, Player, TeamSlot } from '../types/database'
+import type { Encounter, Player, TeamSlot, SoulLinkPair } from '../types/database'
+
+// Distinct, stable colours so a SoulLink pair shares ONE colour across both teams.
+const PAIR_COLORS = ['#f472b6', '#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#22d3ee', '#fb923c', '#a3e635']
 
 function Label({ icon, text, count, color = '#94a3b8' }: { icon: React.ReactNode; text: string; count: number; color?: string }) {
   return (
@@ -91,16 +94,35 @@ interface Props {
   players: Player[]
   myPlayerId: string
   game: string
+  soulLinkPairs: SoulLinkPair[]
   onSelectEncounter: (enc: Encounter) => void
   onImport: (prefill: EncounterPrefill, route?: string) => void
 }
 
+interface MonLinkInfo { pairId: string; partnerName: string; broken: boolean; color: string }
+
 // The single "Mein Team" surface: the live party (source of truth when connected),
 // with ghost slots for party mons not yet imported. Box / Besiegt live in the Box tab.
-export default function TeamOverview({ myEncounters, partnerEncounters, teamSlots, players, myPlayerId, game, onSelectEncounter, onImport }: Props) {
+// SoulLinks are shown ONLY as a visual connection — teams are never mixed.
+export default function TeamOverview({ myEncounters, partnerEncounters, teamSlots, players, myPlayerId, game, soulLinkPairs, onSelectEncounter, onImport }: Props) {
   const { team: liveTeam, connected, game: emuGame, currentLocationName, currentLocationId } = useEmuTeamStore()
   const mismatch = isGameMismatch(game, emuGame)
   const partner = players.find((p) => p.id !== myPlayerId)
+  const [hoveredPairId, setHoveredPairId] = useState<string | null>(null)
+
+  // Resolve an encounter's SoulLink partner (name + shared colour + broken state) for the card.
+  const linkFor = (enc: Encounter): MonLinkInfo | undefined => {
+    const idx = soulLinkPairs.findIndex((p) => p.encounter1.id === enc.id || p.encounter2.id === enc.id)
+    if (idx < 0) return undefined
+    const p = soulLinkPairs[idx]
+    const other = p.encounter1.id === enc.id ? p.encounter2 : p.encounter1
+    return {
+      pairId: p.id,
+      partnerName: other.nickname ?? other.pokemon_name,
+      broken: enc.status === 'dead' || other.status === 'dead',
+      color: PAIR_COLORS[idx % PAIR_COLORS.length],
+    }
+  }
 
   const { team: teamEncs, liveByPid } = deriveTeamGroups(myEncounters, teamSlots, myPlayerId, liveTeam, connected)
   const partnerSlotEncIds = new Set(teamSlots.filter((s) => partner && s.player_id === partner.id).map((s) => s.encounter_id))
@@ -151,7 +173,19 @@ export default function TeamOverview({ myEncounters, partnerEncounters, teamSlot
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {displaySlots.map((slot) => {
             if (slot.type === 'enc') {
-              return <RunMonCard key={slot.enc.id} enc={slot.enc} mon={slot.mon} size="lg" onClick={() => onSelectEncounter(slot.enc)} />
+              const lk = linkFor(slot.enc)
+              return (
+                <RunMonCard
+                  key={slot.enc.id}
+                  enc={slot.enc}
+                  mon={slot.mon}
+                  size="lg"
+                  onClick={() => onSelectEncounter(slot.enc)}
+                  link={lk}
+                  highlighted={!!lk && hoveredPairId === lk.pairId}
+                  onHover={(h) => { if (lk) setHoveredPairId(h ? lk.pairId : null) }}
+                />
+              )
             }
             if (slot.type === 'ghost') {
               return <GhostSlot key={`ghost-${slot.mon.slot}`} mon={slot.mon} game={game} currentLocationName={currentLocationName} currentLocationId={currentLocationId} suppressLocation={mismatch} onImport={onImport} />
@@ -174,9 +208,19 @@ export default function TeamOverview({ myEncounters, partnerEncounters, teamSlot
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {partnerTeam.slice(0, 6).map((e) => (
-              <RunMonCard key={e.id} enc={e} onClick={() => onSelectEncounter(e)} />
-            ))}
+            {partnerTeam.slice(0, 6).map((e) => {
+              const lk = linkFor(e)
+              return (
+                <RunMonCard
+                  key={e.id}
+                  enc={e}
+                  onClick={() => onSelectEncounter(e)}
+                  link={lk}
+                  highlighted={!!lk && hoveredPairId === lk.pairId}
+                  onHover={(h) => { if (lk) setHoveredPairId(h ? lk.pairId : null) }}
+                />
+              )
+            })}
           </div>
         )}
       </div>

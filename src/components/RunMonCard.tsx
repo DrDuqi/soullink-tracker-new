@@ -1,17 +1,28 @@
 import { useEffect, useState } from 'react'
-import { MapPin } from 'lucide-react'
+import { MapPin, Link2 } from 'lucide-react'
 import { getSpriteUrl, getTypeColor, fetchItemName, TYPE_NAMES_DE } from '../lib/pokemon-api'
 import type { EmulatorMon } from '../lib/emulatorSync'
 import type { Encounter } from '../types/database'
 
 // ONE card design for team / box / defeated Pokémon — so box mons never feel "second class".
 // `mon` (live emulator data) is optional: present for the current party (adds Lv + HP bar),
-// absent for box / defeated mons.
+// absent for box / defeated mons. `link` shows the SoulLink partner (never mixes teams — it's
+// only a visual connection); `highlighted` lights up both cards of a pair on hover.
 const STATUS_COLOR: Record<string, string> = { alive: '#4ade80', dead: '#f87171', boxed: '#fbbf24', missing: '#94a3b8' }
 const STATUS_DE: Record<string, string> = { alive: 'Am Leben', dead: 'Besiegt', boxed: 'In Box', missing: 'Vermisst' }
 const typeDe = (t: string) => TYPE_NAMES_DE[t] ?? t
 
-export default function RunMonCard({ enc, mon, onClick, size = 'md' }: { enc: Encounter; mon?: EmulatorMon; onClick?: () => void; size?: 'md' | 'lg' }) {
+export interface MonLink { partnerName: string; broken: boolean; color: string }
+
+export default function RunMonCard({ enc, mon, onClick, size = 'md', link, highlighted, onHover }: {
+  enc: Encounter
+  mon?: EmulatorMon
+  onClick?: () => void
+  size?: 'md' | 'lg'
+  link?: MonLink
+  highlighted?: boolean
+  onHover?: (hovering: boolean) => void
+}) {
   const [item, setItem] = useState<string | null>(null)
   useEffect(() => {
     let c = false
@@ -25,12 +36,19 @@ export default function RunMonCard({ enc, mon, onClick, size = 'md' }: { enc: En
   const dead = enc.status === 'dead'
   const lg = size === 'lg'
   const status = STATUS_COLOR[enc.status] ?? '#94a3b8'
+  const borderCol = highlighted ? (link?.color ?? '#ffffff') : link && !dead ? `${link.color}66` : dead ? '#4a1a1a' : '#2e2e42'
 
   return (
     <button
       onClick={onClick}
+      onMouseEnter={() => onHover?.(true)}
+      onMouseLeave={() => onHover?.(false)}
       className={`rounded-2xl border text-left transition-all duration-200 w-full group hover:-translate-y-0.5 ${lg ? 'p-4' : 'p-3.5'} ${dead ? 'opacity-70' : ''}`}
-      style={{ background: dead ? '#1a1016' : '#1c1c26', borderColor: dead ? '#4a1a1a' : '#2e2e42' }}
+      style={{
+        background: dead ? '#1a1016' : '#1c1c26',
+        borderColor: borderCol,
+        boxShadow: highlighted ? `0 0 0 1px ${link?.color ?? '#fff'}, 0 12px 32px -14px ${link?.color ?? '#ffffff'}88` : undefined,
+      }}
     >
       {enc.types && enc.types.length > 0 && (
         <div className="h-1.5 rounded-full mb-3" style={{ background: enc.types.length === 2 ? `linear-gradient(90deg,${getTypeColor(enc.types[0])} 50%,${getTypeColor(enc.types[1])} 50%)` : getTypeColor(enc.types[0]) }} />
@@ -50,6 +68,13 @@ export default function RunMonCard({ enc, mon, onClick, size = 'md' }: { enc: En
           </div>
         </div>
       </div>
+
+      {link && (
+        <div className="flex items-center gap-1.5 mt-2.5 text-[11px] font-bold" style={{ color: link.broken ? '#f87171' : link.color }}>
+          <Link2 className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">{link.broken ? `Link betroffen · ${link.partnerName}` : `Verlinkt mit ${link.partnerName}`}</span>
+        </div>
+      )}
 
       {mon && (
         <div className="mt-3 flex items-center gap-2">

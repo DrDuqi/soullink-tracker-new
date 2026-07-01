@@ -36,6 +36,16 @@ export default function SoulLinkPairCard({ pair, myPlayerId, players, hasPending
   const [confirmUnlink, setConfirmUnlink] = useState(false)
   const { encounter1: e1, encounter2: e2 } = pair
   const bothDead = e1.status === 'dead' && e2.status === 'dead'
+  const anyDead = e1.status === 'dead' || e2.status === 'dead'
+  const fallen = e1.status === 'dead' ? e1 : e2
+  const survivor = e1.status === 'dead' ? e2 : e1
+  const statusInfo = bothDead
+    ? { label: 'Link gebrochen · beide besiegt', color: '#f87171' }
+    : anyDead
+      ? { label: `${fallen.nickname ?? fallen.pokemon_name} besiegt · ${survivor.nickname ?? survivor.pokemon_name} betroffen`, color: '#fbbf24' }
+      : (e1.status === 'alive' && e2.status === 'alive')
+        ? { label: 'Beide am Leben', color: '#4ade80' }
+        : { label: 'Aktiv', color: '#94a3b8' }
 
   const myPlayer = players.find((p) => p.id === myPlayerId)
   const partnerPlayer = players.find((p) => p.id !== myPlayerId)
@@ -114,6 +124,16 @@ export default function SoulLinkPairCard({ pair, myPlayerId, players, hasPending
             </button>
           )}
         </div>
+      </div>
+
+      {/* Klarer Paar-Status: Name ↔ Name · Status */}
+      <div className="flex items-center gap-2 px-5 pt-3 text-sm flex-wrap">
+        <span className="text-white font-black capitalize">{e1.nickname ?? e1.pokemon_name}</span>
+        <span className="font-black text-pk-red">↔</span>
+        <span className="text-white font-black capitalize">{e2.nickname ?? e2.pokemon_name}</span>
+        <span className="ml-auto text-[11px] font-black px-2.5 py-0.5 rounded-full" style={{ color: statusInfo.color, background: `${statusInfo.color}1e`, border: `1px solid ${statusInfo.color}44` }}>
+          {statusInfo.label}
+        </span>
       </div>
 
       {/* Route warning */}
